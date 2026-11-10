@@ -1,0 +1,21 @@
+# Producción detrás de Cloudflare Tunnel. Se usa junto con docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.produccion.yml up -d --build
+# Solo el frontend sale a Internet, y únicamente a través del túnel (conexión saliente; no se abre ningún puerto).
+# La API y PostgreSQL no publican puertos: viven en la red privada de Compose.
+services:
+  db:
+    ports: !reset []
+  api:
+    ports: !reset []
+  web:
+    # Solo loopback del servidor, para comprobaciones locales; el túnel entra por la red de Compose (web:3310).
+    ports:
+      - "127.0.0.1:${SGRED_WEB_PUERTO:-3310}:3310"
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?defina CLOUDFLARE_TUNNEL_TOKEN en el .env del servidor}
+    depends_on:
+      - web

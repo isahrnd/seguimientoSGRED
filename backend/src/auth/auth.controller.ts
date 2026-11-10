@@ -19,7 +19,9 @@ export class AuthController {
   @HttpCode(200)
   async login(@Body() body: any, @Req() req: any, @Res({ passthrough: true }) res: any) {
     aplicarCabecerasPrivadas(res);
-    const r = await this.auth.iniciar(body?.correo, body?.password, req.ip ?? 'ip');
+    // Detrás del túnel de Cloudflare la IP real llega en CF-Connecting-IP; sin ella, la del socket.
+    const ip = String(req.headers?.['cf-connecting-ip'] ?? req.ip ?? 'ip');
+    const r = await this.auth.iniciar(body?.correo, body?.password, ip);
     res.cookie(COOKIE_SESION, r.token, { ...opcionesCookie(), maxAge: horasSesion() * 3_600_000 });
     return { usuario: r.usuario };
   }
