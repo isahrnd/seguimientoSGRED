@@ -82,6 +82,43 @@ export function detectarFirma(paginas: string[]): FirmaContrato {
   return { estado: 'SIN_EVIDENCIA_DE_FIRMA', detalle: 'Faltan las marcas de firma electrónica de ambas partes o la constancia de suscripción en SECOP II.', fecha, pagina: null };
 }
 
+/**
+ * Algunos PDF parten palabras al extraer el texto («Contra tar», «transpor te»). Se unen solo cuando la palabra completa aparece
+ * escrita sin partir en otro lugar del mismo documento (el propio contrato actúa como diccionario).
+ */
+const PALABRAS_BASE = new Set(['contratar', 'contratista', 'contratante', 'contrato', 'transporte', 'oxicorte', 'terremoto', 'urgencia', 'escombros', 'maquinaria', 'especializado', 'alquiler', 'edificaciones', 'afectadas', 'calamidad', 'concreto', 'concretos']);
+
+export function repararPalabrasPartidas(texto: string, paginas: string[]): string {
+  const conteo = new Map<string, number>();
+  for (const w of paginas.join(' ').toLowerCase().match(/[a-záéíóúñ]{5,}/g) ?? []) conteo.set(w, (conteo.get(w) ?? 0) + 1);
+  const partes = texto.split(' ');
+  const out: string[] = [];
+  for (let i = 0; i < partes.length; i++) {
+    const a = partes[i];
+    const b = partes[i + 1];
+    if (b && /^[A-Za-zÁÉÍÓÚáéíóúñÑ]{2,}$/.test(a) && /^[A-Za-zÁÉÍÓÚáéíóúñÑ]{1,3}$/.test(b)) {
+      const junta = (a + b).toLowerCase();
+      // La unión debe existir como palabra en el documento y aparecer más veces que la primera mitad por sí sola.
+      if (PALABRAS_BASE.has(junta) || ((conteo.get(junta) ?? 0) >= 2 && (conteo.get(junta) ?? 0) > (conteo.get(a.toLowerCase()) ?? 0))) { out.push(a + b); i++; continue; }
+    }
+    out.push(a);
+  }
+  return out.join(' ');
+}
+
+/**
+ * Razón social del contratista. Antes del primer NIT: si ahí aparece un representante («PERSONA, C.C. … R/L. EMPRESA») se toma lo que
+ * sigue a «R/L.»; si no, es la propia razón social («EMPRESA S.A con NIT …»). Nunca se deja el representante ni documentos de identidad.
+ */
+export function nombreContratista(txt: string): string {
+  const t = limpiar(txt);
+  let antes = t.split(/\bNIT\b/i)[0];
+  const rl = /R\/L\.?\s*(.+)$/.exec(antes);
+  if (rl) antes = rl[1];
+  let n = antes.replace(/,?\s*C\.?C\.?\s*#?\s*[\d.\s]+/g, '').replace(/\s+con\s*$/i, '').replace(/[,\s]+$/, '').trim();
+  return limpiar(n);
+}
+
 /** Devuelve null si la página 1 no es el encabezado de un contrato. */
 export function extraerContrato(paginas: string[]): ContratoExtraido | null {
   if (paginas.length === 0) return null;
@@ -99,8 +136,9 @@ export function extraerContrato(paginas: string[]): ContratoExtraido | null {
   const iO = despuesDe(p1, 'OBJETO:');
   const iV = despuesDe(p1, 'VALOR:');
   if (!iC || !iO || !iV) return null;
-  const contratista = limpiar(iC.resto.slice(0, Math.max(0, iO.indice - (p1.length - iC.resto.length)))).replace(/^[:\s]+/, '');
-  const objeto = limpiar(iO.resto.slice(0, Math.max(0, iV.indice - (p1.length - iO.resto.length)))).replace(/^["“\s]+|["”\s.]+$/g, '');
+  const contratistaBruto = limpiar(iC.resto.slice(0, Math.max(0, iO.indice - (p1.length - iC.resto.length)))).replace(/^[:\s]+/, '');
+  const contratista = repararPalabrasPartidas(nombreContratista(contratistaBruto), paginas);
+  const objeto = repararPalabrasPartidas(limpiar(iO.resto.slice(0, Math.max(0, iV.indice - (p1.length - iO.resto.length)))).replace(/^["“\s]+|["”\s.]+$/g, ''), paginas);
   // El importe del contrato es el primero con «$» después de «VALOR:» (no CDP, cotizaciones ni pagos, que están en otras cláusulas).
   const trasValor = iV.resto.slice(0, 600);
   const valor = parsearImporte(trasValor);

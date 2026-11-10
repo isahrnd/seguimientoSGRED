@@ -111,16 +111,25 @@ export class ContratacionContratosService {
   private async fichaPorContrato(c: ContratoExtraido): Promise<number> {
     const p = this.prisma;
     const existente = await p.contratacionExpediente.findFirst({ where: { numero_contrato: c.numero_contrato } });
-    if (existente) return existente.id;
+    if (existente) {
+      // Una ficha aún sin proceso verificado refleja siempre la lectura vigente del contrato.
+      if (!existente.proceso_verificado) await p.contratacionExpediente.update({ where: { id: existente.id }, data: { objeto: c.objeto, intervencion: this.titulo(c.objeto) } });
+      return existente.id;
+    }
     const intervencion = c.objeto.replace(/^(CONTRATAR|EJECUTAR)\s+/i, '').replace(/\s+/g, ' ').trim();
     const corta = (intervencion.charAt(0).toUpperCase() + intervencion.slice(1).toLowerCase()).slice(0, 160);
     const e = await p.contratacionExpediente.create({
       data: {
-        proceso: `${PREFIJO_FICHA}${c.numero_contrato}`, tipo: 'OTRA', intervencion: corta, objeto: c.objeto, numero_contrato: c.numero_contrato, proceso_verificado: false,
+        proceso: `${PREFIJO_FICHA}${c.numero_contrato}`, tipo: 'OTRA', intervencion: this.titulo(c.objeto), objeto: c.objeto, numero_contrato: c.numero_contrato, proceso_verificado: false,
         estado_documentado: 'CONTRATADO', fecha_documento: c.firma.fecha ? new Date(`${c.firma.fecha}T00:00:00Z`) : null,
       },
     });
     return e.id;
+  }
+
+  private titulo(objeto: string): string {
+    const i = objeto.replace(/^(CONTRATAR|EJECUTAR)\s+/i, '').replace(/\s+/g, ' ').trim();
+    return (i.charAt(0).toUpperCase() + i.slice(1).toLowerCase()).slice(0, 160);
   }
 
   private async registrar(versionId: number, documentoId: number, expedienteId: number, c: ContratoExtraido, estado: 'ASOCIADO' | 'FICHA_CREADA', motivo: string) {
