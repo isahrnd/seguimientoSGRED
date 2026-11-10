@@ -38,6 +38,7 @@ services:
       SEGUIMIENTO_DRIVE_CLIENT_SECRET: ${SEGUIMIENTO_DRIVE_CLIENT_SECRET:-}
       SEGUIMIENTO_DRIVE_TOKEN_FILE: ${SEGUIMIENTO_DRIVE_TOKEN_FILE:-/privados/.drive-token.json}
       SEGUIMIENTO_DRIVE_ABRIR_DIRECTO: ${SEGUIMIENTO_DRIVE_ABRIR_DIRECTO:-false}
+      SEGUIMIENTO_DRIVE_CACHE_SEGUNDOS: ${SEGUIMIENTO_DRIVE_CACHE_SEGUNDOS:-10}
     volumes:
       # Documentos e importaciones privados: solo lectura, fuera del repositorio.
       - ${SGRED_PRIVADOS_DIR:?defina SGRED_PRIVADOS_DIR en .env}:/privados:ro
