@@ -1,10 +1,13 @@
 const COP = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 2, minimumFractionDigits: 0 });
+const COP2 = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 2, minimumFractionDigits: 2 });
+/** Con centavos siempre dos decimales (555.555.555,50), nunca uno solo. */
+const fmtCop = (v: number) => (Number.isInteger(v) ? COP.format(v) : COP2.format(v));
 const NUM = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 4 });
 
 export const PENDIENTE = "Pendiente de soporte";
 
 export function cop(v: number | null | undefined): string {
-  return v === null || v === undefined ? PENDIENTE : COP.format(v);
+  return v === null || v === undefined ? PENDIENTE : fmtCop(v);
 }
 
 export const UNIDAD_ETQ: Record<string, string> = { M3: "m³", M2: "m²", H_EQUIPO: "hora de equipo", VIAJE: "viaje", GLOBAL: "suma global", UND: "unidad" };

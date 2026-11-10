@@ -18,6 +18,14 @@ describe("formato del monitoreo de contratación", () => {
 
 import { etiquetaCelda, parsearCelda, resumenFuente, urlHoja } from "./format";
 
+describe("importes con centavos", () => {
+  it("siempre dos decimales cuando hay centavos y ninguno cuando no", () => {
+    expect(cop(555555555.5)).toMatch(/555.555.555,50/);
+    expect(cop(222222222)).not.toMatch(/,/);
+    expect(cop(123456789.12)).toMatch(/,26/);
+  });
+});
+
 describe("hojas y fuentes", () => {
   it("construye el enlace y la etiqueta de hoja y celda", () => {
     expect(etiquetaCelda("Datos", "B2")).toBe("Hoja Datos · celda B2");

@@ -181,7 +181,7 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
           <Tag color={e.valores.contratado !== null ? "success" : "warning"} style={{ fontSize: 14, padding: "2px 10px" }}>{e.valores.contratado !== null ? "Contrato respaldado" : "Espera documento contractual"}</Tag>
         </div>
         <p className="texto-secundario" style={{ margin: "6px 0 0" }}>
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>{etiquetaProceso(e)}</span> · documento del {fechaCorta(e.fecha_documento)} · {ESTADO_ETQ[e.estado]}
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{etiquetaProceso(e)}</span>{e.fecha_documento ? ` · documento del ${fechaCorta(e.fecha_documento)}` : ""} · {ESTADO_ETQ[e.estado]}
           {e.empresa_seleccionada ? ` · ${e.empresa_seleccionada}` : ""}
         </p>
         {e.objeto && <p className="largo" style={{ margin: "10px 0 0", maxWidth: 980 }}>{e.objeto}</p>}
