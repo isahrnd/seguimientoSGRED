@@ -7,6 +7,7 @@ import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "./soporte-link";
 import { BarrasPrecios } from "./barras-precios";
 import { ConciliacionCifras } from "./conciliacion-cifras";
+import { PreciosPorActividad } from "./precios-por-actividad";
 
 export const RESULTADO_ETQ: Record<ResultadoPrecio, string> = {
   SIN_CONTRATO_SOPORTADO: "Pendiente de soporte contractual",
@@ -34,6 +35,7 @@ export function AnalisisPreciosExpediente({ d }: { d: DetalleExpediente }) {
   const contratadoBase = c.valor_inicial ?? c.valor_actualizado;
   return (
     <div style={{ display: "grid", gap: 28 }}>
+      <PreciosPorActividad d={d} />
       <section>
         <ResultadoTag r={a.resultado} />
         <p className="largo" style={{ margin: "10px 0 4px", maxWidth: 900 }}>{a.resumen}</p>

@@ -37,3 +37,8 @@ a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, [tabindex]:fo
   outline-offset: 2px !important;
 }
 .ant-btn-primary:focus-visible { outline-color: #0F6B66 !important; }
+
+/* Cuadro de precios: en móvil el concepto y el precio unitario quedan visibles y el resto pasa a una línea bajo el concepto. */
+.solo-movil { display: none; }
+@media (max-width: 767px) { .solo-movil { display: block; margin-top: 4px; } }
+.fila-activa > td { background: #EEF2F9 !important; }
