@@ -8,8 +8,22 @@ import * as crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/auth/password';
 
+/** Cambia el correo de una cuenta conservando id, contraseña, estado y acceso. Uso: correo-cambiar <actual> <nuevo> */
+async function cambiarCorreo(actual: string, nuevo: string) {
+  const ok = (c?: string) => !!c && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c);
+  if (!ok(actual) || !ok(nuevo)) { console.error('Uso: usuarios-cli correo-cambiar <actual> <nuevo>'); process.exit(1); }
+  const prisma = new PrismaClient({ log: [] });
+  try {
+    const u = await prisma.usuarios.update({ where: { correo: actual.toLowerCase() }, data: { correo: nuevo.toLowerCase() } });
+    console.log(`Correo actualizado. id=${u.id} correo=${u.correo} (contraseña y acceso sin cambios)`);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 async function main() {
   const [cmd, correo, nombre] = process.argv.slice(2);
+  if (cmd === 'correo-cambiar') return cambiarCorreo(correo, nombre);
   if (cmd !== 'crear' || !correo || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
     console.error('Uso: usuarios:crear -- <correo> "<Nombre>"');
     process.exit(1);

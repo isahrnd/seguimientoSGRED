@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, DatePicker, Empty, Grid, Input, Segmented, Select, Skeleton, Table, Tag, Typography } from "antd";
 import { ArrowRightOutlined, ClockCircleOutlined, SafetyCertificateOutlined, SearchOutlined } from "@ant-design/icons";
-import { useExpedientes } from "@/hooks/queries";
+import { useEdificios, useExpedientes } from "@/hooks/queries";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useScrollRestore } from "@/hooks/use-scroll-restore";
 import { ESTADO_ETQ, PENDIENTE, cop, fechaCorta } from "@/lib/format";
@@ -83,6 +83,8 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
   const query = useExpedientes(filtros);
   const todas = useExpedientes(completo ? {} : { q: "" });
   const datos = query.data;
+  const edificios = useEdificios(!completo ? valores.q : "");
+  const edifCoinciden = !completo && valores.q ? (edificios.data?.edificios ?? []) : [];
 
   const filas = useMemo(() => {
     let f = [...(datos?.expedientes ?? [])];
@@ -160,12 +162,29 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
         />
       )}
 
+      {edifCoinciden.length > 0 && (
+        <section aria-label="Edificaciones que coinciden" style={{ marginTop: 16 }}>
+          <h2 style={{ fontSize: 18, margin: "0 0 8px" }}>Edificaciones que coinciden</h2>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+            {edifCoinciden.map((b) => (
+              <li key={b.id} style={{ background: "#fff", border: "1px solid #D5DBE5", borderRadius: 8, padding: "12px 16px", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+                <div className="largo">
+                  <strong style={{ fontSize: 16 }}>{b.nombre}</strong>
+                  <div className="texto-secundario" style={{ fontSize: 13.5 }}>{b.direccion ? `${b.direccion} · ` : ""}{b.documentos} documentos · {b.resolucion.etiqueta}{b.procesos.length === 0 ? " · proceso contractual pendiente" : ""}</div>
+                </div>
+                <BotonEnlace href={`/edificaciones/${b.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir ficha</BotonEnlace>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div style={{ marginTop: 16 }}>
         {query.isLoading ? (
           <Skeleton active paragraph={{ rows: 6 }} />
         ) : query.isError ? (
           <Alert type="error" showIcon message="No fue posible cargar los expedientes." action={<Button onClick={() => query.refetch()}>Reintentar</Button>} />
-        ) : filas.length === 0 ? (
+        ) : filas.length === 0 && edifCoinciden.length > 0 ? null : filas.length === 0 ? (
           <Empty description={valores.q ? `Ningún expediente coincide con “${valores.q}”.` : "No hay expedientes con este filtro."} />
         ) : movil ? (
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>

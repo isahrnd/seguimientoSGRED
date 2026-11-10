@@ -9,6 +9,7 @@ import { SinAcceso, ErrorCarga } from "@/components/estados";
 import { Volver } from "@/components/volver";
 import { EstadoResolucion, ListaDocumentosEdificio } from "@/components/edificios-soportes";
 import { PALETA } from "@/theme/theme";
+import { discrepanciasDireccion } from "@/lib/direccion";
 
 const Caja = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
   <section style={{ background: "#fff", border: `1px solid ${PALETA.borde}`, borderRadius: 8, padding: 18 }}>
@@ -24,6 +25,7 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
   if (q.isLoading) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (q.isError || !q.data) return <ErrorCarga texto="No fue posible cargar la edificación." onReintentar={() => q.refetch()} />;
   const d = q.data;
+  const discrepancias = discrepanciasDireccion(d.edificio.direccion, [...d.visitas_y_soportes_tecnicos, ...d.grupos.flatMap((g) => g.documentos)].map((x) => x.nombre));
   const resto = d.grupos.filter((g) => g.codigo !== "VISITA_SOPORTE_TECNICO");
 
   return (
@@ -33,6 +35,11 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
         <h1 className="largo" style={{ margin: "6px 0 0", fontSize: 30 }}>{d.edificio.nombre}</h1>
         {d.edificio.direccion && <p className="texto-secundario largo" style={{ margin: "4px 0 0" }}>{d.edificio.direccion}</p>}
       </div>
+
+      {discrepancias.length > 0 && (
+        <Alert type="warning" showIcon message="Discrepancia documental de dirección por aclarar"
+          description={<>La dirección registrada es <strong>{d.edificio.direccion}</strong>, pero estos documentos mencionan otra: {discrepancias.join("; ")}. No se ha determinado cuál es la correcta.</>} />
+      )}
 
       {d.sin_proceso_confirmado && (
         <Alert type="warning" showIcon message="Proceso contractual pendiente" description="Aún no se ha confirmado la relación de esta edificación con un contrato. Sus visitas y cotizaciones confirmadas se pueden consultar abajo." />
@@ -60,11 +67,11 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
       <Caja titulo="Visitas y soportes técnicos">
         {d.visitas_y_soportes_tecnicos.length === 0
           ? <span className="texto-secundario">{PENDIENTE}: no hay visitas ni soportes técnicos vinculados a esta edificación.</span>
-          : <ListaDocumentosEdificio docs={d.visitas_y_soportes_tecnicos} />}
+          : <ListaDocumentosEdificio docs={d.visitas_y_soportes_tecnicos} ocultarProceso={d.sin_proceso_confirmado} />}
       </Caja>
 
       {resto.map((g) => (
-        <Caja key={g.codigo} titulo={g.nombre}><ListaDocumentosEdificio docs={g.documentos} /></Caja>
+        <Caja key={g.codigo} titulo={g.nombre}><ListaDocumentosEdificio docs={g.documentos} ocultarProceso={d.sin_proceso_confirmado} /></Caja>
       ))}
     </div>
   );

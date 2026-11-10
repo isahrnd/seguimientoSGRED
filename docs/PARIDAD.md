@@ -35,4 +35,5 @@ El frontend más reciente (Análisis de precios y «Actualizar índice») solo e
 - Interfaz nueva (Ant Design, pantalla ejecutiva, síntesis económica de cinco valores, gráfico de precios unitarios equivalentes).
 - Búsqueda ampliada a empresas y sectores.
 - OCR local por página y versión añadido (no estaba implementado en el origen para este flujo).
-- Pendiente: vinculación de Drive (por tanto proceso 777, Edificio Ejemplo, comparativo general y 29 documentos de Drive no están cargados con datos reales).
+- Drive vinculado de solo lectura con token propio. La carga de edificios se aplicó con una revisión que actualiza la huella del Excel comparativo (se volvió a guardar en Drive tras la revisión; se verificó que A2:A6, F:J y filas 10-19 coinciden).
+- La búsqueda de Inicio también lista edificaciones (p. ej. un edificio sin expediente) y la ficha avisa de discrepancias de dirección entre la registrada y las citadas en nombres de documentos.

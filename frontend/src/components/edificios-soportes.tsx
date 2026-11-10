@@ -41,15 +41,15 @@ export function FilaDocumento({ nombre, detalle, versionId, disponible = true, e
   );
 }
 
-export function ListaDocumentosEdificio({ docs }: { docs: DocumentoEdificio[] }) {
+export function ListaDocumentosEdificio({ docs, ocultarProceso }: { docs: DocumentoEdificio[]; ocultarProceso?: boolean }) {
   return (
     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
       {docs.map((x) => (
         <FilaDocumento key={x.documento_id} nombre={x.nombre} versionId={x.version_id} disponible={x.disponible}
-          detalle={<>{x.categoria_nombre} · {fechaCorta(x.fecha_documento)}{x.origen_asociacion === "PROCESO" && " · del proceso (alcance conjunto)"}{x.proceso && <> · <Link href={`/expedientes/${x.proceso.id}`}>{x.proceso.proceso}</Link></>}</>}
+          detalle={<>{x.categoria_nombre}{x.fecha_documento ? ` · ${fechaCorta(x.fecha_documento)}` : ""}{x.origen_asociacion === "PROCESO" && " · del proceso (alcance conjunto)"}{x.proceso && <> · <Link href={`/expedientes/${x.proceso.id}`}>{x.proceso.proceso}</Link></>}</>}
           extra={<>
             {x.empresas?.map((e) => <div key={e.nombre} className="largo" style={{ fontSize: 13.5 }}>Empresa: <strong>{e.nombre}</strong>{e.aclaracion && <span className="texto-secundario"> · Aclaración del equipo: {e.aclaracion}</span>}</div>)}
-            {x.asociaciones_faltantes.length > 0 && <div style={{ marginTop: 4 }}>{x.asociaciones_faltantes.map((f) => <Tag key={f} color="warning" style={{ fontWeight: 400 }}>{f === "Proceso contractual" ? "Proceso contractual pendiente" : `${f} pendiente`}</Tag>)}</div>}
+            {x.asociaciones_faltantes.filter((f) => !(ocultarProceso && f === "Proceso contractual")).length > 0 && <div style={{ marginTop: 4 }}>{x.asociaciones_faltantes.filter((f) => !(ocultarProceso && f === "Proceso contractual")).map((f) => <Tag key={f} color="warning" style={{ fontWeight: 400 }}>{f === "Proceso contractual" ? "Proceso contractual pendiente" : `${f} pendiente`}</Tag>)}</div>}
           </>} />
       ))}
     </ul>

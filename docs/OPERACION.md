@@ -24,6 +24,10 @@ Lectura únicamente (`drive.readonly`); la aplicación nunca escribe en Drive. L
 
 Si Drive falla, la interfaz sigue mostrando lo disponible, distingue «sin conexión» de «carpeta vacía» e indica la última lectura correcta.
 
+## Cuentas
+
+`usuarios-cli crear <correo> "<Nombre>"` crea o restablece la contraseña; `usuarios-cli correo-cambiar <actual> <nuevo>` cambia el correo conservando id, contraseña y acceso.
+
 ## Sincronización
 
 Cada `SEGUIMIENTO_SYNC_MINUTOS` (30 por defecto, 5–1440, 0 desactiva). «Actualizar índice» reutiliza la operación en curso, muestra el avance y el resultado por fuente y refresca la biblioteca y los expedientes sin recargar ni perder filtros.
