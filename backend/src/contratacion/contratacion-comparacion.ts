@@ -166,6 +166,10 @@ export function diferenciasSinExplicar(significados: ValorSignificado[], pendien
     out.push({ codigo: 'EJECUTADO_MULTIPLES', descripcion: 'Hay más de un valor ejecutado citado con importes distintos; cada uno conserva su fuente y ninguno se ha conciliado.' });
   }
   if (!contratado.length && ejec.length) out.push({ codigo: 'EJECUTADO_SIN_CONTRATO', descripcion: 'Hay un valor ejecutado citado sin contrato ni acta que lo respalde.' });
-  for (const p of pendientesAclaracion) out.push({ codigo: 'PENDIENTE_ACLARACION', descripcion: p });
+  for (const p of pendientesAclaracion) {
+    // Una aclaración escrita antes de que el contrato constara («sin contrato, acta ni soporte de pago…») se reformula con lo que aún falta.
+    const anteriorAlContrato = contratado.length > 0 && /^sin contrato,? acta ni soporte de pago/i.test(p.trim());
+    out.push({ codigo: 'PENDIENTE_ACLARACION', descripcion: anteriorAlContrato ? 'Sin acta ni soporte de pago que acredite lo ejecutado (el contrato ya consta en su documento).' : p });
+  }
   return out;
 }

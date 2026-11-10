@@ -140,3 +140,17 @@ describe('validación de la importación ampliada', () => {
     expect(r.errores.join(' ')).toMatch(/solo se registra en "contratos"/);
   });
 });
+
+describe('aclaraciones anteriores al contrato', () => {
+  const sig = (tipo: any, importes: any[]) => ({ tipo, etiqueta: tipo, estado: importes.length ? 'SOPORTADO' : 'PENDIENTE_SOPORTE', importes });
+  const base = (contratado: any[]) => [sig('PRESUPUESTO_OFICIAL', []), sig('COTIZACION', []), sig('OFERTA_SELECCIONADA', []), sig('VALOR_CONTRATADO', contratado), sig('VALOR_EJECUTADO', [])] as any;
+  it('con contrato ya no dice «sin contrato» y conserva lo que falta (acta o pago)', () => {
+    const r = diferenciasSinExplicar(base([{ importe: 10, concepto: null, proveedor: null, soporte: null, estado_soporte: 'RESPALDADO' }]), ['Sin contrato, acta ni soporte de pago que acredite lo contratado o ejecutado']);
+    expect(r[0].descripcion).toMatch(/Sin acta ni soporte de pago/);
+    expect(r[0].descripcion).not.toMatch(/Sin contrato/);
+  });
+  it('sin contrato conserva la aclaración original', () => {
+    const r = diferenciasSinExplicar(base([]), ['Sin contrato, acta ni soporte de pago que acredite lo contratado o ejecutado']);
+    expect(r[0].descripcion).toMatch(/^Sin contrato/);
+  });
+});
