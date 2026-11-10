@@ -30,7 +30,7 @@ export interface ValorSignificado {
 
 interface EntradaValores {
   valores: Array<{ tipo: string; importe: number; concepto: string | null; estado_soporte: string; oferta: string | null; soporte: SoporteRef | null }>;
-  contratos: Array<{ valor: number; tipo_acto: string; oferta: string | null; soporte: SoporteRef | null; alcance?: string | null }>;
+  contratos: Array<{ valor: number; tipo_acto: string; oferta: string | null; soporte: SoporteRef | null; alcance?: string | null; numero?: string | null; contratista?: string | null; expresion_valor?: string | null }>;
   /** Oferta marcada como seleccionada por una justificación documentada (sin acto de contratación). */
   seleccionJustificada: Array<{ oferta: string | null; texto: string; soporte: SoporteRef | null }>;
 }
@@ -57,7 +57,7 @@ export function valoresPorSignificado(e: EntradaValores): ValorSignificado[] {
     mk('PRESUPUESTO_OFICIAL', filas(de('PRESUPUESTO_OFICIAL'))),
     mk('COTIZACION', filas(de('COTIZADO'))),
     mk('OFERTA_SELECCIONADA', seleccionadas),
-    mk('VALOR_CONTRATADO', e.contratos.map((c) => ({ importe: c.valor, concepto: c.alcance ?? c.tipo_acto, proveedor: c.oferta, soporte: c.soporte, estado_soporte: 'RESPALDADO' }))),
+    mk('VALOR_CONTRATADO', e.contratos.map((c) => ({ importe: c.valor, concepto: c.numero ? `${c.tipo_acto === 'CONTRATO' ? 'Contrato' : c.tipo_acto} ${c.numero}${c.expresion_valor ? ' · ' + c.expresion_valor : ''}` : c.alcance ?? c.tipo_acto, proveedor: c.oferta ?? c.contratista ?? null, soporte: c.soporte, estado_soporte: 'RESPALDADO' }))),
     mk('VALOR_EJECUTADO', filas(de('EJECUTADO'))),
   ];
 }

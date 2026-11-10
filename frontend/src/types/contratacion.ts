@@ -25,6 +25,8 @@ export interface ExpedienteFila {
   reportado_contratado?: boolean;
   id: number;
   proceso: string;
+  numero_contrato?: string | null;
+  proceso_verificado?: boolean;
   intervencion: string;
   edificaciones: string[];
   empresa_seleccionada: string | null;
@@ -171,6 +173,12 @@ export interface DetalleExpediente {
       valor: number;
       oferta: string | null;
       soporte: SoporteRef | null;
+      contratista: string | null;
+      expresion_valor: string | null;
+      firma_estado: "FIRMADO_ELECTRONICAMENTE" | "FIRMA_PARCIAL" | "SIN_EVIDENCIA_DE_FIRMA" | null;
+      firma_detalle: string | null;
+      firma_fecha: string | null;
+      numero_proceso_citado: string | null;
     }[];
     seleccion_documentada: boolean;
     aviso: string | null;
@@ -515,6 +523,8 @@ export interface AnalisisPrecios {
 export interface FilaAnalisisPrecios {
   id: number;
   proceso: string;
+  numero_contrato?: string | null;
+  proceso_verificado?: boolean;
   intervencion: string;
   tipo_intervencion: "DEMOLICION" | "IZAJE_GRUAS" | "OTRA";
   edificios: string[];

@@ -96,3 +96,9 @@ export const REQUISITO_TONO: Record<string, "secondary" | "outline" | "destructi
   POR_CONFIRMAR_ALCANCE: "outline",
   SIN_INTERVENCION: "outline",
 };
+
+/** Número de proceso y número de contrato son datos distintos; un proceso sin verificar se dice expresamente. */
+export function etiquetaProceso(e: { proceso: string; numero_contrato?: string | null; proceso_verificado?: boolean }): string {
+  if (e.proceso_verificado === false) return `Contrato ${e.numero_contrato ?? e.proceso.replace(/^CONTRATO-/, "")} · proceso pendiente de verificar`;
+  return `Proceso ${e.proceso}${e.numero_contrato ? ` · Contrato ${e.numero_contrato}` : ""}`;
+}

@@ -5,6 +5,7 @@ import type { DetalleExpediente, ImporteSignificado, ValorSignificado } from "@/
 import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "./soporte-link";
 import { ofertasSinTotal } from "@/lib/oferta";
+import { FirmaContrato } from "./firma-contrato";
 
 const QUE_ES: Record<ValorSignificado["tipo"], string> = {
   PRESUPUESTO_OFICIAL: "Presupuesto oficial",
@@ -71,6 +72,7 @@ export function SintesisEconomica({ d }: { d: DetalleExpediente }) {
             ) : (
               <>
                 {v.importes.slice(0, 3).map((i, k) => <Importe key={k} i={i} grande={k === 0} />)}
+                {v.tipo === "VALOR_CONTRATADO" && d.contratacion.contratos.slice(0, 3).map((c) => <FirmaContrato key={c.id} c={c} detalle={false} />)}
                 {v.importes.length > 3 && <div className="texto-secundario" style={{ fontSize: 13, marginTop: 8 }}>y {v.importes.length - 3} más en el detalle</div>}
                 {v.tipo === "VALOR_EJECUTADO" && new Set(v.importes.map((i) => i.importe)).size > 1 && <div style={{ fontSize: 13, color: PALETA.ambar, fontWeight: 600, marginTop: 8 }}>Importes distintos, sin conciliar: no se suman</div>}
                 {v.estado !== "SOPORTADO" && <Tag color="warning" style={{ marginTop: 8 }}>{ESTADO_VALOR_ETQ[v.estado]}</Tag>}

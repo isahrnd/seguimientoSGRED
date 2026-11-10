@@ -7,7 +7,7 @@ import { ArrowRightOutlined, ClockCircleOutlined, SafetyCertificateOutlined, Sea
 import { useEdificios, useExpedientes } from "@/hooks/queries";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useScrollRestore } from "@/hooks/use-scroll-restore";
-import { ESTADO_ETQ, PENDIENTE, cop, fechaCorta } from "@/lib/format";
+import { ESTADO_ETQ, PENDIENTE, cop, etiquetaProceso, fechaCorta } from "@/lib/format";
 import type { ExpedienteFila } from "@/types/contratacion";
 import { PALETA } from "@/theme/theme";
 import { SinAcceso } from "./estados";
@@ -55,7 +55,7 @@ function Alcance({ e }: { e: ExpedienteFila }) {
     <div className="largo">
       <div style={{ fontWeight: 600, fontSize: 16 }}>{e.intervencion}</div>
       <div className="texto-secundario" style={{ fontSize: 13.5 }}>
-        Proceso <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.proceso}</span>
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>{etiquetaProceso(e)}</span>
         {sitios.length > 0 && <> · {sitios.slice(0, 3).join(", ")}{sitios.length > 3 ? ` y ${sitios.length - 3} más` : ""}</>}
       </div>
     </div>

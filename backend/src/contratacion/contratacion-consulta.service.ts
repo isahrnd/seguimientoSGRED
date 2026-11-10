@@ -42,6 +42,8 @@ export class ContratacionConsultaService {
     return {
       id: e.id,
       proceso: e.proceso,
+      numero_contrato: e.numero_contrato ?? null,
+      proceso_verificado: e.proceso_verificado !== false,
       intervencion: e.intervencion,
       edificaciones: e.hechos.filter((h: any) => h.tipo === 'EDIFICACION').map((h: any) => h.titulo),
       sectores: e.hechos.filter((h: any) => h.tipo === 'SECTOR').map((h: any) => h.titulo),
@@ -207,6 +209,8 @@ export class ContratacionConsultaService {
     const contratos = e.contratos.map((c) => ({
       id: c.id, clave: c.clave, tipo_acto: c.tipo_acto, numero: c.numero, fecha_acto: d(c.fecha_acto), alcance: c.alcance,
       justificacion: c.justificacion, valor: n(c.valor), oferta: c.oferta_id ? ofertaPorId.get(c.oferta_id)?.proveedor ?? null : null, soporte: S(c),
+      contratista: (c as any).contratista ?? null, expresion_valor: (c as any).expresion_valor ?? null, firma_estado: (c as any).firma_estado ?? null,
+      firma_detalle: (c as any).firma_detalle ?? null, firma_fecha: d((c as any).firma_fecha), numero_proceso_citado: (c as any).numero_proceso_citado ?? null,
     }));
     const fila = this.fila({ ...e, documentos: e.documentos });
 
@@ -218,7 +222,7 @@ export class ContratacionConsultaService {
     });
     const significados = valoresPorSignificado({
       valores: valores.map((v) => ({ tipo: v.tipo, importe: v.importe, concepto: v.concepto, estado_soporte: v.estado_soporte, oferta: v.oferta, soporte: v.soporte as any })),
-      contratos: contratos.map((c) => ({ valor: c.valor, tipo_acto: c.tipo_acto, oferta: c.oferta, soporte: c.soporte as any, alcance: c.alcance })),
+      contratos: contratos.map((c) => ({ valor: c.valor, tipo_acto: c.tipo_acto, oferta: c.oferta, soporte: c.soporte as any, alcance: c.alcance, numero: c.numero, contratista: c.contratista, expresion_valor: c.expresion_valor })),
       seleccionJustificada: justificaciones as any,
     });
     const alcance = diferenciasAlcance(e.ofertas.map((o) => ({ clave: o.clave, proveedor: o.proveedor, incluye: o.incluye, excluye: o.excluye, lineas: lineas.filter((l) => l.oferta_clave === o.clave).map((l) => ({ actividad: l.actividad, descripcion: l.descripcion })) })));
@@ -350,7 +354,7 @@ export class ContratacionConsultaService {
       const A = D.analisis_precios;
       const primerContrato = D.contratacion.contratos[0] ?? null;
       return {
-        id: D.expediente.id, proceso: D.expediente.proceso, intervencion: D.expediente.intervencion, tipo_intervencion: D.expediente.tipo_intervencion,
+        id: D.expediente.id, proceso: D.expediente.proceso, numero_contrato: D.expediente.numero_contrato, proceso_verificado: D.expediente.proceso_verificado, intervencion: D.expediente.intervencion, tipo_intervencion: D.expediente.tipo_intervencion,
         edificios: D.expediente.edificaciones, sectores: D.expediente.sectores,
         alcance: D.necesidad.actividades.map((a: any) => a.titulo),
         empresa_seleccionada: D.comparacion.seleccion.oferta,

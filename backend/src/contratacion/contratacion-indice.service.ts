@@ -11,6 +11,7 @@ import { extraerCeldas, leerCeldas } from './contratacion-excel';
 import { MODELOS_CON_FUENTE, decidirCelda } from './contratacion-cambios';
 import { normalizar, sugerir } from './contratacion-sugerencias';
 import { completarConOcr, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
+import { ContratacionContratosService } from './contratacion-contratos.service';
 
 interface Candidato {
   tipo: 'LOCAL' | 'DRIVE';
@@ -95,6 +96,7 @@ export class ContratacionIndiceService {
   private trabajo: TrabajoIndice | null = null;
   private secuencia = 0;
   private readonly ocr = new OcrLocal();
+  private readonly contratos = new ContratacionContratosService(this.prisma);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -120,6 +122,7 @@ export class ContratacionIndiceService {
       const drive = await this.fuente('DRIVE', () => this.candidatosDrive());
       await this.reasociarPendientes();
       await this.enriquecer();
+      await this.leerContratos();
       trabajo.resultado = { local, drive };
       trabajo.estado = 'FINALIZADA';
       return { local, drive };
@@ -452,6 +455,19 @@ export class ContratacionIndiceService {
       } catch (e) {
         this.log.warn(`Sin extracto para una versión: ${(e as Error).message}`);
       }
+    }
+  }
+
+  /** Lee los contratos en PDF (texto nativo) y los asocia a su expediente; un fallo aquí no invalida la actualización del índice. */
+  private async leerContratos() {
+    try {
+      const r = await this.contratos.procesar(async (_id, md5) => {
+        const cand = this.candidatosVistos.get(md5);
+        return cand ? await paginasPdf(await cand.leerBytes(), 80) : null;
+      });
+      if (r.leidos) this.log.log(`Contratos leídos: ${r.leidos}; asociados ${r.asociados}; fichas ${r.fichas}; en revisión ${r.revision}`);
+    } catch (e) {
+      this.log.warn(`Sin lectura de contratos: ${(e as Error).message}`);
     }
   }
 

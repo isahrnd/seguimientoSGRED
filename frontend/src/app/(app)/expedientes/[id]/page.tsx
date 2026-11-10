@@ -4,7 +4,7 @@ import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, Select, Skeleton, Table, Tabs, Tag } from "antd";
 import { useComparar, useDetalleExpediente, useExpedientes } from "@/hooks/queries";
-import { ESTADO_ETQ, PENDIENTE, cop, fechaCorta, precioConUnidad } from "@/lib/format";
+import { ESTADO_ETQ, PENDIENTE, cop, etiquetaProceso, fechaCorta, precioConUnidad } from "@/lib/format";
 import { esErrorDeAcceso } from "@/lib/api";
 import type { Hecho, Valor } from "@/types/contratacion";
 import { PALETA } from "@/theme/theme";
@@ -14,6 +14,7 @@ import { SintesisEconomica } from "@/components/sintesis-economica";
 import { AnalisisPreciosExpediente, ResultadoTag } from "@/components/analisis-precios";
 import { ComparacionCotizaciones, ResultadoPct } from "@/components/comparacion-cotizaciones";
 import { documentosParaAvanzar } from "@/lib/oferta";
+import { FirmaContrato } from "@/components/firma-contrato";
 import { Volver } from "@/components/volver";
 import { EdificiosSoportes } from "@/components/edificios-soportes";
 
@@ -143,8 +144,11 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
       : <div style={{ display: "grid", gap: 10 }}>{d.contratacion.contratos.map((c) => (
           <div key={c.id} style={{ background: "#fff", border: `1px solid ${PALETA.borde}`, borderRadius: 8, padding: 14 }}>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}><strong>{c.tipo_acto}{c.numero ? ` ${c.numero}` : ""}</strong><SoporteLink soporte={c.soporte} /></div>
-            <div>Oferta seleccionada: {c.oferta ?? PENDIENTE} · Fecha: {fechaCorta(c.fecha_acto)}</div>
-            <div>Valor contratado: <strong className="cifra">{cop(c.valor)}</strong></div>
+            <div className="largo">Contratista: {c.contratista ?? PENDIENTE}</div>
+            <div>Oferta seleccionada: {c.oferta ?? "Pendiente de su propio soporte (el contrato no la fija)"} · Fecha de suscripción: {fechaCorta(c.fecha_acto ?? c.firma_fecha)}</div>
+            <div>{c.expresion_valor ? c.expresion_valor.charAt(0).toUpperCase() + c.expresion_valor.slice(1) : "Valor contratado"}: <strong className="cifra">{cop(c.valor)}</strong></div>
+            {c.numero_proceso_citado && <div className="texto-secundario">Número de proceso citado en el contrato: {c.numero_proceso_citado}</div>}
+            <FirmaContrato c={c} />
             <div className="largo">Alcance: {c.alcance ?? PENDIENTE}</div>
             <div className="largo">Justificación documentada: {c.justificacion ?? PENDIENTE}</div>
           </div>))}</div> },
@@ -177,7 +181,7 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
           <Tag color={e.valores.contratado !== null ? "success" : "warning"} style={{ fontSize: 14, padding: "2px 10px" }}>{e.valores.contratado !== null ? "Contrato respaldado" : "Espera documento contractual"}</Tag>
         </div>
         <p className="texto-secundario" style={{ margin: "6px 0 0" }}>
-          Proceso <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.proceso}</span> · documento del {fechaCorta(e.fecha_documento)} · {ESTADO_ETQ[e.estado]}
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{etiquetaProceso(e)}</span> · documento del {fechaCorta(e.fecha_documento)} · {ESTADO_ETQ[e.estado]}
           {e.empresa_seleccionada ? ` · ${e.empresa_seleccionada}` : ""}
         </p>
         {e.objeto && <p className="largo" style={{ margin: "10px 0 0", maxWidth: 980 }}>{e.objeto}</p>}

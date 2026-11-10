@@ -16,6 +16,9 @@ model ContratacionExpediente {
   estado_documentado String    @default("PENDIENTE_SOPORTE")
   /// DEMOLICION | RCD_SIN_DEMOLICION: solo lo fija una confirmación privada; sin valor la resolución se exige.
   alcance_confirmado String?
+  /// Número del contrato (distinto del número de proceso). Un proceso no verificado queda marcado.
+  numero_contrato    String?
+  proceso_verificado Boolean   @default(true)
   fecha_documento    DateTime? @db.Date
   creado_en          DateTime  @default(now())
   actualizado_en     DateTime  @updatedAt
@@ -82,6 +85,7 @@ model ContratacionDocumentoVersion {
 
   @@unique([documento_id, numero], map: "uq_contratacion_ver_doc_num")
   ocr_paginas ContratacionOcrPagina[]
+  doc_contrato ContratacionDocContrato?
   cotizaciones_edificio ContratacionCotizacionEdificio[]
 
   @@map("tbl_contratacion_doc_versiones")
@@ -262,6 +266,12 @@ model ContratacionContrato {
   pagina        Int?
   hoja String?
   celda String?
+  contratista   String?
+  expresion_valor String?
+  firma_estado  String?
+  firma_detalle String?
+  firma_fecha   DateTime? @db.Date
+  numero_proceso_citado String?
   creado_en     DateTime  @default(now())
 
   expediente ContratacionExpediente        @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
@@ -517,4 +527,31 @@ model ContratacionCotizacionEdificio {
   expediente ContratacionExpediente? @relation(fields: [expediente_id], references: [id], onDelete: SetNull)
 
   @@map("tbl_contratacion_cotizaciones_edificio")
+}
+
+/// Lectura de un contrato en PDF (encabezado y cláusula de valor) y la decisión de asociarlo a un expediente.
+model ContratacionDocContrato {
+  version_id      Int      @id
+  estado          String   @db.VarChar(20)
+  numero_contrato String?
+  consecutivo     String?
+  anio            Int?
+  contratista     String?
+  objeto          String?
+  valor           Decimal? @db.Decimal(20, 2)
+  expresion_valor String?
+  valor_clausula  Decimal? @db.Decimal(20, 2)
+  proceso_citado  String?
+  firma_estado    String?
+  firma_detalle   String?
+  firma_fecha     DateTime? @db.Date
+  expediente_id   Int?
+  motivo          String?
+  candidatos      Json?
+  advertencias    Json?
+  procesado_en    DateTime @default(now())
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@map("tbl_contratacion_doc_contrato")
 }

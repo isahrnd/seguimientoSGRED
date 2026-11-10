@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Alert, Button, Skeleton, Table, Tag, Typography } from "antd";
 import { ArrowRightOutlined } from "@ant-design/icons";
 import { useAnalisisPrecios } from "@/hooks/queries";
-import { PENDIENTE, cop } from "@/lib/format";
+import { PENDIENTE, cop, etiquetaProceso } from "@/lib/format";
 import { esErrorDeAcceso } from "@/lib/api";
 import { SinAcceso, ErrorCarga } from "@/components/estados";
 import { ResultadoTag } from "@/components/analisis-precios";
@@ -43,7 +43,7 @@ export default function AnalisisPreciosPage() {
           { title: "Intervención", render: (_, f) => (
             <div className="largo" style={{ minWidth: 240 }}>
               <strong style={{ fontSize: 16 }}>{f.intervencion}</strong>
-              <div className="texto-secundario" style={{ fontSize: 13.5 }}>Proceso {f.proceso} · {TIPO[f.tipo_intervencion]}{[...f.edificios, ...f.sectores].length ? ` · ${[...f.edificios, ...f.sectores].join(", ")}` : ""}</div>
+              <div className="texto-secundario" style={{ fontSize: 13.5 }}>{etiquetaProceso(f)} · {TIPO[f.tipo_intervencion]}{[...f.edificios, ...f.sectores].length ? ` · ${[...f.edificios, ...f.sectores].join(", ")}` : ""}</div>
             </div>) },
           { title: "Contratado", align: "right", render: (_, f) => (f.valor_contratado?.sustentado
             ? <div><div className="cifra" style={{ fontWeight: 700, fontSize: 17 }}>{cop(f.valor_contratado.valor_actualizado ?? f.valor_contratado.valor_inicial)}</div><SoporteLink soporte={f.soporte_contrato} corto /></div>
