@@ -100,6 +100,16 @@ export class MonitoreoContratacionController {
   }
 
   @UseGuards(ContratacionAccesoGuard)
+  @Get('exportar/resumen-contratos')
+  async exportarResumen(@Res() res: any) {
+    const libro = await this.consulta.resumenPorContrato();
+    aplicarCabecerasPrivadas(res);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="resumen-por-contrato.xlsx"');
+    res.end(libro);
+  }
+
+  @UseGuards(ContratacionAccesoGuard)
   @Get('fuentes')
   fuentes() {
     return this.consulta.fuentes();

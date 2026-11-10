@@ -54,3 +54,39 @@ export function sincronizacionMinutos(): number {
   const n = Number(v);
   return n === 0 ? 0 : Math.min(Math.max(n, 5), 1440);
 }
+
+/**
+ * Claude API (solo backend, nunca NEXT_PUBLIC_*). Sin clave, la lectura nativa de PDF/Excel y las reglas locales siguen funcionando;
+ * solo se pausa la interpretación asistida y las tareas quedan pendientes de reintento.
+ */
+export const ENV_CLAUDE = {
+  API_KEY: 'ANTHROPIC_API_KEY',
+  MODELO: 'SEGUIMIENTO_CLAUDE_MODELO',
+  MAX_LLAMADAS_DIA: 'SEGUIMIENTO_CLAUDE_MAX_LLAMADAS_DIA',
+  MAX_TOKENS_ENTRADA: 'SEGUIMIENTO_CLAUDE_MAX_TOKENS_ENTRADA',
+} as const;
+
+export function claudeApiKey(): string | null {
+  const v = process.env[ENV_CLAUDE.API_KEY]?.trim();
+  return v && v.length >= 20 && !/\s/.test(v) ? v : null;
+}
+
+export function claudeModelo(): string {
+  const v = process.env[ENV_CLAUDE.MODELO]?.trim();
+  return v && /^[a-z0-9][a-z0-9.-]{2,80}$/i.test(v) ? v : 'claude-sonnet-5-5';
+}
+
+const entero = (clave: string, def: number, min: number, max: number): number => {
+  const v = process.env[clave]?.trim();
+  if (!v || !/^\d+$/.test(v)) return def;
+  return Math.min(Math.max(Number(v), min), max);
+};
+
+/** Tope de llamadas por día (0 las desactiva) y de tokens de entrada por llamada: límite de consumo antes de cada solicitud. */
+export const claudeMaxLlamadasDia = () => entero(ENV_CLAUDE.MAX_LLAMADAS_DIA, 50, 0, 2000);
+export const claudeMaxTokensEntrada = () => entero(ENV_CLAUDE.MAX_TOKENS_ENTRADA, 12000, 500, 100000);
+
+/** Estado sin revelar la clave: solo si hay una configurada. */
+export function claudeConfigurado(): boolean {
+  return claudeApiKey() !== null && claudeMaxLlamadasDia() > 0;
+}

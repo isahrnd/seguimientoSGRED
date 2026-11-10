@@ -17,7 +17,7 @@ for k in SEGUIMIENTO_DRIVE_CLIENT_SECRET SEGUIMIENTO_DRIVE_CLIENT_ID POSTGRES_PA
   echo "   $k: $n archivos"; [ "$n" -gt 0 ] && fallo=1
 done
 echo "3) Patrones de credenciales"
-n=$(git grep -lIE 'GOCSPX-|["= :]1//0[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY' $revs -- . ':!*package-lock.json' ':!scripts/verificar-privacidad.sh' 2>/dev/null | wc -l)
+n=$(git grep -lIE 'GOCSPX-|sk-ant-[A-Za-z0-9_-]{20,}|["= :]1//0[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY' $revs -- . ':!*package-lock.json' ':!scripts/verificar-privacidad.sh' 2>/dev/null | wc -l)
 echo "   coincidencias: $n"; [ "$n" -gt 0 ] && fallo=1
 [ $fallo -eq 0 ] && echo "OK: nada privado detectado" || echo "FALLA: revise las rutas indicadas antes de publicar"
 exit $fallo

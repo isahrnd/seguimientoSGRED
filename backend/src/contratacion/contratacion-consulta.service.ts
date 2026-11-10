@@ -9,6 +9,8 @@ import { analizarPrecios, tipoIntervencion } from './contratacion-precios';
 import { normalizar } from './contratacion-sugerencias';
 import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
 import { vistaMatriz } from './contratacion-matriz-vista';
+import { filaResumen } from './contratacion-resumen';
+import { construirLibroResumen } from './contratacion-resumen-excel';
 
 const n = (v: any): number | null => (v === null || v === undefined ? null : typeof v.toNumber === 'function' ? v.toNumber() : Number(v));
 const formatoDe = (mime: string | null | undefined) => (mime === 'application/pdf' ? 'PDF' : mime?.includes('spreadsheetml') ? 'XLSX' : 'OTRO');
@@ -390,6 +392,13 @@ export class ContratacionConsultaService {
       })),
       aviso: 'Los casos reportados como contratados que aún no tienen contrato o soporte equivalente no se incluyen en el total contratado confirmado.',
     };
+  }
+
+  /** Libro Excel «Resumen por contrato»: una fila por expediente, cada cifra con su fuente; matriz, contrato y ejecución en columnas separadas. */
+  async resumenPorContrato(): Promise<Buffer> {
+    const exps = await this.prisma.contratacionExpediente.findMany({ select: { id: true }, orderBy: [{ fecha_documento: 'desc' }, { proceso: 'asc' }] });
+    const detalles: any[] = await Promise.all(exps.map((x) => this.detalle(x.id)));
+    return construirLibroResumen(detalles.map(filaResumen));
   }
 
   async pendientes() {
