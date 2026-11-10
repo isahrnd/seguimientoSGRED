@@ -47,6 +47,10 @@ docker compose run --rm --no-deps -T api node dist/scripts/importar-privados.js
 
 Ver [docs/OPERACION.md](docs/OPERACION.md#google-drive). Sin credenciales de Drive la aplicación funciona con la carpeta local y muestra «Drive sin configurar».
 
+## Antes de publicar
+
+`bash scripts/verificar-privacidad.sh` revisa índice e historial (rutas, valores de secretos locales y patrones de credenciales) sin imprimir contenido. Instálelo como hook: `cp` o enlace a `.git/hooks/pre-push`.
+
 ## Desarrollo y pruebas
 
 ```bash
