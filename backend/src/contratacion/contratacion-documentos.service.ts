@@ -18,6 +18,13 @@ export function parsearRango(h: string | undefined, total: number): { inicio: nu
 
 const nombreSeguro = (s: string) => s.replace(/[^\w.\- ]+/g, '_').slice(0, 120);
 
+/** 503 si la fuente falló por una causa pasajera (reintentable); 410 solo cuando se comprobó que el archivo ya no está o cambió. */
+export function sinFuente(transitorio: boolean): HttpException {
+  return transitorio
+    ? new HttpException('La fuente del documento no respondió; intente de nuevo en unos segundos', HttpStatus.SERVICE_UNAVAILABLE)
+    : new HttpException('El documento ya no está disponible en una fuente autorizada o cambió; actualice el índice', HttpStatus.GONE);
+}
+
 @Injectable()
 export class ContratacionDocumentosService {
   constructor(
@@ -36,6 +43,7 @@ export class ContratacionDocumentosService {
     if (!origenes.some((o) => o.mime === 'application/pdf')) {
       throw new UnsupportedMediaTypeException('Sin vista previa para este formato');
     }
+    let transitorio = false;
     for (const o of origenes) {
       if (o.mime !== 'application/pdf') continue;
       try {
@@ -43,10 +51,11 @@ export class ContratacionDocumentosService {
         if (o.tipo === 'DRIVE' && (await this.enDrive(o, v, rangoHeader, res))) return;
       } catch (e) {
         if (e instanceof HttpException) throw e;
-        // origen caído: se intenta la alternativa autorizada
+        // origen caído: se intenta la alternativa autorizada; si todas fallan por causas pasajeras no se dice «retirado»
+        transitorio = true;
       }
     }
-    throw new HttpException('El documento ya no está disponible en una fuente autorizada o cambió; actualice el índice', HttpStatus.GONE);
+    throw sinFuente(transitorio);
   }
 
   /** Lee el contenido completo de una versión (con los mismos controles que `servir`), con tope de tamaño. */
@@ -57,6 +66,7 @@ export class ContratacionDocumentosService {
     });
     if (!v || v.origenes.length === 0) throw new NotFoundException('Documento no disponible en ninguna fuente autorizada');
     const origenes = [...v.origenes].sort((a, b) => (a.tipo === 'LOCAL' ? -1 : 1) - (b.tipo === 'LOCAL' ? -1 : 1));
+    let transitorio = false;
     for (const o of origenes) {
       try {
         if (o.tipo === 'LOCAL') {
@@ -79,9 +89,10 @@ export class ContratacionDocumentosService {
         return { buf: Buffer.concat(partes), mime: o.mime ?? '', origen: 'DRIVE' };
       } catch (e) {
         if (e instanceof HttpException) throw e;
+        transitorio = true;
       }
     }
-    throw new HttpException('El documento ya no está disponible en una fuente autorizada o cambió; actualice el índice', HttpStatus.GONE);
+    throw sinFuente(transitorio);
   }
 
   private cabeceras(res: any, v: any, origen: string, extra: Record<string, string>) {

@@ -3,13 +3,14 @@ import { use } from "react";
 import Link from "next/link";
 import { Alert, Skeleton, Tag } from "antd";
 import { useDetalleEdificio } from "@/hooks/queries";
-import { PENDIENTE, cop } from "@/lib/format";
+import { PENDIENTE, cop, fechaCorta } from "@/lib/format";
 import { esErrorDeAcceso } from "@/lib/api";
 import { SinAcceso, ErrorCarga } from "@/components/estados";
 import { Volver } from "@/components/volver";
 import { EstadoResolucion, ListaDocumentosEdificio } from "@/components/edificios-soportes";
 import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "@/components/soporte-link";
+import { agruparCotizaciones } from "@/lib/oferta";
 import { discrepanciasDireccion } from "@/lib/direccion";
 
 const Caja = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
@@ -67,16 +68,23 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
 
       {d.cotizaciones.length > 0 && (
         <Caja titulo="Cotizaciones de esta edificación">
-          {Object.entries(d.cotizaciones.reduce<Record<string, typeof d.cotizaciones>>((a, c) => ((a[c.proveedor] ??= []).push(c), a), {})).map(([prov, cs]) => {
+          {agruparCotizaciones(d.cotizaciones).map((cs) => {
             const base = cs.find((c) => c.soporte.pagina !== null) ?? cs[0];
             return (
-              <div key={prov}>
-                <h3 className="largo" style={{ margin: "0 0 4px", fontSize: 17 }}>{prov}</h3>
+              <div key={cs[0].id} style={{ borderTop: "1px solid #E6EAF0", paddingTop: 14, marginTop: 14 }}>
+                <h3 className="largo" style={{ margin: "0 0 4px", fontSize: 17 }}>{base.proveedor}{base.referencia_oferta ? ` · ${base.referencia_oferta}` : ""}{base.fecha_oferta ? ` · ${fechaCorta(base.fecha_oferta)}` : ""}</h3>
                 <div className="importe cifra">{cop(base.importe)}</div>
                 <div className="largo" style={{ fontWeight: 600 }}>{base.concepto}</div>
                 <div className="texto-secundario" style={{ fontSize: 13.5 }}>
                   {base.base === "COSTO_DIRECTO" ? "Costo directo de esta edificación, antes de administración, imprevistos, utilidad e IVA." : "Total según la fuente."}
                 </div>
+                {(base.actividades || base.cantidad || base.tratamiento_aiu) && (
+                  <ul className="largo" style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 14 }}>
+                    {base.actividades && <li><strong>Actividades:</strong> {base.actividades}</li>}
+                    {base.cantidad && <li><strong>Cantidades:</strong> {base.cantidad}</li>}
+                    {base.tratamiento_aiu && <li><strong>AIU e IVA:</strong> {base.tratamiento_aiu}</li>}
+                  </ul>
+                )}
                 {base.alcance_oferta && (
                   <p className="largo" style={{ margin: "8px 0 0" }}>
                     <strong>Es una oferta conjunta:</strong> {base.alcance_oferta}.

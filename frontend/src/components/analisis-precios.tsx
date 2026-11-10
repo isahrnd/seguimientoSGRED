@@ -6,6 +6,7 @@ import type { DetalleExpediente, ReferenciaPrecio, ResultadoPrecio } from "@/typ
 import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "./soporte-link";
 import { BarrasPrecios } from "./barras-precios";
+import { ConciliacionCifras } from "./conciliacion-cifras";
 
 export const RESULTADO_ETQ: Record<ResultadoPrecio, string> = {
   SIN_CONTRATO_SOPORTADO: "Pendiente de soporte contractual",
@@ -97,6 +98,8 @@ export function AnalisisPreciosExpediente({ d }: { d: DetalleExpediente }) {
           </p>
         )}
       </section>
+
+      <ConciliacionCifras d={d} />
 
       <BarrasPrecios d={d} />
 

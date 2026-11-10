@@ -32,6 +32,14 @@ export interface DriveClient {
   descargar(id: string, rango?: string): Promise<DriveDescarga>;
 }
 
+/** Falla de Drive que puede resolverse sola (red, cuota, 5xx): no significa que el archivo se haya retirado. */
+export class DriveTransitorioError extends Error {
+  readonly transitorio = true;
+}
+
+const MOTIVOS_CUOTA = /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|backendError/i;
+const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const CAMPOS = 'id,name,mimeType,md5Checksum,size,modifiedTime,parents,trashed';
 
 export class DriveHttpClient implements DriveClient {
@@ -61,8 +69,24 @@ export class DriveHttpClient implements DriveClient {
     return this.access.token;
   }
 
+  /** GET con hasta 3 intentos ante errores de red, 429, 5xx y 403 por cuota; los demás estados se devuelven tal cual. */
   private async get(url: string, extra: Record<string, string> = {}) {
-    return fetch(url, { headers: { Authorization: `Bearer ${await this.token()}`, ...extra } });
+    let ultimo = 'sin respuesta';
+    for (let intento = 0; intento < 3; intento++) {
+      if (intento > 0) await espera(300 * 3 ** (intento - 1));
+      try {
+        const r = await fetch(url, { headers: { Authorization: `Bearer ${await this.token()}`, ...extra } });
+        if (r.status === 429 || r.status >= 500) { ultimo = String(r.status); continue; }
+        if (r.status === 403) {
+          const cuerpo = await r.clone().text().catch(() => '');
+          if (MOTIVOS_CUOTA.test(cuerpo)) { ultimo = '403 por cuota'; continue; }
+        }
+        return r;
+      } catch (e) {
+        ultimo = (e as Error).message;
+      }
+    }
+    throw new DriveTransitorioError(`Drive no respondió (${ultimo})`);
   }
 
   async listarCarpeta(carpetaId: string, pageToken?: string) {
@@ -104,7 +128,28 @@ export class DriveHttpClient implements DriveClient {
  * Verifica que un archivo sigue dentro de la raíz autorizada, fuera de papelera,
  * que no es un atajo y que la identidad de lectura conserva acceso.
  */
-export async function verificarEnRaiz(cli: DriveClient, id: string, raiz: string): Promise<DriveArchivo | null> {
+const cacheRaiz = new Map<string, { vence: number; f: DriveArchivo }>();
+
+/** Segundos que se reutiliza una verificación positiva (agrupa las lecturas por rango de un mismo visor). 0 la desactiva. */
+export function cacheRaizMs(): number {
+  const n = Number(process.env.SEGUIMIENTO_DRIVE_CACHE_SEGUNDOS ?? 10);
+  return Number.isFinite(n) && n >= 0 && n <= 120 ? n * 1000 : 10_000;
+}
+
+export async function verificarEnRaiz(cli: DriveClient, id: string, raiz: string, ttlMs = cacheRaizMs()): Promise<DriveArchivo | null> {
+  const clave = `${raiz}|${id}`;
+  const hit = cacheRaiz.get(clave);
+  if (hit && hit.vence > Date.now()) return hit.f;
+  const f = await verificarEnRaizSinCache(cli, id, raiz);
+  if (f && ttlMs > 0) cacheRaiz.set(clave, { vence: Date.now() + ttlMs, f });
+  return f;
+}
+
+export function vaciarCacheRaiz() {
+  cacheRaiz.clear();
+}
+
+async function verificarEnRaizSinCache(cli: DriveClient, id: string, raiz: string): Promise<DriveArchivo | null> {
   const f = await cli.obtener(id);
   if (!f || f.trashed || f.mimeType === MIME_ATAJO) return null;
   let actual: DriveArchivo = f;

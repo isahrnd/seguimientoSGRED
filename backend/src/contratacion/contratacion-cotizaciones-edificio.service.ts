@@ -20,6 +20,11 @@ export interface CotizacionEdificioEntrada {
   celda?: string | null;
   verificacion: (typeof VERIFICACIONES)[number];
   nota?: string | null;
+  fecha_oferta?: string | null;
+  referencia_oferta?: string | null;
+  tratamiento_aiu?: string | null;
+  actividades?: string | null;
+  cantidad?: string | null;
   /** Solo si existe un número de proceso verificable; si no, la cotización queda ligada solo al edificio. */
   proceso?: string | null;
 }
@@ -43,6 +48,7 @@ export function validarEntrada(c: CotizacionEdificioEntrada, i: number): string[
   if (pdf === xls) e.push(`${p}: indique una sola fuente: página (PDF) u hoja y celda (Excel)`);
   if (pdf && (!Number.isInteger(c.pagina) || (c.pagina as number) < 1)) e.push(`${p}: página no válida`);
   if (xls && (!c.hoja?.trim() || !CELDA.test(String(c.celda ?? '')))) e.push(`${p}: hoja y celda deben indicarse (p. ej. I2)`);
+  if (c.fecha_oferta && !/^\d{4}-\d{2}-\d{2}$/.test(c.fecha_oferta)) e.push(`${p}: fecha_oferta debe ser AAAA-MM-DD`);
   if (c.verificacion === 'VERIFICADO_EN_IMAGEN' && !pdf) e.push(`${p}: «verificado en imagen» exige página del PDF`);
   return e;
 }
@@ -97,7 +103,10 @@ export class ContratacionCotizacionesEdificioService {
 
   private cambia(x: any, f: { c: CotizacionEdificioEntrada; expedienteId: number | null }) {
     return Number(x.importe) !== f.c.importe || x.base !== f.c.base || x.verificacion !== f.c.verificacion || x.expediente_id !== f.expedienteId ||
-      Number(x.total_oferta ?? 0) !== Number(f.c.total_oferta ?? 0) || (x.nota ?? null) !== (f.c.nota ?? null) || (x.concepto !== f.c.concepto);
+      Number(x.total_oferta ?? 0) !== Number(f.c.total_oferta ?? 0) || (x.nota ?? null) !== (f.c.nota ?? null) || x.concepto !== f.c.concepto ||
+      (x.referencia_oferta ?? null) !== (f.c.referencia_oferta ?? null) || (x.tratamiento_aiu ?? null) !== (f.c.tratamiento_aiu ?? null) ||
+      (x.actividades ?? null) !== (f.c.actividades ?? null) || (x.cantidad ?? null) !== (f.c.cantidad ?? null) ||
+      (x.fecha_oferta ? x.fecha_oferta.toISOString().slice(0, 10) : null) !== (f.c.fecha_oferta ?? null);
   }
 
   async aplicar(payload: any) {
@@ -111,6 +120,8 @@ export class ContratacionCotizacionesEdificioService {
           edificio_id: f.edificioId, version_id: f.versionId, expediente_id: f.expedienteId, proveedor: f.c.proveedor.trim(), concepto: f.c.concepto.trim(),
           importe: f.c.importe, base: f.c.base, total_oferta: f.c.total_oferta ?? null, alcance_oferta: f.c.alcance_oferta ?? null,
           pagina: f.c.pagina ?? null, hoja: f.c.hoja ?? null, celda: f.c.celda ?? null, verificacion: f.c.verificacion, nota: f.c.nota ?? null,
+          fecha_oferta: f.c.fecha_oferta ? new Date(`${f.c.fecha_oferta}T00:00:00Z`) : null, referencia_oferta: f.c.referencia_oferta ?? null,
+          tratamiento_aiu: f.c.tratamiento_aiu ?? null, actividades: f.c.actividades ?? null, cantidad: f.c.cantidad ?? null,
         };
         await tx.contratacionCotizacionEdificio.upsert({ where: { clave: f.clave }, create: { clave: f.clave, ...datos }, update: datos });
       }
@@ -119,9 +130,9 @@ export class ContratacionCotizacionesEdificioService {
   }
 
   /** Cotizaciones de una edificación con su fuente, para la ficha. */
-  async deEdificio(edificioId: number) {
+  async deEdificio(edificioId: number | number[]) {
     const filas = await this.prisma.contratacionCotizacionEdificio.findMany({
-      where: { edificio_id: edificioId },
+      where: { edificio_id: Array.isArray(edificioId) ? { in: edificioId } : edificioId },
       include: { version: { include: { documento: true } }, expediente: { select: { id: true, proceso: true } } },
       orderBy: [{ proveedor: 'asc' }, { id: 'asc' }],
     });
@@ -133,7 +144,9 @@ export class ContratacionCotizacionesEdificioService {
     return filas.map((f) => ({
       id: f.id, proveedor: f.proveedor, concepto: f.concepto, importe: Number(f.importe), base: f.base,
       total_oferta: f.total_oferta === null ? null : Number(f.total_oferta), alcance_oferta: f.alcance_oferta,
-      verificacion: f.verificacion, nota: f.nota,
+      verificacion: f.verificacion, nota: f.nota, edificio_id: f.edificio_id,
+      fecha_oferta: f.fecha_oferta ? f.fecha_oferta.toISOString().slice(0, 10) : null, referencia_oferta: f.referencia_oferta,
+      tratamiento_aiu: f.tratamiento_aiu, actividades: f.actividades, cantidad: f.cantidad,
       proceso: f.expediente ? { id: f.expediente.id, proceso: f.expediente.proceso } : null,
       soporte: {
         version_id: f.version_id, documento_id: f.version.documento_id, documento: f.version.documento.nombre, numero_version: f.version.numero,

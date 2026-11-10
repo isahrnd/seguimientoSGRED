@@ -7,6 +7,7 @@ import { ContratacionEdificiosService } from './contratacion-edificios.service';
 import { diferenciasAlcance, diferenciasSinExplicar, valoresPorSignificado } from './contratacion-comparacion';
 import { analizarPrecios, tipoIntervencion } from './contratacion-precios';
 import { normalizar } from './contratacion-sugerencias';
+import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
 
 const n = (v: any): number | null => (v === null || v === undefined ? null : typeof v.toNumber === 'function' ? v.toNumber() : Number(v));
 const formatoDe = (mime: string | null | undefined) => (mime === 'application/pdf' ? 'PDF' : mime?.includes('spreadsheetml') ? 'XLSX' : 'OTRO');
@@ -307,6 +308,8 @@ export class ContratacionConsultaService {
       valores,
       soportes,
       edificios: edificiosProceso,
+      // Cifras de cotizaciones atribuidas a los edificios del proceso (otras ofertas del mismo proveedor, de otra fecha o alcance).
+      cotizaciones_edificio: await new ContratacionCotizacionesEdificioService(this.prisma).deEdificio(edificiosProceso.map((b) => b.id)),
       documentos_por_edificio: porEdificio,
       comparacion,
       analisis_precios,

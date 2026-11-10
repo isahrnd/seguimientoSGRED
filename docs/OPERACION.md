@@ -18,6 +18,10 @@ Los archivos de análisis de precios (proceso 777) y de edificios confirman docu
 
 Una oferta conjunta puede traer el importe de cada edificio en una tabla del PDF. Se registra con una carga privada `cotizaciones_edificio` (mismo importador, mismo manifiesto con SHA-256). Cada entrada lleva la huella MD5 de la versión, el edificio, el proveedor, el importe, su base (`COSTO_DIRECTO` o `TOTAL`), el total de la oferta y **una sola fuente**: página del PDF u hoja y celda de Excel. La verificación es `VERIFICADO_EN_IMAGEN` (importe leído en la imagen de la página y contrastado con el OCR), `COINCIDE_CON_PDF` (referencia del comparativo) o `PENDIENTE`. Solo se asocia a un expediente si se indica un número de proceso que exista; si no, queda ligada al edificio. Las imágenes y el texto del OCR de trabajo se guardan en la carpeta privada, no en Git.
 
+## Conciliación de cifras de un proveedor
+
+En el expediente, la pestaña de análisis de precios muestra las cifras del mismo proveedor que constan en otras fuentes (otra fecha o alcance) con su categoría, fuente y página, cantidades y tratamiento de AIU e IVA. La diferencia se calcula solo entre importes de la misma base (costo directo con costo directo) y nunca se suma ni sustituye una categoría por otra. Una cotización por edificio no se asocia al proceso sin un número de proceso existente.
+
 ## Google Drive
 
 Lectura únicamente (`drive.readonly`); la aplicación nunca escribe en Drive. La identidad que lee Drive (token del servidor) es independiente de la cuenta que consulta la web.
@@ -25,6 +29,8 @@ Lectura únicamente (`drive.readonly`); la aplicación nunca escribe en Drive. L
 1. Cree en Google Cloud un cliente OAuth «Aplicación de escritorio» y complete en `.env`: `SEGUIMIENTO_DRIVE_CLIENT_ID`, `SEGUIMIENTO_DRIVE_CLIENT_SECRET`, `SEGUIMIENTO_DRIVE_ROOT_ID` (carpeta raíz).
 2. En el equipo con navegador: `cd backend && npm run contratacion:drive-vincular`. Abra la dirección que imprime con la cuenta que tiene lectura sobre la carpeta; guarda el token en `SEGUIMIENTO_DRIVE_TOKEN_FILE` (modo 0600).
 3. Coloque ese token en `<privados>/.drive-token.json` y reinicie `api`. Pulse «Actualizar índice».
+
+Un fallo pasajero de Drive (red, cuota, 5xx) se reintenta hasta 3 veces y, si persiste, el visor responde **503** con «Reintentar»; **410** significa que se comprobó que el archivo ya no está en la raíz autorizada o cambió. Las verificaciones positivas se reutilizan `SEGUIMIENTO_DRIVE_CACHE_SEGUNDOS` (10 por defecto; 0 la desactiva), de modo que retirar un archivo de Drive se refleja en ese plazo.
 
 Si Drive falla, la interfaz sigue mostrando lo disponible, distingue «sin conexión» de «carpeta vacía» e indica la última lectura correcta.
 

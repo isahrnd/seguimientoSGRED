@@ -505,6 +505,11 @@ model ContratacionCotizacionEdificio {
   celda         String?
   verificacion  String   @db.VarChar(30)
   nota          String?
+  fecha_oferta  DateTime? @db.Date
+  referencia_oferta String?
+  tratamiento_aiu String?
+  actividades   String?
+  cantidad      String?
   creado_en     DateTime @default(now())
 
   edificio ContratacionEdificio @relation(fields: [edificio_id], references: [id], onDelete: Cascade)

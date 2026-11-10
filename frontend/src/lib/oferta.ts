@@ -49,3 +49,17 @@ export function documentosParaAvanzar(d: DetalleExpediente): string[] {
   else if (ejec.length === 1) r.push("Acta de ejecución o de pago que respalde el importe de ejecución citado.");
   return r;
 }
+
+import type { CotizacionEdificio } from "@/types/contratacion";
+
+/** Una cotización por documento y fecha (PDF); la referencia de Excel con el mismo importe se agrega a esa misma cotización. */
+export function agruparCotizaciones(cs: CotizacionEdificio[]): CotizacionEdificio[][] {
+  const grupos: CotizacionEdificio[][] = [];
+  for (const c of cs.filter((x) => x.soporte.pagina !== null)) grupos.push([c]);
+  for (const c of cs.filter((x) => x.soporte.pagina === null)) {
+    const g = grupos.find((x) => x[0].proveedor === c.proveedor && x[0].importe === c.importe && x[0].edificio_id === c.edificio_id);
+    if (g) g.push(c);
+    else grupos.push([c]);
+  }
+  return grupos;
+}

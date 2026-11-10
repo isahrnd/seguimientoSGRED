@@ -184,6 +184,7 @@ export interface DetalleExpediente {
     documentos: { documento_id: number; version_id: number | null; nombre: string; categoria: string; categoria_nombre: string; origen: "PROCESO" | "EDIFICIO" }[];
   }[];
   comparacion: ComparacionCotizaciones;
+  cotizaciones_edificio: CotizacionEdificio[];
 }
 
 export type RequisitoResolucion = "VERIFICADA" | "PENDIENTE_SOPORTE" | "NO_APLICA" | "POR_CONFIRMAR_ALCANCE" | "SIN_INTERVENCION";
@@ -308,6 +309,12 @@ export interface CotizacionEdificio {
   alcance_oferta: string | null;
   verificacion: "VERIFICADO_EN_IMAGEN" | "COINCIDE_CON_PDF" | "PENDIENTE";
   nota: string | null;
+  edificio_id: number;
+  fecha_oferta: string | null;
+  referencia_oferta: string | null;
+  tratamiento_aiu: string | null;
+  actividades: string | null;
+  cantidad: string | null;
   proceso: { id: number; proceso: string } | null;
   soporte: SoporteRef;
 }

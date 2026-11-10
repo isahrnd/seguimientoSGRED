@@ -19,6 +19,8 @@ import { ContratacionEdificiosService } from './contratacion-edificios.service';
 import { ContratacionSincronizacionService } from './contratacion-sincronizacion.service';
 import { DriveArchivo, DriveClient } from './contratacion-drive.client';
 
+// Estas pruebas cambian el estado de Drive entre lecturas: sin caché de verificación.
+process.env.SEGUIMIENTO_DRIVE_CACHE_SEGUNDOS = '0';
 const URL = process.env.CONTRATACION_TEST_DATABASE_URL;
 const habilitado = !!URL && /@(127\.0\.0\.1|localhost)[:/]/.test(URL);
 const d = habilitado ? describe : describe.skip;
