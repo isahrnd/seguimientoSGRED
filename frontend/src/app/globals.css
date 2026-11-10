@@ -30,3 +30,10 @@ body { font-family: var(--font-sgred), -apple-system, "Segoe UI", Roboto, sans-s
 .ant-segmented { max-width: 100%; overflow-x: auto; }
 .grupo-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 900px) { .grupo-valores.grupo-3 { grid-template-columns: 1fr; } .grupo-valores.grupo-3 > div { border-right: 0; border-bottom: 1px solid #E6EAF0; } }
+
+/* Foco por teclado siempre visible (Ant Design lo anula en enlaces y botones). */
+a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, [tabindex]:focus-visible, summary:focus-visible, select:focus-visible {
+  outline: 3px solid rgba(27, 58, 107, 0.7) !important;
+  outline-offset: 2px !important;
+}
+.ant-btn-primary:focus-visible { outline-color: #0F6B66 !important; }

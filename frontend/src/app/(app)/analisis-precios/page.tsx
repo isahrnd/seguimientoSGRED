@@ -1,4 +1,5 @@
 "use client";
+import { BotonEnlace } from "@/components/boton-enlace";
 import Link from "next/link";
 import { Alert, Button, Skeleton, Table, Tag, Typography } from "antd";
 import { ArrowRightOutlined } from "@ant-design/icons";
@@ -49,7 +50,7 @@ export default function AnalisisPreciosPage() {
             : <span style={{ color: PALETA.ambar }}>{f.reportado_contratado ? "Reportado; falta el contrato" : PENDIENTE}</span>) },
           { title: "Referencias", render: (_, f) => <span>{f.ofertas} {f.ofertas === 1 ? "oferta" : "ofertas"} · {f.referencias_independientes} independientes{f.rango && <div className="cifra texto-secundario" style={{ fontSize: 13 }}>{cop(f.rango.min)} a {cop(f.rango.max)}</div>}</span> },
           { title: "Lectura", render: (_, f) => <div style={{ maxWidth: 320 }}><ResultadoTag r={f.resultado} /></div> },
-          { title: "", width: 130, render: (_, f) => <Link href={`/expedientes/${f.id}`}><Button type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</Button></Link> },
+          { title: "", width: 130, render: (_, f) => <BotonEnlace href={`/expedientes/${f.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
         ]}
       />
 

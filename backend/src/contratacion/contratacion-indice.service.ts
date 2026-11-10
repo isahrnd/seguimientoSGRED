@@ -10,6 +10,7 @@ import { escanearLocal, resolverDentro } from './contratacion-fuente-local';
 import { extraerCeldas, leerCeldas } from './contratacion-excel';
 import { MODELOS_CON_FUENTE, decidirCelda } from './contratacion-cambios';
 import { normalizar, sugerir } from './contratacion-sugerencias';
+import { completarConOcr, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 
 interface Candidato {
   tipo: 'LOCAL' | 'DRIVE';
@@ -93,6 +94,7 @@ export class ContratacionIndiceService {
   private confirmarVacia = false;
   private trabajo: TrabajoIndice | null = null;
   private secuencia = 0;
+  private readonly ocr = new OcrLocal();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -414,6 +416,21 @@ export class ContratacionIndiceService {
         let hojas: any = null;
         if (cand.mime === 'application/pdf') {
           paginas = (await paginasPdf(await cand.leerBytes())).map((texto, i) => ({ pagina: i + 1, texto }));
+          // Documento escaneado: OCR local solo de las páginas sin texto nativo, guardado por versión y página.
+          const c = await completarConOcr({
+            ejecutor: this.ocr,
+            pdf: () => cand.leerBytes(),
+            paginas,
+            cache: async (pagina) => (await p.contratacionOcrPagina.findUnique({ where: { version_id_pagina: { version_id: v.id, pagina } } }))?.texto ?? null,
+            guardar: async (pagina, texto) => {
+              await p.contratacionOcrPagina.upsert({
+                where: { version_id_pagina: { version_id: v.id, pagina } },
+                create: { version_id: v.id, pagina, texto, motor: MOTOR_OCR },
+                update: { texto, motor: MOTOR_OCR },
+              });
+            },
+          });
+          paginas = c.paginas;
         } else if (cand.mime.includes('spreadsheetml')) {
           const x = await extraerCeldas(await cand.leerBytes());
           celdas = x.celdas;

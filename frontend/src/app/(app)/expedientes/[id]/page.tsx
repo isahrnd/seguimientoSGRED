@@ -1,4 +1,5 @@
 "use client";
+import { BotonEnlace } from "@/components/boton-enlace";
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, Select, Skeleton, Table, Tabs, Tag } from "antd";
@@ -158,7 +159,7 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
                 { title: "Categoría", dataIndex: "categoria_nombre" },
                 { title: "Origen", render: (_, s) => (s.origenes.length === 0 ? "—" : [...new Set(s.origenes.map((o) => `${o.tipo === "LOCAL" ? "Local" : "Drive"}${o.estado === "ACTIVO" ? "" : " (retirado)"}`))].map((t) => <Tag key={t}>{t}</Tag>)) },
                 { title: "Fecha", render: (_, s) => fechaCorta(s.fecha_documento) },
-                { title: "", render: (_, s) => (s.previsualizable && s.version_id ? <Link href={urlVisor(s.version_id)}><Button>Abrir soporte</Button></Link> : <span className="texto-secundario">{s.disponible ? "Sin vista previa para este formato" : "No disponible en ninguna fuente"}</span>) },
+                { title: "", render: (_, s) => (s.previsualizable && s.version_id ? <BotonEnlace href={urlVisor(s.version_id)}>Abrir soporte</BotonEnlace> : <span className="texto-secundario">{s.disponible ? "Sin vista previa para este formato" : "No disponible en ninguna fuente"}</span>) },
               ]} />
           )}
         </section>

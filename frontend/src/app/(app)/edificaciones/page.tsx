@@ -1,4 +1,5 @@
 "use client";
+import { BotonEnlace } from "@/components/boton-enlace";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Empty, Grid, Input, Skeleton, Table, Tag, Typography } from "antd";
@@ -44,7 +45,7 @@ function Contenido() {
                   <div className="texto-secundario largo">{e.direccion ?? ""}</div>
                   <div style={{ margin: "8px 0" }}><Tag color={TONO[e.resolucion.requisito] ?? "default"} style={{ whiteSpace: "normal" }}>{e.resolucion.etiqueta}</Tag></div>
                   <div>{procesos(e)}</div>
-                  <Link href={`/edificaciones/${e.id}`}><Button block type="primary" style={{ marginTop: 10 }}>Abrir ficha · {e.documentos} documentos</Button></Link>
+                  <BotonEnlace href={`/edificaciones/${e.id}`} block type="primary" style={{ marginTop: 10 }}>Abrir ficha · {e.documentos} documentos</BotonEnlace>
                 </li>
               ))}
             </ul>
@@ -55,7 +56,7 @@ function Contenido() {
                 { title: "Resolución", render: (_, e) => <Tag color={TONO[e.resolucion.requisito] ?? "default"} style={{ whiteSpace: "normal" }}>{e.resolucion.etiqueta}</Tag> },
                 { title: "Proceso contractual", render: (_, e) => procesos(e) },
                 { title: "Documentos", align: "right", dataIndex: "documentos", render: (n) => <span className="cifra">{n}</span> },
-                { title: "", width: 130, render: (_, e) => <Link href={`/edificaciones/${e.id}`}><Button type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</Button></Link> },
+                { title: "", width: 130, render: (_, e) => <BotonEnlace href={`/edificaciones/${e.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
               ]} />
           )}
       </div>

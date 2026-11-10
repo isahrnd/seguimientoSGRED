@@ -13,7 +13,7 @@ RUN npx prisma generate && npx tsc -p tsconfig.build.json
 FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production NODE_PATH=/app/dist
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl tesseract-ocr tesseract-ocr-spa poppler-utils && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma

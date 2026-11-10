@@ -7,6 +7,13 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await sesionServidor();
+  if (s === "sin-servicio") {
+    return (
+      <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>
+        <Result status="error" title="El servicio no responde" subTitle="No fue posible conectar con la API. Los datos no se han modificado; intente de nuevo en unos minutos." extra={<a href="">Reintentar</a>} />
+      </main>
+    );
+  }
   if (!s) redirect("/login");
   if (!s.autorizado) {
     return (

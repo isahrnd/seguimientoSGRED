@@ -78,6 +78,8 @@ model ContratacionDocumentoVersion {
   indice      ContratacionDocIndice?
 
   @@unique([documento_id, numero], map: "uq_contratacion_ver_doc_num")
+  ocr_paginas ContratacionOcrPagina[]
+
   @@map("tbl_contratacion_doc_versiones")
 }
 
@@ -462,4 +464,19 @@ model sesiones {
 
   @@index([usuario_id])
   @@map("tbl_sesiones")
+}
+
+/// OCR local de páginas escaneadas, por versión y página (no se envía a servicios externos).
+model ContratacionOcrPagina {
+  id         Int      @id @default(autoincrement())
+  version_id Int
+  pagina     Int
+  texto      String
+  motor      String   @db.VarChar(40)
+  creado_en  DateTime @default(now())
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@unique([version_id, pagina])
+  @@map("tbl_contratacion_ocr_paginas")
 }

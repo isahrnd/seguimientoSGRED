@@ -34,4 +34,5 @@ El frontend más reciente (Análisis de precios y «Actualizar índice») solo e
 - Autenticación: cuentas y sesiones propias (`tbl_usuarios`, `tbl_sesiones`) en lugar del JWT de INFOGRED.
 - Interfaz nueva (Ant Design, pantalla ejecutiva, síntesis económica de cinco valores, gráfico de precios unitarios equivalentes).
 - Búsqueda ampliada a empresas y sectores.
-- Pendiente: OCR local; vinculación de Drive (por tanto proceso 777, Edificio Ejemplo, comparativo general y 29 documentos de Drive no están cargados con datos reales).
+- OCR local por página y versión añadido (no estaba implementado en el origen para este flujo).
+- Pendiente: vinculación de Drive (por tanto proceso 777, Edificio Ejemplo, comparativo general y 29 documentos de Drive no están cargados con datos reales).

@@ -34,7 +34,9 @@ Cuando cambia el valor de una celda de Excel o el PDF que respaldaba una cifra, 
 
 ## OCR local
 
-La lectura de contenido usa texto nativo del PDF y celdas de Excel. El OCR de páginas escaneadas **no está implementado** (tampoco lo estaba en el módulo de origen para este flujo). Pendiente: añadir Tesseract en la imagen y guardar el resultado por versión y página. Los documentos no se envían a servicios externos.
+Orden de lectura: ruta y nombre → texto nativo del PDF o celdas de Excel → OCR local solo de las páginas **sin texto nativo** (documento escaneado). Usa Tesseract (español) y Poppler dentro de la imagen de la API; nada sale del servidor. El resultado se guarda por versión y página en `tbl_contratacion_ocr_paginas` y no se repite en reindexados posteriores. Se desactiva con `SEGUIMIENTO_OCR=false`; el idioma se cambia con `SEGUIMIENTO_OCR_IDIOMA`.
+
+Prueba real sobre un PDF ficticio solo-imagen: `docker compose run --rm --no-deps -T -v ./backend/scripts:/t:ro api node /t/ocr-verificacion.js`. Las 3 PDF reales actuales tienen texto nativo, por lo que el OCR no se activó con ellos; cuando llegue un escaneado de Drive se aplicará en el siguiente reindexado.
 
 ## Acceso fuera de la red interna
 

@@ -1,4 +1,5 @@
 "use client";
+import { BotonEnlace } from "./boton-enlace";
 import Link from "next/link";
 import { Alert, Button, Tag } from "antd";
 import { FileExcelOutlined, FilePdfOutlined } from "@ant-design/icons";
@@ -34,7 +35,7 @@ export function FilaDocumento({ nombre, detalle, versionId, disponible = true, e
         {extra}
       </div>
       {versionId && disponible
-        ? <Link href={urlAbrirOriginal(nombre, versionId)}><Button>Abrir soporte</Button></Link>
+        ? <BotonEnlace href={urlAbrirOriginal(nombre, versionId)}>Abrir soporte</BotonEnlace>
         : <span className="texto-secundario" style={{ fontSize: 13.5 }}>No disponible en ninguna fuente</span>}
     </li>
   );

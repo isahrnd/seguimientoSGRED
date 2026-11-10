@@ -1,4 +1,5 @@
 "use client";
+import { BotonEnlace } from "@/components/boton-enlace";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Empty, Grid, Input, Pagination, Segmented, Select, Skeleton, Table, Tag, Typography } from "antd";
@@ -49,7 +50,7 @@ function Contenido() {
   const d = q.data;
   const hayFiltros = valores.categoria || valores.formato || valores.edificacion || valores.origen || valores.expediente;
   const abrir = (x: DocumentoBiblioteca) => x.version_id && x.disponible
-    ? <Link href={urlAbrirOriginal(x.nombre, x.version_id)}><Button type="primary">Abrir soporte</Button></Link>
+    ? <BotonEnlace href={urlAbrirOriginal(x.nombre, x.version_id)} type="primary">Abrir soporte</BotonEnlace>
     : <span className="texto-secundario" style={{ fontSize: 13.5 }}>No disponible</span>;
   const estado = (x: DocumentoBiblioteca) => x.clasificado
     ? <Tag color="success">{x.categoria?.nombre ?? "Clasificado"}</Tag>

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 export async function sesionServidor(): Promise<{
   usuario: { id: number; nombre: string; correo: string };
   autorizado: boolean;
-} | null> {
+} | null | "sin-servicio"> {
   const jar = await cookies();
   const sid = jar.get("sgred_sid")?.value;
   if (!sid) return null;
@@ -13,8 +13,9 @@ export async function sesionServidor(): Promise<{
       headers: { cookie: `sgred_sid=${sid}` },
       cache: "no-store",
     });
+    if (r.status >= 500) return "sin-servicio";
     return r.ok ? await r.json() : null;
   } catch {
-    return null;
+    return "sin-servicio";
   }
 }

@@ -1,4 +1,5 @@
 "use client";
+import { BotonEnlace } from "./boton-enlace";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, DatePicker, Empty, Grid, Input, Segmented, Select, Skeleton, Table, Tag, Typography } from "antd";
@@ -175,7 +176,7 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
                   <EstadoExpediente e={e} />
                   <Cifra e={e} />
                 </div>
-                <Link href={`/expedientes/${e.id}`}><Button block style={{ marginTop: 10 }} type="primary">Abrir expediente</Button></Link>
+                <BotonEnlace href={`/expedientes/${e.id}`} block style={{ marginTop: 10 }} type="primary">Abrir expediente</BotonEnlace>
               </li>
             ))}
           </ul>
@@ -192,7 +193,7 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
               { title: "Estado", key: "s", render: (_, e) => <EstadoExpediente e={e} /> },
               { title: "Documento", dataIndex: "fecha_documento", key: "f", responsive: ["xl"], render: (f) => fechaCorta(f) },
               { title: <div style={{ textAlign: "right" }}>Cifra principal</div>, key: "c", align: "right", render: (_, e) => <Cifra e={e} /> },
-              { title: "", key: "a", width: 120, render: (_, e) => <Link href={`/expedientes/${e.id}`}><Button type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</Button></Link> },
+              { title: "", key: "a", width: 120, render: (_, e) => <BotonEnlace href={`/expedientes/${e.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
             ]}
           />
         )}
