@@ -1,0 +1,42 @@
+{
+  "name": "seguimiento-sgred-backend",
+  "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start": "node dist/src/main.js",
+    "start:dev": "ts-node -r tsconfig-paths/register src/main.ts",
+    "test": "jest",
+    "prisma:generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy",
+    "usuarios:crear": "ts-node -r tsconfig-paths/register scripts/usuarios-cli.ts crear",
+    "contratacion:reindexar": "ts-node -r tsconfig-paths/register scripts/contratacion-cli.ts reindexar",
+    "contratacion:importar": "ts-node -r tsconfig-paths/register scripts/contratacion-cli.ts importar",
+    "contratacion:importar-privados": "ts-node -r tsconfig-paths/register scripts/importar-privados.ts",
+    "contratacion:drive-vincular": "ts-node -r tsconfig-paths/register scripts/contratacion-cli.ts drive-vincular"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.13",
+    "@nestjs/core": "^11.0.13",
+    "@nestjs/platform-express": "^11.0.13",
+    "@prisma/client": "^6.19.2",
+    "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
+    "pdf-parse": "^1.1.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.1",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.14.0",
+    "jest": "^29.7.0",
+    "prisma": "^6.19.2",
+    "ts-jest": "^29.3.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.8.3"
+  }
+}

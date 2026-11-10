@@ -1,0 +1,29 @@
+{
+  "name": "seguimiento-sgred-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3310",
+    "build": "next build",
+    "start": "next start -p 3310 -H 0.0.0.0",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "@ant-design/nextjs-registry": "^1.0.2",
+    "@tanstack/react-query": "^5.71.10",
+    "antd": "^5.27.0",
+    "dayjs": "^1.11.13",
+    "next": "^15.5.28",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}

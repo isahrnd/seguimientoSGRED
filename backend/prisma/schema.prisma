@@ -1,0 +1,465 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ContratacionExpediente {
+  id                 Int       @id @default(autoincrement())
+  proceso            String    @unique
+  tipo               String    @default("DEMOLICION")
+  intervencion       String
+  objeto             String?
+  estado_documentado String    @default("PENDIENTE_SOPORTE")
+  /// DEMOLICION | RCD_SIN_DEMOLICION: solo lo fija una confirmación privada; sin valor la resolución se exige.
+  alcance_confirmado String?
+  fecha_documento    DateTime? @db.Date
+  creado_en          DateTime  @default(now())
+  actualizado_en     DateTime  @updatedAt
+
+  documentos  ContratacionDocumento[]
+  hechos      ContratacionHecho[]
+  ofertas     ContratacionOferta[]
+  lineas      ContratacionLinea[]
+  referencias ContratacionReferencia[]
+  valores     ContratacionValor[]
+  contratos   ContratacionContrato[]
+  edificios   ContratacionExpedienteEdificio[]
+  alertas     ContratacionAlertaCifra[]
+
+  @@index([tipo], map: "idx_contratacion_exp_tipo")
+  @@map("tbl_contratacion_expedientes")
+}
+
+model ContratacionDocumento {
+  id                   Int       @id @default(autoincrement())
+  expediente_id        Int?
+  nombre               String
+  categoria            String
+  fecha_documento      DateTime? @db.Date
+  proceso_detectado    String?
+  estado_clasificacion String    @default("PENDIENTE_CLASIFICACION")
+  /// EDIFICIO | PROCESO | GENERAL, confirmado por revisión privada.
+  alcance              String?
+  creado_en            DateTime  @default(now())
+  actualizado_en       DateTime  @updatedAt
+
+  expediente ContratacionExpediente?        @relation(fields: [expediente_id], references: [id], onDelete: SetNull)
+  versiones  ContratacionDocumentoVersion[]
+  sugerencias ContratacionDocSugerencia[]
+  edificios   ContratacionDocumentoEdificio[]
+
+  @@index([expediente_id], map: "idx_contratacion_doc_exp")
+  @@map("tbl_contratacion_documentos")
+}
+
+model ContratacionDocumentoVersion {
+  id             Int       @id @default(autoincrement())
+  documento_id   Int
+  numero         Int
+  md5            String    @unique
+  tamano         BigInt?
+  vigente        Boolean   @default(true)
+  creado_en      DateTime  @default(now())
+  reemplazada_en DateTime?
+
+  documento   ContratacionDocumento         @relation(fields: [documento_id], references: [id], onDelete: Restrict)
+  origenes    ContratacionDocumentoOrigen[]
+  ofertas     ContratacionOferta[]
+  lineas      ContratacionLinea[]
+  referencias ContratacionReferencia[]
+  valores     ContratacionValor[]
+  contratos   ContratacionContrato[]
+  hechos      ContratacionHecho[]
+  resoluciones ContratacionResolucion[]
+  indice      ContratacionDocIndice?
+
+  @@unique([documento_id, numero], map: "uq_contratacion_ver_doc_num")
+  @@map("tbl_contratacion_doc_versiones")
+}
+
+model ContratacionDocumentoOrigen {
+  id              Int       @id @default(autoincrement())
+  version_id      Int
+  tipo            String
+  id_origen       String
+  nombre_original String
+  ruta            String?
+  mime            String?
+  tamano          BigInt?
+  modificado_en   DateTime?
+  estado          String    @default("ACTIVO")
+  motivo_retiro   String?
+  visto_en        DateTime  @default(now())
+  creado_en       DateTime  @default(now())
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Restrict)
+
+  @@unique([tipo, id_origen, version_id], map: "uq_contratacion_origen")
+  @@index([tipo, id_origen, estado], map: "idx_contratacion_origen_busqueda")
+  @@map("tbl_contratacion_doc_origenes")
+}
+
+model ContratacionFuenteEstado {
+  tipo            String    @id
+  estado          String    @default("SIN_CONFIGURAR")
+  ultimo_intento  DateTime?
+  ultima_correcta DateTime?
+  total           Int?
+  detalle         String?
+
+  @@map("tbl_contratacion_fuentes_estado")
+}
+
+model ContratacionHecho {
+  id            Int      @id @default(autoincrement())
+  expediente_id Int
+  clave         String
+  tipo          String
+  titulo        String
+  detalle       String?
+  atributos     Json?
+  version_id    Int?
+  pagina        Int?
+  hoja String?
+  celda String?
+  creado_en     DateTime @default(now())
+
+  expediente ContratacionExpediente        @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+  version    ContratacionDocumentoVersion? @relation(fields: [version_id], references: [id], onDelete: Restrict)
+
+  @@unique([expediente_id, clave], map: "uq_contratacion_hecho")
+  @@map("tbl_contratacion_hechos")
+}
+
+model ContratacionOferta {
+  id            Int       @id @default(autoincrement())
+  expediente_id Int
+  clave         String
+  proveedor     String
+  grupo_oferta  String
+  revision      Int       @default(1)
+  fecha_oferta  DateTime? @db.Date
+  incluye       String[]
+  excluye       String[]
+  notas         String?
+  version_id    Int?
+  pagina        Int?
+  hoja String?
+  celda String?
+  creado_en     DateTime  @default(now())
+
+  expediente ContratacionExpediente        @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+  version    ContratacionDocumentoVersion? @relation(fields: [version_id], references: [id], onDelete: Restrict)
+  lineas     ContratacionLinea[]
+  valores    ContratacionValor[]
+  contratos  ContratacionContrato[]
+
+  @@unique([expediente_id, clave], map: "uq_contratacion_oferta")
+  @@map("tbl_contratacion_ofertas")
+}
+
+model ContratacionLinea {
+  id                Int      @id @default(autoincrement())
+  expediente_id     Int
+  oferta_id         Int?
+  clave             String
+  actividad         String
+  descripcion       String
+  cantidad          Decimal? @db.Decimal(20, 4)
+  unidad            String
+  precio_unitario   Decimal? @db.Decimal(20, 4)
+  total             Decimal? @db.Decimal(20, 2)
+  base_economica    String
+  grupo_comparacion String?
+  derivado          Boolean  @default(false)
+  estado_revision   String   @default("VERIFICADO")
+  nota              String?
+  version_id        Int?
+  pagina            Int?
+  hoja String?
+  celda String?
+  creado_en         DateTime @default(now())
+
+  expediente ContratacionExpediente        @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+  oferta     ContratacionOferta?           @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  version    ContratacionDocumentoVersion? @relation(fields: [version_id], references: [id], onDelete: Restrict)
+
+  @@unique([expediente_id, clave], map: "uq_contratacion_linea")
+  @@map("tbl_contratacion_lineas")
+}
+
+model ContratacionReferencia {
+  id            Int       @id @default(autoincrement())
+  expediente_id Int
+  clave         String
+  entidad       String
+  proveedor     String?
+  proceso_ref   String?
+  fecha         DateTime? @db.Date
+  objeto        String
+  valor         Decimal?  @db.Decimal(20, 2)
+  unidad        String    @default("GLOBAL")
+  condiciones   String?
+  version_id    Int?
+  pagina        Int?
+  hoja String?
+  celda String?
+  creado_en     DateTime  @default(now())
+
+  expediente ContratacionExpediente        @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+  version    ContratacionDocumentoVersion? @relation(fields: [version_id], references: [id], onDelete: Restrict)
+
+  @@unique([expediente_id, clave], map: "uq_contratacion_referencia")
+  @@map("tbl_contratacion_referencias")
+}
+
+model ContratacionValor {
+  id             Int      @id @default(autoincrement())
+  expediente_id  Int
+  oferta_id      Int?
+  clave          String
+  tipo           String
+  concepto       String
+  importe        Decimal  @db.Decimal(20, 2)
+  estado_soporte String   @default("RESPALDADO")
+  version_id     Int?
+  pagina         Int?
+  hoja String?
+  celda String?
+  creado_en      DateTime @default(now())
+
+  expediente ContratacionExpediente        @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+  oferta     ContratacionOferta?           @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  version    ContratacionDocumentoVersion? @relation(fields: [version_id], references: [id], onDelete: Restrict)
+
+  @@unique([expediente_id, clave], map: "uq_contratacion_valor")
+  @@index([tipo], map: "idx_contratacion_valor_tipo")
+  @@map("tbl_contratacion_valores")
+}
+
+model ContratacionContrato {
+  id            Int       @id @default(autoincrement())
+  expediente_id Int
+  oferta_id     Int?
+  clave         String
+  tipo_acto     String
+  numero        String?
+  fecha_acto    DateTime? @db.Date
+  alcance       String?
+  justificacion String?
+  valor         Decimal   @db.Decimal(20, 2)
+  version_id    Int?
+  pagina        Int?
+  hoja String?
+  celda String?
+  creado_en     DateTime  @default(now())
+
+  expediente ContratacionExpediente        @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+  oferta     ContratacionOferta?           @relation(fields: [oferta_id], references: [id], onDelete: SetNull)
+  version    ContratacionDocumentoVersion? @relation(fields: [version_id], references: [id], onDelete: Restrict)
+
+  @@unique([expediente_id, clave], map: "uq_contratacion_contrato")
+  @@map("tbl_contratacion_contratos")
+}
+
+model ContratacionImportacion {
+  id         Int      @id @default(autoincrement())
+  hash       String
+  estado     String
+  resumen    Json?
+  creado_por Int?
+  creado_en  DateTime @default(now())
+
+  auditoria ContratacionAuditoria[]
+
+  @@index([hash], map: "idx_contratacion_imp_hash")
+  @@map("tbl_contratacion_importaciones")
+}
+
+model ContratacionAuditoria {
+  id             Int      @id @default(autoincrement())
+  importacion_id Int?
+  entidad        String
+  clave          String
+  expediente_id  Int?
+  accion         String
+  anterior       Json?
+  nuevo          Json?
+  creado_en      DateTime @default(now())
+
+  importacion ContratacionImportacion? @relation(fields: [importacion_id], references: [id], onDelete: SetNull)
+
+  @@index([entidad, clave], map: "idx_contratacion_aud_clave")
+  @@map("tbl_contratacion_auditoria")
+}
+
+/// Texto normalizado (nombre, carpeta y extracto) para buscar. Es un dato derivado: no sustituye al documento.
+model ContratacionDocIndice {
+  version_id Int      @id
+  texto      String
+  hojas      Json?
+  extraido_en DateTime @default(now())
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@map("tbl_contratacion_doc_indice")
+}
+
+/// Sugerencias con su evidencia. Una sugerencia no es una asociación confirmada ni toca importes.
+model ContratacionDocSugerencia {
+  id             Int       @id @default(autoincrement())
+  documento_id   Int
+  tipo           String
+  valor          String
+  fuente_tipo    String
+  fuente_detalle String
+  estado         String    @default("SUGERIDA")
+  confirmada_en  DateTime?
+  creado_en      DateTime  @default(now())
+
+  documento ContratacionDocumento @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+
+  @@unique([documento_id, tipo, valor, fuente_tipo, fuente_detalle], map: "uq_contratacion_sugerencia")
+  @@index([tipo, valor], map: "idx_contratacion_sug_valor")
+  @@map("tbl_contratacion_doc_sugerencias")
+}
+
+/// Edificación consultable aunque su relación con un contrato no esté confirmada.
+model ContratacionEdificio {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  nombre_norm    String   @unique
+  direccion      String?
+  creado_en      DateTime @default(now())
+  actualizado_en DateTime @updatedAt
+
+  expedientes ContratacionExpedienteEdificio[]
+  documentos  ContratacionDocumentoEdificio[]
+  resoluciones ContratacionResolucionEdificio[]
+
+  @@map("tbl_contratacion_edificios")
+}
+
+/// Un proceso puede cubrir varios edificios; el valor contratado vive solo en el contrato (no se divide ni se duplica).
+model ContratacionExpedienteEdificio {
+  id            Int      @id @default(autoincrement())
+  expediente_id Int
+  edificio_id   Int
+  estado        String   @default("CONFIRMADA")
+  creado_en     DateTime @default(now())
+
+  expediente ContratacionExpediente @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+  edificio   ContratacionEdificio   @relation(fields: [edificio_id], references: [id], onDelete: Cascade)
+
+  @@unique([expediente_id, edificio_id], map: "uq_contratacion_exp_edif")
+  @@map("tbl_contratacion_expediente_edificios")
+}
+
+/// Documento con edificio confirmado (con o sin proceso contractual).
+model ContratacionDocumentoEdificio {
+  id           Int      @id @default(autoincrement())
+  documento_id Int
+  edificio_id  Int
+  creado_en    DateTime @default(now())
+
+  documento ContratacionDocumento @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+  edificio  ContratacionEdificio  @relation(fields: [edificio_id], references: [id], onDelete: Cascade)
+
+  @@unique([documento_id, edificio_id], map: "uq_contratacion_doc_edif")
+  @@map("tbl_contratacion_documento_edificios")
+}
+
+/// Acto administrativo de demolición. Una resolución puede identificar varios edificios.
+model ContratacionResolucion {
+  id                  Int       @id @default(autoincrement())
+  numero              String    @unique
+  fecha               DateTime? @db.Date
+  tipo                String    @default("DEMOLICION")
+  estado_verificacion String    @default("VERIFICADA")
+  version_id          Int?
+  pagina              Int?
+  creado_en           DateTime  @default(now())
+
+  edificios ContratacionResolucionEdificio[]
+  version   ContratacionDocumentoVersion?     @relation(fields: [version_id], references: [id], onDelete: Restrict)
+
+  @@map("tbl_contratacion_resoluciones")
+}
+
+model ContratacionResolucionEdificio {
+  id            Int @id @default(autoincrement())
+  resolucion_id Int
+  edificio_id   Int
+
+  resolucion ContratacionResolucion @relation(fields: [resolucion_id], references: [id], onDelete: Cascade)
+  edificio   ContratacionEdificio   @relation(fields: [edificio_id], references: [id], onDelete: Cascade)
+
+  @@unique([resolucion_id, edificio_id], map: "uq_contratacion_res_edif")
+  @@map("tbl_contratacion_resolucion_edificios")
+}
+
+/// Cifra confirmada cuya celda de origen cambió en una versión nueva del archivo: se conserva la versión anterior y se pide revisión.
+model ContratacionAlertaCifra {
+  id                  Int       @id @default(autoincrement())
+  expediente_id       Int
+  entidad             String
+  clave               String
+  hoja                String
+  celda               String
+  version_anterior_id Int
+  version_nueva_id    Int
+  valor_anterior      String?
+  valor_nuevo         String?
+  estado              String    @default("PENDIENTE")
+  creado_en           DateTime  @default(now())
+  resuelta_en         DateTime?
+
+  expediente ContratacionExpediente @relation(fields: [expediente_id], references: [id], onDelete: Cascade)
+
+  @@unique([entidad, clave, expediente_id, version_nueva_id], map: "uq_contratacion_alerta")
+  @@map("tbl_contratacion_alertas_cifra")
+}
+
+/// Valor de las celdas que respaldan cifras confirmadas, por versión del archivo. Permite detectar que una celda cambió
+/// cuando llega una versión nueva, aunque el archivo anterior ya no esté en la fuente.
+model ContratacionCeldaRespaldo {
+  id         Int      @id @default(autoincrement())
+  version_id Int
+  hoja       String
+  celda      String
+  valor      String?
+  creado_en  DateTime @default(now())
+
+  @@unique([version_id, hoja, celda], map: "uq_contratacion_celda_respaldo")
+  @@map("tbl_contratacion_celdas_respaldo")
+}
+
+/// Cuentas de consulta de este despliegue (no se importan usuarios municipales).
+model usuarios {
+  id            Int        @id @default(autoincrement())
+  correo        String     @unique @db.VarChar(200)
+  nombre        String     @db.VarChar(200)
+  password_hash String     @db.VarChar(300)
+  estado        Boolean    @default(true)
+  creado_en     DateTime   @default(now())
+  sesiones      sesiones[]
+
+  @@map("tbl_usuarios")
+}
+
+/// Sesiones validadas en servidor. Solo se guarda el hash SHA-256 del identificador de la cookie.
+model sesiones {
+  id         Int      @id @default(autoincrement())
+  token_hash String   @unique @db.VarChar(64)
+  usuario_id Int
+  usuario    usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  creada_en  DateTime @default(now())
+  expira_en  DateTime
+
+  @@index([usuario_id])
+  @@map("tbl_sesiones")
+}

@@ -1,0 +1,32 @@
+:root { color-scheme: light; }
+html, body { margin: 0; background: #F3F5F9; color: #1A2433; }
+body { font-family: var(--font-sgred), -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+/* Cifras alineadas: las columnas de importes se leen en vertical. */
+.cifra { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; white-space: nowrap; }
+.contenedor { width: 100%; max-width: 1760px; margin: 0 auto; padding: 24px 32px 56px; }
+@media (max-width: 767px) { .contenedor { padding: 16px 14px 40px; } }
+.texto-secundario { color: #4A5568; }
+.largo { overflow-wrap: break-word; word-break: normal; }
+/* Foco visible y consistente para teclado */
+:focus-visible { outline: 3px solid rgba(27, 58, 107, 0.55); outline-offset: 2px; border-radius: 4px; }
+.saltar { position: absolute; left: -999px; top: 8px; background: #1B3A6B; color: #fff; padding: 8px 14px; border-radius: 6px; z-index: 100; }
+.saltar:focus { left: 8px; }
+/* Las tablas anchas solo se desplazan dentro de su componente */
+.ant-table-wrapper { max-width: 100%; }
+.seccion { margin-top: 32px; }
+.seccion > h2 { font-size: 18px; margin: 0 0 12px; font-weight: 650; }
+.grupo-valores { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border: 1px solid #D5DBE5; border-radius: 8px; background: #fff; overflow: hidden; }
+.grupo-valores > div { padding: 16px 18px; border-right: 1px solid #E6EAF0; min-width: 0; }
+.grupo-valores > div:last-child { border-right: 0; }
+@media (max-width: 1100px) { .grupo-valores { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grupo-valores > div { border-bottom: 1px solid #E6EAF0; } }
+@media (max-width: 600px) { .grupo-valores { grid-template-columns: 1fr; } .grupo-valores > div { border-right: 0; } }
+.etq-valor { font-size: 13px; color: #4A5568; font-weight: 600; margin-bottom: 4px; }
+.importe { font-size: 23px; line-height: 1.15; font-weight: 700; letter-spacing: -0.01em; }
+@media (min-width: 1600px) { .importe { font-size: 30px; } body { font-size: 16px; } }
+
+/* Sin desplazamiento horizontal global: los hijos de grillas y pestañas pueden encogerse y solo las tablas anchas se desplazan. */
+.ant-layout, .ant-layout-content, .contenedor > *, .ant-tabs, .ant-tabs-content-holder, .ant-tabs-content, .ant-tabs-tabpane, [style*="display: grid"] > * { min-width: 0; }
+.ant-segmented { max-width: 100%; overflow-x: auto; }
+.grupo-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .grupo-valores.grupo-3 { grid-template-columns: 1fr; } .grupo-valores.grupo-3 > div { border-right: 0; border-bottom: 1px solid #E6EAF0; } }

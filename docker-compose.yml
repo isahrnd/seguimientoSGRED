@@ -1,0 +1,58 @@
+name: seguimiento-sgred
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-seguimiento_sgred}
+      POSTGRES_USER: ${POSTGRES_USER:-sgred}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD en .env}
+    ports:
+      - "127.0.0.1:${SGRED_DB_PUERTO:-55450}:5432"
+    volumes:
+      - sgred_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sgred}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-seguimiento_sgred}?schema=public
+      PORT: "4310"
+      SEGUIMIENTO_DOCS_DIR: /privados/contrataciones
+      SEGUIMIENTO_USUARIO_ID: ${SEGUIMIENTO_USUARIO_ID:-}
+      SEGUIMIENTO_SESION_HORAS: ${SEGUIMIENTO_SESION_HORAS:-8}
+      SEGUIMIENTO_COOKIE_SEGURA: ${SEGUIMIENTO_COOKIE_SEGURA:-false}
+      SEGUIMIENTO_SYNC_MINUTOS: ${SEGUIMIENTO_SYNC_MINUTOS:-30}
+      SEGUIMIENTO_DRIVE_ROOT_ID: ${SEGUIMIENTO_DRIVE_ROOT_ID:-}
+      SEGUIMIENTO_DRIVE_CLIENT_ID: ${SEGUIMIENTO_DRIVE_CLIENT_ID:-}
+      SEGUIMIENTO_DRIVE_CLIENT_SECRET: ${SEGUIMIENTO_DRIVE_CLIENT_SECRET:-}
+      SEGUIMIENTO_DRIVE_TOKEN_FILE: ${SEGUIMIENTO_DRIVE_TOKEN_FILE:-/privados/.drive-token.json}
+      SEGUIMIENTO_DRIVE_ABRIR_DIRECTO: ${SEGUIMIENTO_DRIVE_ABRIR_DIRECTO:-false}
+    volumes:
+      # Documentos e importaciones privados: solo lectura, fuera del repositorio.
+      - ${SGRED_PRIVADOS_DIR:?defina SGRED_PRIVADOS_DIR en .env}:/privados:ro
+    ports:
+      - "127.0.0.1:${SGRED_API_PUERTO:-4310}:4310"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_INTERNA: http://api:4310
+    depends_on:
+      - api
+    environment:
+      API_INTERNA: http://api:4310
+    ports:
+      - "127.0.0.1:${SGRED_WEB_PUERTO:-3310}:3310"
+
+volumes:
+  sgred_pgdata:

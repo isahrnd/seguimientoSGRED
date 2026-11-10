@@ -1,0 +1,72 @@
+"use client";
+import { Tag } from "antd";
+import { cop, ESTADO_VALOR_ETQ, PENDIENTE } from "@/lib/format";
+import type { DetalleExpediente, ImporteSignificado, ValorSignificado } from "@/types/contratacion";
+import { PALETA } from "@/theme/theme";
+import { SoporteLink } from "./soporte-link";
+
+const QUE_ES: Record<ValorSignificado["tipo"], string> = {
+  PRESUPUESTO_OFICIAL: "Presupuesto oficial",
+  COTIZACION: "Cotización",
+  OFERTA_SELECCIONADA: "Oferta seleccionada",
+  VALOR_CONTRATADO: "Contratado",
+  VALOR_EJECUTADO: "Ejecutado",
+};
+
+const FALTA: Record<ValorSignificado["tipo"], string> = {
+  PRESUPUESTO_OFICIAL: "Falta el documento que fija el presupuesto.",
+  COTIZACION: "No hay cotización registrada.",
+  OFERTA_SELECCIONADA: "Falta el soporte de la selección.",
+  VALOR_CONTRATADO: "Falta el contrato o acto de adjudicación.",
+  VALOR_EJECUTADO: "Faltan actas de ejecución.",
+};
+
+function Importe({ i, grande }: { i: ImporteSignificado; grande: boolean }) {
+  return (
+    <div style={{ marginTop: grande ? 0 : 10 }}>
+      <div className={grande ? "importe cifra" : "cifra"} style={{ fontSize: grande ? undefined : 17, fontWeight: grande ? undefined : 650, color: i.estado_soporte === "CITADO_SIN_ACTA" ? PALETA.ambar : PALETA.texto }}>
+        {cop(i.importe)}
+      </div>
+      {(i.proveedor || i.concepto) && <div className="texto-secundario largo" style={{ fontSize: 13.5 }}>{[i.proveedor, i.concepto].filter(Boolean).join(" · ")}</div>}
+      {i.estado_soporte === "CITADO_SIN_ACTA" && <div style={{ fontSize: 13, color: PALETA.ambar, fontWeight: 600 }}>Citado en el análisis; acta pendiente</div>}
+      <div style={{ marginTop: 2 }}><SoporteLink soporte={i.soporte} /></div>
+    </div>
+  );
+}
+
+/** Los cinco valores económicos, cada uno con lo que representa y su fuente. El pago se muestra solo si existe soporte. */
+export function SintesisEconomica({ d }: { d: DetalleExpediente }) {
+  const valores = d.comparacion.valores;
+  const pagos = d.ejecucion.valores.filter((v) => /pago|desembolso|cuenta de cobro/i.test(v.concepto));
+  return (
+    <section aria-label="Síntesis económica">
+      <div className="grupo-valores">
+        {valores.map((v) => (
+          <div key={v.tipo}>
+            <div className="etq-valor">{QUE_ES[v.tipo]}</div>
+            {v.importes.length === 0 ? (
+              <>
+                <div style={{ fontSize: 18, fontWeight: 650, color: PALETA.ambar }}>{PENDIENTE}</div>
+                <div className="texto-secundario" style={{ fontSize: 13.5, marginTop: 4 }}>{FALTA[v.tipo]}</div>
+              </>
+            ) : (
+              <>
+                {v.importes.slice(0, 3).map((i, k) => <Importe key={k} i={i} grande={k === 0} />)}
+                {v.importes.length > 3 && <div className="texto-secundario" style={{ fontSize: 13, marginTop: 8 }}>y {v.importes.length - 3} más en el detalle</div>}
+                {v.estado !== "SOPORTADO" && <Tag color="warning" style={{ marginTop: 8 }}>{ESTADO_VALOR_ETQ[v.estado]}</Tag>}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      {pagos.length > 0 && (
+        <div style={{ marginTop: 12, padding: "12px 16px", background: PALETA.petroleoFondo, borderRadius: 8 }}>
+          <strong>Pagos con soporte: </strong>
+          {pagos.map((p) => (
+            <span key={p.id} style={{ marginRight: 16 }} className="cifra">{cop(p.importe)} <SoporteLink soporte={p.soporte} corto /></span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
