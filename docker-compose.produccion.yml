@@ -2,6 +2,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.produccion.yml up -d --build
 # Solo el frontend sale a Internet, y únicamente a través del túnel (conexión saliente; no se abre ningún puerto).
 # La API y PostgreSQL no publican puertos: viven en la red privada de Compose.
+# El túnel usa HTTP/2 (TCP 7844): en redes que bloquean UDP, QUIC no conecta.
 services:
   db:
     ports: !reset []
@@ -14,7 +15,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2025.11.1
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    command: tunnel --no-autoupdate --protocol http2 run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?defina CLOUDFLARE_TUNNEL_TOKEN en el .env del servidor}
     depends_on:
