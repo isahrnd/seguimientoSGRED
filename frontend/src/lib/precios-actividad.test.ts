@@ -60,33 +60,39 @@ describe("frentes de un costo directo por unidad", () => {
   });
 });
 
+const AREA = { estado: "DOCUMENTADA", valor: 100, tipo: "CONSTRUIDA", cita: "área construida de 100 m2", motivo: null, soporte: { version_id: 3, documento: "ficha.pdf", pagina: 4 } };
+
 describe("área y precio por m²", () => {
-  it("el área de referencia es la cantidad más repetida a dos decimales y cada capítulo conserva la suya", () => {
-    const [g] = desglose(exp());
-    const a = areaDocumentada(g)!;
-    expect(a.valor).toBe(100);
-    expect(a.distintas).toEqual([99.9, 100]);
+  it("las cantidades de las partidas en m² no se toman como superficie del edificio", () => {
+    const d = exp();
+    const [g] = desglose(d);
     expect(g.filas[1].cantidad).toBe(99.9);
+    expect(areaDocumentada(d)).toBeNull();
+    const h = encabezadoM2(d);
+    expect(h.area).toBeNull();
+    expect(h.costoDirecto).toBeNull();
+    expect(h.presupuesto).toBeNull();
   });
-  it("divide cada importe por el área y marca el resultado como calculado", () => {
-    const h = encabezadoM2(exp());
+  it("con una superficie documentada divide cada importe y marca el resultado como calculado", () => {
+    const h = encabezadoM2(exp({ area_precio: AREA }));
+    expect(h.area).toMatchObject({ valor: 100, tipo: "CONSTRUIDA" });
+    expect(h.area?.soporte).toMatchObject({ documento: "ficha.pdf", pagina: 4 });
     expect(h.costoDirecto).toMatchObject({ valor: porM2(20150154, 100), origen: "CALCULADO", importe: 20150154 });
     expect(h.presupuesto).toMatchObject({ valor: 245000, origen: "CALCULADO" });
     expect(h.presupuesto?.importeSoporte?.pagina).toBe(71);
   });
-  it("sin área muestra «Área pendiente» y no calcula", () => {
-    const sinArea = exp({ cotizaciones: [{ id: 1, clave: "o1", proveedor: "ACME", fecha_oferta: null, lineas: lineas().map((l: any) => ({ ...l, unidad: l.unidad === "M2" ? "M3" : l.unidad })) }] });
-    const h = encabezadoM2(sinArea);
-    expect(h.motivo).toBe("Área pendiente");
+  it("sin superficie documentada muestra el motivo del servidor y no calcula", () => {
+    const h = encabezadoM2(exp({ area_precio: { estado: "PENDIENTE", valor: null, motivo: "Superficie no documentada para este edificio." } }));
+    expect(h.motivo).toBe("Superficie no documentada para este edificio.");
     expect(h.costoDirecto).toBeNull();
   });
-  it("con varios edificios exige valor y área atribuibles y no calcula", () => {
-    const h = encabezadoM2(exp({ edificios: [{ id: 1 }, { id: 2 }] }));
-    expect(h.motivo).toMatch(/varios edificios/);
-    expect(h.costoDirecto).toBeNull();
+  it("con superficies en conflicto no calcula", () => {
+    const h = encabezadoM2(exp({ area_precio: { estado: "CONFLICTO", valor: null, motivo: "Superficies distintas" } }));
+    expect(h.area).toBeNull();
+    expect(h.presupuesto).toBeNull();
   });
   it("las grúas no tienen precio por m²", () => {
-    expect(encabezadoM2(exp({ expediente: { id: 4, tipo_intervencion: "IZAJE_GRUAS" } })).aplica).toBe(false);
+    expect(encabezadoM2(exp({ area_precio: AREA, expediente: { id: 4, tipo_intervencion: "IZAJE_GRUAS" } })).aplica).toBe(false);
   });
 });
 

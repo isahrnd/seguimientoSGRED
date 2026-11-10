@@ -10,6 +10,7 @@ import { normalizar } from './contratacion-sugerencias';
 import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
 import { vistaMatriz } from './contratacion-matriz-vista';
 import { filaResumen } from './contratacion-resumen';
+import { areaParaPrecio, AreaRegistrada } from './contratacion-areas';
 import { construirLibroResumen } from './contratacion-resumen-excel';
 
 const n = (v: any): number | null => (v === null || v === undefined ? null : typeof v.toNumber === 'function' ? v.toNumber() : Number(v));
@@ -258,6 +259,25 @@ export class ContratacionConsultaService {
     });
     const ids = e.edificios.map((x) => x.edificio_id);
     const req = await this.edificios.requisitos(ids);
+    // Superficies documentadas de forma explícita (con página y cita) que se refieren a los edificios del proceso o a sus documentos.
+    const filasAreas = await this.prisma.contratacionAreaDocumentada.findMany({
+      where: { version: { vigente: true }, OR: [{ edificio_id: { in: ids.length ? ids : [-1] } }, { version: { documento: { expediente_id: id } } }] },
+      include: { version: { include: { documento: true } } }, orderBy: { id: 'asc' },
+    });
+    const areas: AreaRegistrada[] = filasAreas.map((a) => ({
+      id: a.id, valor: n(a.valor) as number, tipo: a.tipo, estado: a.estado, edificio_id: a.edificio_id, pagina: a.pagina, cita: a.cita,
+      soporte: { version_id: a.version_id, documento: a.version.documento.nombre, pagina: a.pagina },
+    }));
+    const area_precio = areaParaPrecio(areas, ids);
+    // Datos que la lectura asistida extrajo de los documentos del proceso: aceptados con su página y cita; no entran en los totales.
+    const lecturas = await this.prisma.contratacionIaExtraccion.findMany({
+      where: { estado: 'OK', version: { vigente: true, documento: { expediente_id: id } } },
+      include: { version: { include: { documento: true } } }, orderBy: { id: 'asc' },
+    });
+    const lectura_asistida = lecturas.map((x) => {
+      const r: any = x.resultado ?? {};
+      return { version_id: x.version_id, documento: x.version.documento.nombre, campos: Object.entries(r.campos ?? {}).map(([campo, c]: [string, any]) => ({ campo, valor: c.valor, pagina: c.pagina, cita: c.cita })), descartados: ((x.descartes as any[]) ?? []).length };
+    }).filter((x) => x.campos.length > 0);
     const edificiosProceso = e.edificios.map((x) => ({ id: x.edificio.id, nombre: x.edificio.nombre, direccion: x.edificio.direccion, estado_asociacion: x.estado, resolucion: req.get(x.edificio_id) ?? null }));
     const comparacion = {
       valores: significados,
@@ -303,6 +323,9 @@ export class ContratacionConsultaService {
     return {
       expediente: { ...fila, objeto: e.objeto },
       matriz: vistaMatriz(e.matriz_filas, e.contratos),
+      areas,
+      area_precio,
+      lectura_asistida,
       necesidad: {
         edificaciones: e.hechos.filter((h) => h.tipo === 'EDIFICACION').map((h) => ({ clave: h.clave, titulo: h.titulo, detalle: h.detalle, atributos: h.atributos, soporte: S(h) })),
         actividades: e.hechos.filter((h) => h.tipo === 'ACTIVIDAD').map((h) => ({ clave: h.clave, titulo: h.titulo, detalle: h.detalle, soporte: S(h) })),

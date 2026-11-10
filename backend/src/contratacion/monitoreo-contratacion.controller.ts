@@ -130,6 +130,12 @@ export class MonitoreoContratacionController {
   }
 
   @UseGuards(ContratacionAccesoGuard)
+  @Get('lectura-asistida/estado')
+  estadoLecturaAsistida() {
+    return this.indice.ia.estado();
+  }
+
+  @UseGuards(ContratacionAccesoGuard)
   @Get('sincronizacion')
   estadoSincronizacion() {
     return this.sincronizacion.estado();

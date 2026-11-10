@@ -160,8 +160,26 @@ export interface Valor {
   soporte: SoporteRef | null;
 }
 
+export interface AreaPrecio {
+  estado: "DOCUMENTADA" | "PENDIENTE" | "CONFLICTO";
+  valor: number | null;
+  tipo?: string;
+  cita?: string;
+  motivo: string | null;
+  soporte?: { version_id: number; documento: string | null; pagina: number } | null;
+}
+
+export interface LecturaAsistida {
+  version_id: number;
+  documento: string;
+  campos: { campo: string; valor: string | number; pagina: number; cita: string }[];
+  descartados: number;
+}
+
 export interface DetalleExpediente {
   matriz?: VistaMatriz;
+  area_precio?: AreaPrecio;
+  lectura_asistida?: LecturaAsistida[];
   analisis_precios: AnalisisPrecios;
   sectores: Hecho[];
   expediente: ExpedienteFila & { objeto: string | null };

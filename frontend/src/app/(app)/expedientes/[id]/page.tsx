@@ -12,6 +12,7 @@ import { SinAcceso, ErrorCarga } from "@/components/estados";
 import { SoporteLink, urlVisor } from "@/components/soporte-link";
 import { SintesisEconomica } from "@/components/sintesis-economica";
 import { MatrizContrato } from "@/components/matriz-contrato";
+import { LecturaAsistida } from "@/components/lectura-asistida";
 import { AnalisisPreciosExpediente, ResultadoTag } from "@/components/analisis-precios";
 import { ComparacionCotizaciones, ResultadoPct } from "@/components/comparacion-cotizaciones";
 import { documentosParaAvanzar } from "@/lib/oferta";
@@ -190,6 +191,7 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
 
       <div style={{ marginTop: 20 }}><SintesisEconomica d={d} /></div>
       <MatrizContrato d={d} />
+      <LecturaAsistida d={d} />
 
       <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
         <div><ResultadoTag r={d.analisis_precios.resultado} /></div>

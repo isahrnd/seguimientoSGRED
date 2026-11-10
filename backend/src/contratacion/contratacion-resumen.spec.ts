@@ -1,5 +1,5 @@
 import * as ExcelJS from 'exceljs';
-import { areaDocumentadaM2, filaResumen, fuenteTexto } from './contratacion-resumen';
+import { filaResumen, fuenteTexto } from './contratacion-resumen';
 import { construirLibroResumen } from './contratacion-resumen-excel';
 
 const base = (o: any = {}) => ({
@@ -26,14 +26,18 @@ describe('resumen por contrato', () => {
     expect(f.valor_contrato).toBe(100);
     expect(f.observacion).toContain('cuenta una sola vez');
   });
-  it('el precio por m² exige un edificio y un área; no aplica a grúas', () => {
+  it('el precio por m² usa solo una superficie documentada; las partidas en m² no cuentan', () => {
     const lineas = [{ unidad: 'M2', cantidad: 50 }, { unidad: 'M2', cantidad: 50 }, { unidad: 'M2', cantidad: 20 }];
-    expect(areaDocumentadaM2(lineas)).toBe(50);
-    const ok = filaResumen(base({ cotizaciones: [{ lineas }], valores: [{ tipo: 'PRESUPUESTO_OFICIAL', importe: 5000, soporte: null }] }));
+    const oficial = [{ tipo: 'PRESUPUESTO_OFICIAL', importe: 5000, soporte: null }];
+    const sinArea = filaResumen(base({ cotizaciones: [{ lineas }], valores: oficial, area_precio: { estado: 'PENDIENTE', valor: null, motivo: 'Superficie no documentada para este edificio.' } }));
+    expect(sinArea.precio_m2).toBeNull();
+    expect(sinArea.area_m2).toBeNull();
+    expect(sinArea.nota_m2).toBe('Superficie no documentada para este edificio.');
+    const ok = filaResumen(base({ valores: oficial, area_precio: { estado: 'DOCUMENTADA', valor: 50, tipo: 'CONSTRUIDA', cita: 'área construida de 50 m2', soporte: { documento: 'ficha.pdf', pagina: 2 }, motivo: null } }));
     expect(ok.precio_m2).toBe(100);
-    expect(filaResumen(base()).nota_m2).toBe('Área pendiente');
-    const dos = base({ cotizaciones: [{ lineas }] }); dos.expediente.edificaciones = ['A', 'B'];
-    expect(filaResumen(dos).precio_m2).toBeNull();
+    expect(ok.nota_m2).toContain('ficha.pdf, p. 2');
+    const conflicto = filaResumen(base({ valores: oficial, area_precio: { estado: 'CONFLICTO', valor: null, motivo: 'Superficies distintas' } }));
+    expect(conflicto.precio_m2).toBeNull();
     const g = base(); g.expediente.tipo_intervencion = 'IZAJE_GRUAS';
     expect(filaResumen(g).nota_m2).toContain('No aplica');
   });

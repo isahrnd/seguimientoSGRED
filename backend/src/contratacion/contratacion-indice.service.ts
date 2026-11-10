@@ -13,6 +13,7 @@ import { normalizar, sugerir } from './contratacion-sugerencias';
 import { completarConOcr, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { ContratacionContratosService } from './contratacion-contratos.service';
 import { ContratacionMatrizService } from './contratacion-matriz.service';
+import { ContratacionIaService } from './contratacion-ia.service';
 
 interface Candidato {
   tipo: 'LOCAL' | 'DRIVE';
@@ -98,6 +99,7 @@ export class ContratacionIndiceService {
   private secuencia = 0;
   private readonly ocr = new OcrLocal();
   private readonly contratos = new ContratacionContratosService(this.prisma);
+  readonly ia = new ContratacionIaService(this.prisma);
   private readonly matriz = new ContratacionMatrizService(this.prisma);
 
   constructor(
@@ -126,6 +128,7 @@ export class ContratacionIndiceService {
       await this.enriquecer();
       await this.leerContratos();
       await this.leerMatriz();
+      await this.interpretarDocumentos();
       trabajo.resultado = { local, drive };
       trabajo.estado = 'FINALIZADA';
       return { local, drive };
@@ -484,6 +487,18 @@ export class ContratacionIndiceService {
       if (r.versiones) this.log.log(`Matriz de contratación leída: ${r.versiones} archivo(s), ${r.filas} fila(s); vinculadas ${r.vinculadas}`);
     } catch (e) {
       this.log.warn(`Sin lectura de la matriz de contratación: ${(e as Error).message}`);
+    }
+  }
+
+  /** Lectura asistida de lo que la lectura nativa no resolvió (sin clave queda pendiente); un fallo aquí no invalida la actualización. */
+  private async interpretarDocumentos() {
+    try {
+      await this.ia.procesar({
+        paginas: async (md5, max) => { const cand = this.candidatosVistos.get(md5); return cand && cand.mime === 'application/pdf' ? await paginasPdf(await cand.leerBytes(), max) : null; },
+        bytes: async (md5) => { const cand = this.candidatosVistos.get(md5); return cand ? await cand.leerBytes() : null; },
+      });
+    } catch (e) {
+      this.log.warn(`Sin lectura asistida: ${(e as Error).message}`);
     }
   }
 

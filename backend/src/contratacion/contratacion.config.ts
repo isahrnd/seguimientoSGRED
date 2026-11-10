@@ -90,3 +90,15 @@ export const claudeMaxTokensEntrada = () => entero(ENV_CLAUDE.MAX_TOKENS_ENTRADA
 export function claudeConfigurado(): boolean {
   return claudeApiKey() !== null && claudeMaxLlamadasDia() > 0;
 }
+
+/** Tope de tokens de la respuesta, de documentos interpretados por actualización y de páginas por OCR para la interpretación. */
+export const claudeMaxTokensSalida = () => entero('SEGUIMIENTO_CLAUDE_MAX_TOKENS_SALIDA', 1500, 200, 8000);
+export const claudeMaxDocsEjecucion = () => entero('SEGUIMIENTO_CLAUDE_MAX_DOCS_EJECUCION', 10, 0, 200);
+export const ocrMaxPaginasIa = () => entero('SEGUIMIENTO_OCR_MAX_PAGINAS_IA', 6, 0, 30);
+
+/** Tarifa opcional (USD por millón de tokens) para estimar el costo; sin ella solo se registran tokens. */
+export function claudeTarifaUsd(): { entrada: number; salida: number } | null {
+  const e = Number(process.env.SEGUIMIENTO_CLAUDE_USD_MTOK_ENTRADA);
+  const s = Number(process.env.SEGUIMIENTO_CLAUDE_USD_MTOK_SALIDA);
+  return Number.isFinite(e) && Number.isFinite(s) && e > 0 && s > 0 ? { entrada: e, salida: s } : null;
+}

@@ -11,18 +11,6 @@ export const fuenteTexto = (s: SoporteTexto | null | undefined): string => {
   return [s.documento, lugar].filter(Boolean).join(', ');
 };
 
-/** Área documentada: la cantidad en m² más repetida entre las líneas (a 2 decimales); null si ninguna consta. */
-export function areaDocumentadaM2(lineas: Array<{ unidad: string | null; cantidad: number | null; derivado?: boolean | null }>): number | null {
-  const cuenta = new Map<string, number>();
-  for (const l of lineas) {
-    if (String(l.unidad ?? '').toUpperCase() !== 'M2' || l.cantidad === null || l.cantidad === undefined || l.derivado) continue;
-    const k = Number(l.cantidad).toFixed(2);
-    cuenta.set(k, (cuenta.get(k) ?? 0) + 1);
-  }
-  let mejor: [string, number] | null = null;
-  for (const e of cuenta) if (!mejor || e[1] > mejor[1] || (e[1] === mejor[1] && Number(e[0]) > Number(mejor[0]))) mejor = e;
-  return mejor ? Number(mejor[0]) : null;
-}
 
 export interface FilaResumen {
   proceso: string;
@@ -61,14 +49,15 @@ export function filaResumen(d: any): FilaResumen {
   const valorContrato = total(contratos.map((c) => c.valor as number));
   const valorEjec = total(ejecutados.map((v: any) => v.importe as number));
   const edificios: string[] = exp.edificaciones ?? [];
-  const area = areaDocumentadaM2((d.cotizaciones ?? []).flatMap((o: any) => o.lineas ?? []));
+  // La superficie viene solo de un documento que la declara de forma expresa, con su fuente (ver areaParaPrecio); nunca de las partidas.
+  const ap = d.area_precio ?? null;
+  const area: number | null = ap?.estado === 'DOCUMENTADA' ? ap.valor : null;
   const base = valorContrato ?? oficial?.importe ?? null;
   let precio: number | null = null;
   let nota = '';
   if (exp.tipo_intervencion === 'IZAJE_GRUAS') nota = 'No aplica: servicio por unidad de equipo';
-  else if (area === null) nota = 'Área pendiente';
-  else if (edificios.length !== 1) nota = 'Varios edificios: falta valor y área por edificio';
-  else if (base !== null) { precio = Math.round(base / area); nota = `Calculado: ${valorContrato !== null ? 'valor del contrato' : 'presupuesto oficial'} ÷ área`; }
+  else if (area === null) nota = ap?.motivo ?? 'Superficie pendiente de documentar';
+  else if (base !== null) { precio = Math.round(base / area); nota = `Calculado: ${valorContrato !== null ? 'valor del contrato' : 'presupuesto oficial'} ÷ superficie documentada (${fuenteTexto(ap.soporte)})`; }
   const obs: string[] = [];
   if (rep && contratos.length === 0) obs.push('Contrato pendiente de vincular');
   if (rep && contratos.length && !rep.coincide_con_contrato) obs.push('El valor de la matriz difiere del contrato');

@@ -42,16 +42,18 @@ function EncabezadoM2({ d }: { d: DetalleExpediente }) {
     <div>
       <div className="grupo-valores grupo-3">
         <div>
-          <div className="etq-valor">Área documentada</div>
+          <div className="etq-valor">Superficie documentada</div>
           {h.area ? (
             <>
               <div className="importe cifra">{num(h.area.valor)} <span style={{ fontSize: 15, fontWeight: 500 }}>m²</span></div>
               <Tag color="success" icon={<FileTextOutlined />}>Del documento</Tag>
               <div style={{ marginTop: 4 }}><SoporteLink soporte={h.area.soporte} corto /></div>
-              {h.area.distintas.length > 1 && <div className="texto-secundario" style={{ fontSize: 12.5 }}>Los capítulos indican {h.area.distintas.map((x) => num(x)).join(", ")} m²; cada uno conserva la suya.</div>}
             </>
           ) : (
-            <div style={{ color: PALETA.ambar, fontWeight: 650, fontSize: 18 }}>Área pendiente</div>
+            <>
+              <div style={{ color: PALETA.ambar, fontWeight: 650, fontSize: 18 }}>Pendiente</div>
+              {h.motivo && <div className="texto-secundario" style={{ fontSize: 12.5 }}>{h.motivo}</div>}
+            </>
           )}
         </div>
         <div>
@@ -63,7 +65,6 @@ function EncabezadoM2({ d }: { d: DetalleExpediente }) {
           <CifraM2 p={h.presupuesto} area={h.area?.valor ?? null} />
         </div>
       </div>
-      {h.motivo && h.area && <p className="texto-secundario" style={{ margin: "8px 0 0" }}>{h.motivo}</p>}
     </div>
   );
 }

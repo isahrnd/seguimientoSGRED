@@ -111,25 +111,21 @@ export function desglose(d: DetalleExpediente): GrupoOferta[] {
 
 export interface AreaDocumentada {
   valor: number;
+  /** Documento y página que declaran la superficie. */
   soporte: SoporteRef | null;
-  /** Cantidades distintas que indican los capítulos (cada capítulo conserva la suya). */
-  distintas: number[];
+  tipo: string | null;
+  cita: string | null;
 }
 
-/** Área de referencia: el valor (a 2 decimales) más repetido entre las partidas de primer nivel en m². Ninguna si no consta. */
-export function areaDocumentada(g: GrupoOferta | undefined): AreaDocumentada | null {
-  if (!g) return null;
-  const m2 = g.filas.filter((f) => f.unidad === "M2" && f.cantidad !== null);
-  if (m2.length === 0) return null;
-  const cuenta = new Map<number, { n: number; soporte: SoporteRef | null }>();
-  for (const f of m2) {
-    const v = Math.round((f.cantidad as number) * 100) / 100;
-    const e = cuenta.get(v) ?? { n: 0, soporte: f.soporte };
-    e.n++;
-    cuenta.set(v, e);
-  }
-  const [valor, e] = [...cuenta.entries()].sort((a, b) => b[1].n - a[1].n || b[0] - a[0])[0];
-  return { valor, soporte: e.soporte, distintas: [...cuenta.keys()].sort((a, b) => a - b) };
+/**
+ * Superficie documentada: la que el servidor acepta (una sola, declarada de forma expresa en un documento y referida al único edificio del proceso).
+ * No se deduce de las cantidades de las partidas: cada capítulo conserva la suya en m² como cantidad de obra, no como superficie del edificio.
+ */
+export function areaDocumentada(d: DetalleExpediente): AreaDocumentada | null {
+  const a = d.area_precio;
+  if (!a || a.estado !== "DOCUMENTADA" || a.valor === null) return null;
+  const s = a.soporte ? ({ version_id: a.soporte.version_id, documento_id: 0, documento: a.soporte.documento, numero_version: 1, es_vigente: true, version_vigente_id: null, pagina: a.soporte.pagina, hoja: null, celda: null } as SoporteRef) : null;
+  return { valor: a.valor, soporte: s, tipo: a.tipo ?? null, cita: a.cita ?? null };
 }
 
 export interface PrecioM2 {
@@ -151,12 +147,10 @@ export function encabezadoM2(d: DetalleExpediente): {
   motivo: string | null;
 } {
   const g = desglose(d)[0];
-  const area = areaDocumentada(g);
+  const area = areaDocumentada(d);
   const esGruas = d.expediente.tipo_intervencion === "IZAJE_GRUAS";
   if (esGruas) return { aplica: false, area: null, costoDirecto: null, presupuesto: null, motivo: "Servicio por unidad de equipo: no aplica un precio por m²." };
-  if (!area) return { aplica: true, area: null, costoDirecto: null, presupuesto: null, motivo: "Área pendiente" };
-  const unPredio = d.edificios.length <= 1;
-  if (!unPredio) return { aplica: true, area, costoDirecto: null, presupuesto: null, motivo: "El proceso abarca varios edificios: se exige un valor y un área atribuibles a cada uno." };
+  if (!area) return { aplica: true, area: null, costoDirecto: null, presupuesto: null, motivo: d.area_precio?.motivo ?? "Superficie pendiente de documentar" };
   const dir = g.costoDirecto.reportado ?? g.costoDirecto.suma;
   const oficial = d.valores.find((v) => v.tipo === "PRESUPUESTO_OFICIAL");
   return {

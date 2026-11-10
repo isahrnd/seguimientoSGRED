@@ -90,6 +90,8 @@ model ContratacionDocumentoVersion {
   cotizaciones_edificio ContratacionCotizacionEdificio[]
   matriz_filas          ContratacionMatrizFila[]
   matriz_lectura        ContratacionMatrizLectura?
+  ia_extracciones       ContratacionIaExtraccion[]
+  areas                 ContratacionAreaDocumentada[]
 
   @@map("tbl_contratacion_doc_versiones")
 }
@@ -360,6 +362,7 @@ model ContratacionEdificio {
   documentos  ContratacionDocumentoEdificio[]
   resoluciones ContratacionResolucionEdificio[]
   cotizaciones ContratacionCotizacionEdificio[]
+  areas        ContratacionAreaDocumentada[]
 
   @@map("tbl_contratacion_edificios")
 }
@@ -603,4 +606,77 @@ model ContratacionMatrizFila {
   @@unique([version_id, hoja, fila], map: "uq_contratacion_matriz_fila")
   @@index([expediente_id], map: "idx_contratacion_matriz_exp")
   @@map("tbl_contratacion_matriz_filas")
+}
+
+/// Estado y resultado de la lectura asistida de una versión con un extractor concreto. Es la caché persistente: la misma versión con el mismo
+/// extractor no se vuelve a procesar, y el mismo contenido (huella) reutiliza el resultado sin llamar de nuevo a la API.
+/// Nunca guarda el texto del documento: solo campos validados con su página y cita corta.
+model ContratacionIaExtraccion {
+  id              Int       @id @default(autoincrement())
+  version_id      Int
+  extractor       String    @db.VarChar(40)
+  /// NATIVO (resuelto sin API) | PENDIENTE_IA | OK | ERROR
+  estado          String    @db.VarChar(20)
+  huella          String?   @db.VarChar(64)
+  modelo          String?   @db.VarChar(80)
+  resultado       Json?
+  descartes       Json?
+  intentos        Int       @default(0)
+  proximo_intento DateTime?
+  error           String?   @db.VarChar(60)
+  paginas_ocr     Int       @default(0)
+  tokens_entrada  Int       @default(0)
+  tokens_salida   Int       @default(0)
+  creado_en       DateTime  @default(now())
+  actualizado_en  DateTime  @updatedAt
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@unique([version_id, extractor], map: "uq_contratacion_ia_version")
+  @@index([huella, extractor], map: "idx_contratacion_ia_huella")
+  @@map("tbl_contratacion_ia_extracciones")
+}
+
+/// Cada solicitud a la API (o su reserva) para aplicar el límite diario y medir consumo. Sin contenido.
+model ContratacionIaLlamada {
+  id             Int      @id @default(autoincrement())
+  dia            DateTime @db.Date
+  version_id     Int?
+  modelo         String   @db.VarChar(80)
+  /// RESERVADA | OK | ERROR
+  estado         String   @db.VarChar(12)
+  http           Int?
+  tokens_entrada Int      @default(0)
+  tokens_salida  Int      @default(0)
+  duracion_ms    Int?
+  costo_usd      Decimal? @db.Decimal(12, 6)
+  creado_en      DateTime @default(now())
+
+  @@index([dia], map: "idx_contratacion_ia_llamada_dia")
+  @@map("tbl_contratacion_ia_llamadas")
+}
+
+/// Superficie explícitamente documentada, con su página, cita y alcance. Sin superficie documentada no se calcula un precio por m².
+model ContratacionAreaDocumentada {
+  id            Int      @id @default(autoincrement())
+  version_id    Int
+  pagina        Int
+  valor         Decimal  @db.Decimal(14, 2)
+  /// CONSTRUIDA | INTERVENCION | DEMOLICION | LOTE | OTRA
+  tipo          String   @db.VarChar(14)
+  /// Edificio al que se refiere (documento con un único edificio confirmado); sin él, el alcance no es explícito.
+  edificio_id   Int?
+  etapa         String?  @db.VarChar(24)
+  cita          String
+  /// NATIVO | CLAUDE
+  origen        String   @db.VarChar(8)
+  /// DOCUMENTADA | EN_REVISION | DESCARTADA (esta última la fija una persona y no se reescribe)
+  estado        String   @db.VarChar(14)
+  creado_en     DateTime @default(now())
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+  edificio ContratacionEdificio?       @relation(fields: [edificio_id], references: [id], onDelete: SetNull)
+
+  @@unique([version_id, pagina, tipo, valor], map: "uq_contratacion_area")
+  @@map("tbl_contratacion_areas")
 }
