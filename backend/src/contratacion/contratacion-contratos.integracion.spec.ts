@@ -4,6 +4,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { ContratacionContratosService } from './contratacion-contratos.service';
+import { normalizar } from './contratacion-sugerencias';
 
 const URL = process.env.CONTRATACION_TEST_DATABASE_URL;
 const habilitado = !!URL && /@(127\.0\.0\.1|localhost)[:/]/.test(URL);
@@ -29,7 +30,8 @@ d('ingesta de contratos en PDF (BD)', () => {
     await prisma.contratacionDocIndice.create({ data: { version_id: ver.id, texto: normal(paginas[0]) } });
     return { doc, ver };
   }
-  const normal = (s: string) => s.toLowerCase().replace(/\s+/g, ' ');
+  // Igual que el índice real: texto normalizado, sin signos de puntuación (así «objeto:» queda «objeto»).
+  const normal = (s: string) => normalizar(s);
   const leer = async (_id: number, md5: string) => paginasPorMd5.get(md5) ?? null;
 
   async function expediente(proceso: string, interv: string, proveedor?: string) {

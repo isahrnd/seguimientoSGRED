@@ -31,7 +31,8 @@ export class ContratacionContratosService {
         AND: [
           { indice: { OR: [{ texto: { contains: 'contrato no' } }, { texto: { contains: 'contra to no' } }] } },
           { indice: { OR: [{ texto: { contains: 'contratista' } }, { texto: { contains: 'contra tista' } }] } },
-          { indice: { OR: [{ texto: { contains: 'objeto:' } }, { texto: { contains: 'objet o:' } }] } },
+          // El índice guarda el texto normalizado (sin signos): «objeto:» queda como «objeto» (o «objet o»).
+          { indice: { OR: [{ texto: { contains: 'objeto' } }, { texto: { contains: 'objet o' } }] } },
         ],
       },
       include: { documento: true },
