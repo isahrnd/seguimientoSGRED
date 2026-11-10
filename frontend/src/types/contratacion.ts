@@ -298,7 +298,22 @@ export interface EdificioFila {
   resolucion: { requisito: RequisitoResolucion; etiqueta: string };
 }
 
+export interface CotizacionEdificio {
+  id: number;
+  proveedor: string;
+  concepto: string;
+  importe: number;
+  base: "COSTO_DIRECTO" | "TOTAL";
+  total_oferta: number | null;
+  alcance_oferta: string | null;
+  verificacion: "VERIFICADO_EN_IMAGEN" | "COINCIDE_CON_PDF" | "PENDIENTE";
+  nota: string | null;
+  proceso: { id: number; proceso: string } | null;
+  soporte: SoporteRef;
+}
+
 export interface DetalleEdificio {
+  cotizaciones: CotizacionEdificio[];
   edificio: { id: number; nombre: string; direccion: string | null };
   procesos: {
     id: number;

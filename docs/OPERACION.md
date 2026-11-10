@@ -14,6 +14,10 @@ Orden por dependencias (lo define `importaciones/manifiesto.json`): 1) índice d
 
 Los archivos de análisis de precios (proceso 777) y de edificios confirman documentos que **solo están en Drive**; mientras Drive no esté vinculado la vista previa los rechaza («documentos no indexados») y no se aplica nada parcial.
 
+## Cotizaciones por edificación
+
+Una oferta conjunta puede traer el importe de cada edificio en una tabla del PDF. Se registra con una carga privada `cotizaciones_edificio` (mismo importador, mismo manifiesto con SHA-256). Cada entrada lleva la huella MD5 de la versión, el edificio, el proveedor, el importe, su base (`COSTO_DIRECTO` o `TOTAL`), el total de la oferta y **una sola fuente**: página del PDF u hoja y celda de Excel. La verificación es `VERIFICADO_EN_IMAGEN` (importe leído en la imagen de la página y contrastado con el OCR), `COINCIDE_CON_PDF` (referencia del comparativo) o `PENDIENTE`. Solo se asocia a un expediente si se indica un número de proceso que exista; si no, queda ligada al edificio. Las imágenes y el texto del OCR de trabajo se guardan en la carpeta privada, no en Git.
+
 ## Google Drive
 
 Lectura únicamente (`drive.readonly`); la aplicación nunca escribe en Drive. La identidad que lee Drive (token del servidor) es independiente de la cuenta que consulta la web.

@@ -13,6 +13,7 @@ import { SoporteLink, urlVisor } from "@/components/soporte-link";
 import { SintesisEconomica } from "@/components/sintesis-economica";
 import { AnalisisPreciosExpediente, ResultadoTag } from "@/components/analisis-precios";
 import { ComparacionCotizaciones, ResultadoPct } from "@/components/comparacion-cotizaciones";
+import { documentosParaAvanzar } from "@/lib/oferta";
 import { Volver } from "@/components/volver";
 import { EdificiosSoportes } from "@/components/edificios-soportes";
 
@@ -186,6 +187,10 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
 
       <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
         <div><ResultadoTag r={d.analisis_precios.resultado} /></div>
+        {documentosParaAvanzar(d).length > 0 && (
+          <Alert type="info" showIcon message="Documento que permite avanzar"
+            description={<ul style={{ margin: 0, paddingLeft: 18 }}>{documentosParaAvanzar(d).map((x) => <li key={x}>{x}</li>)}</ul>} />
+        )}
         {(pendientesClave.length > 0 || d.comparacion.diferencias_sin_explicar.length > 0) && (
           <Alert type="warning" showIcon message="Qué falta para concluir"
             description={<ul style={{ margin: 0, paddingLeft: 18 }}>{pendientesClave.map((p) => <li key={p}>{p}</li>)}{d.comparacion.diferencias_sin_explicar.map((x, i) => <li key={`d${i}`}>{x.descripcion}</li>)}</ul>} />

@@ -9,6 +9,7 @@ import { SinAcceso, ErrorCarga } from "@/components/estados";
 import { Volver } from "@/components/volver";
 import { EstadoResolucion, ListaDocumentosEdificio } from "@/components/edificios-soportes";
 import { PALETA } from "@/theme/theme";
+import { SoporteLink } from "@/components/soporte-link";
 import { discrepanciasDireccion } from "@/lib/direccion";
 
 const Caja = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
@@ -63,6 +64,44 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
           </div>
         )}
       </Caja>
+
+      {d.cotizaciones.length > 0 && (
+        <Caja titulo="Cotizaciones de esta edificación">
+          {Object.entries(d.cotizaciones.reduce<Record<string, typeof d.cotizaciones>>((a, c) => ((a[c.proveedor] ??= []).push(c), a), {})).map(([prov, cs]) => {
+            const base = cs.find((c) => c.soporte.pagina !== null) ?? cs[0];
+            return (
+              <div key={prov}>
+                <h3 className="largo" style={{ margin: "0 0 4px", fontSize: 17 }}>{prov}</h3>
+                <div className="importe cifra">{cop(base.importe)}</div>
+                <div className="largo" style={{ fontWeight: 600 }}>{base.concepto}</div>
+                <div className="texto-secundario" style={{ fontSize: 13.5 }}>
+                  {base.base === "COSTO_DIRECTO" ? "Costo directo de esta edificación, antes de administración, imprevistos, utilidad e IVA." : "Total según la fuente."}
+                </div>
+                {base.alcance_oferta && (
+                  <p className="largo" style={{ margin: "8px 0 0" }}>
+                    <strong>Es una oferta conjunta:</strong> {base.alcance_oferta}.
+                    {base.total_oferta !== null && <> Total de la oferta: <span className="cifra">{cop(base.total_oferta)}</span>; este importe no es el total del edificio con AIU.</>}
+                  </p>
+                )}
+                <p style={{ margin: "12px 0 4px", fontWeight: 600 }}>Dónde se comprueba</p>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {cs.map((c) => (
+                    <li key={c.id} className="largo">
+                      <SoporteLink soporte={c.soporte} />{" "}
+                      <Tag color={c.verificacion === "VERIFICADO_EN_IMAGEN" ? "success" : c.verificacion === "COINCIDE_CON_PDF" ? "processing" : "warning"}>
+                        {c.verificacion === "VERIFICADO_EN_IMAGEN" ? "Verificado en la imagen del PDF" : c.verificacion === "COINCIDE_CON_PDF" ? "Referencia del comparativo; coincide con el PDF" : "Pendiente de verificar"}
+                      </Tag>
+                      {c.nota && <div className="texto-secundario" style={{ fontSize: 13 }}>{c.nota}</div>}
+                    </li>
+                  ))}
+                </ul>
+                <Alert style={{ marginTop: 12 }} type="warning" showIcon message={base.proceso ? `Asociada al proceso ${base.proceso.proceso}` : "Sin proceso contractual verificado"}
+                  description={base.proceso ? undefined : "La cotización está ligada solo a esta edificación. Se asociará a un expediente cuando exista un número de proceso verificable."} />
+              </div>
+            );
+          })}
+        </Caja>
+      )}
 
       <Caja titulo="Visitas y soportes técnicos">
         {d.visitas_y_soportes_tecnicos.length === 0

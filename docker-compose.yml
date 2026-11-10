@@ -3,6 +3,7 @@ name: seguimiento-sgred
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-seguimiento_sgred}
       POSTGRES_USER: ${POSTGRES_USER:-sgred}
@@ -20,6 +21,7 @@ services:
   api:
     build:
       context: ./backend
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +49,7 @@ services:
       context: ./frontend
       args:
         API_INTERNA: http://api:4310
+    restart: unless-stopped
     depends_on:
       - api
     environment:

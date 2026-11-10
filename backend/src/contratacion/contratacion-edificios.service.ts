@@ -4,6 +4,7 @@ import { CATEGORIAS } from './contratacion-clasificador';
 import { ETIQUETA_REQUISITO, RequisitoResolucion, requisitoResolucion } from './contratacion-comparacion';
 import { driveAbrirDirecto } from './contratacion.config';
 import { normalizar } from './contratacion-sugerencias';
+import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
 
 const d = (v: Date | null | undefined) => (v ? v.toISOString().slice(0, 10) : null);
 const formatoDe = (mime: string | null | undefined) => (mime === 'application/pdf' ? 'PDF' : mime?.includes('spreadsheetml') ? 'XLSX' : 'OTRO');
@@ -23,6 +24,7 @@ const GRUPOS: Array<{ codigo: string; nombre: string }> = [
 
 @Injectable()
 export class ContratacionEdificiosService {
+  private readonly cotizaciones = new ContratacionCotizacionesEdificioService(this.prisma);
   constructor(private readonly prisma: PrismaService) {}
 
   /** Soporte con página/hoja/celda, en la misma forma que usa el expediente. */
@@ -161,6 +163,7 @@ export class ContratacionEdificiosService {
       sin_proceso_confirmado: e.expedientes.length === 0,
       resolucion,
       grupos,
+      cotizaciones: await this.cotizaciones.deEdificio(id),
       visitas_y_soportes_tecnicos: grupos.find((g) => g.codigo === 'VISITA_SOPORTE_TECNICO')?.documentos ?? [],
     };
   }

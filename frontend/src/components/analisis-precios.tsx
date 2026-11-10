@@ -8,7 +8,7 @@ import { SoporteLink } from "./soporte-link";
 import { BarrasPrecios } from "./barras-precios";
 
 export const RESULTADO_ETQ: Record<ResultadoPrecio, string> = {
-  SIN_CONTRATO_SOPORTADO: "Sin contrato soportado",
+  SIN_CONTRATO_SOPORTADO: "Pendiente de soporte contractual",
   EVIDENCIA_INSUFICIENTE: "Evidencia insuficiente para contrastar con el mercado",
   ALCANCE_NO_EQUIVALENTE: "Alcance no equivalente: sin comparación",
   DENTRO_DEL_RANGO: "Dentro del rango de las referencias comparables",
@@ -80,7 +80,7 @@ export function AnalisisPreciosExpediente({ d }: { d: DetalleExpediente }) {
                   {r.motivo && <div className="texto-secundario" style={{ fontSize: 13 }}>{r.motivo}</div>}
                 </div>) },
               { title: "Valor", key: "v", align: "right", render: (_, r) => <span className="cifra">{r.valor !== null ? cop(r.valor) : PENDIENTE}</span> },
-              { title: "Diferencia (COP)", key: "d", align: "right", render: (_, r) => <span className="cifra">{r.comparable ? copDif(r.diferencia_cop) : "—"}</span> },
+              { title: "Diferencia (COP)", key: "d", align: "right", render: (_, r) => <span className="cifra">{r.comparable ? copDif(r.diferencia_cop) : <span className="texto-secundario" style={{ fontSize: 13 }}>{contratadoBase === null ? "Pendiente de soporte contractual" : "—"}</span>}</span> },
               { title: "Diferencia (%)", key: "p", align: "right", render: (_, r) => <span className="cifra">{r.comparable ? pct(r.diferencia_pct) : "—"}</span> },
               { title: "Base de comparación", key: "b", render: (_, r) => (r.comparable && r.base !== null && contratadoBase !== null ? <span className="cifra">{cop(r.base)}</span> : <span className="texto-secundario">No comparable</span>) },
               { title: "Soporte", key: "s", render: (_, r) => <SoporteLink soporte={r.soporte} corto /> },

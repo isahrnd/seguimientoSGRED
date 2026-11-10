@@ -19,6 +19,7 @@ import { NestFactory } from '@nestjs/core';
 import { PrismaClient } from '@prisma/client';
 import { MonitoreoContratacionModule } from '../src/contratacion/monitoreo-contratacion.module';
 import { ContratacionImportacionService } from '../src/contratacion/contratacion-importacion.service';
+import { ContratacionCotizacionesEdificioService } from '../src/contratacion/contratacion-cotizaciones-edificio.service';
 import { ContratacionIndiceService } from '../src/contratacion/contratacion-indice.service';
 import { docsDir } from '../src/contratacion/contratacion.config';
 
@@ -40,6 +41,7 @@ export async function conteos(prisma: PrismaClient) {
     resoluciones: await prisma.contratacionResolucion.count(),
     asociaciones_expediente_edificio: await prisma.contratacionExpedienteEdificio.count(),
     asociaciones_documento_edificio: await prisma.contratacionDocumentoEdificio.count(),
+    cotizaciones_edificio: await prisma.contratacionCotizacionEdificio.count(),
   };
 }
 
@@ -59,7 +61,8 @@ async function main() {
     const indice = app.get(ContratacionIndiceService);
     const r = await indice.reindexar();
     console.log(`INFO  índice documental: local ${r.local.estado} (${r.local.total}), drive ${r.drive.estado}`);
-    const svc = app.get(ContratacionImportacionService);
+    const svcGeneral = app.get(ContratacionImportacionService);
+    const svcCotizaciones = app.get(ContratacionCotizacionesEdificioService);
     for (const x of lista) {
       const ruta = path.join(dir, x.archivo);
       if (!fs.existsSync(ruta)) { console.log(`INFO  ${x.archivo}: no está en la carpeta privada; se omite`); continue; }
@@ -68,6 +71,8 @@ async function main() {
       if (sha !== x.sha256) { console.log(`FALLA ${x.archivo}: el SHA-256 no coincide con el verificado; no se importa`); fallo = true; continue; }
       console.log(`OK    ${x.archivo}: SHA-256 verificado`);
       const payload = JSON.parse(bytes.toString('utf8'));
+      // Las cargas de cotizaciones por edificio tienen su propio validador; el resto usa el importador general.
+      const svc: any = payload && Array.isArray(payload.cotizaciones_edificio) ? svcCotizaciones : svcGeneral;
       const antes = await conteos(prisma);
       const v: any = await svc.previsualizar(payload);
       console.log(`${v.valida ? 'OK   ' : 'FALLA'} vista previa: ${resumen(v)}; errores ${v.errores?.length ?? 0}; advertencias ${v.advertencias?.length ?? 0}`);

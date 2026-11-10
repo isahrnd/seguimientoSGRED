@@ -30,6 +30,10 @@ El frontend más reciente (Análisis de precios y «Actualizar índice») solo e
 
 ## Diferencias conocidas
 
+- Ofertas con partidas y sin total: la síntesis muestra «Oferta de X · N partidas», «Total de la oferta pendiente de soporte» y la suma de costos directos con sus páginas.
+- Cotizaciones por edificación (tabla nueva) con fuente PDF/página o Excel/hoja/celda y verificación explícita.
+- Estado «Pendiente de soporte contractual» y bloque «Documento que permite avanzar» por expediente.
+
 - Variables de entorno renombradas de `INFOGRED_CONTRATACION_*` a `SEGUIMIENTO_*`.
 - Autenticación: cuentas y sesiones propias (`tbl_usuarios`, `tbl_sesiones`) en lugar del JWT de INFOGRED.
 - Interfaz nueva (Ant Design, pantalla ejecutiva, síntesis económica de cinco valores, gráfico de precios unitarios equivalentes).

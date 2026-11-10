@@ -7,6 +7,7 @@ import { ContratacionConsultaService } from './contratacion-consulta.service';
 import { CONTRATACION_DRIVE_CLIENT, DriveHttpClient } from './contratacion-drive.client';
 import { ContratacionEdificiosService } from './contratacion-edificios.service';
 import { ContratacionDocumentosService } from './contratacion-documentos.service';
+import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
 import { ContratacionImportacionService } from './contratacion-importacion.service';
 import { ContratacionIndiceService } from './contratacion-indice.service';
 import { ContratacionSincronizacionService } from './contratacion-sincronizacion.service';
@@ -25,9 +26,10 @@ import { MonitoreoContratacionController } from './monitoreo-contratacion.contro
     ContratacionBibliotecaService,
     ContratacionDocumentosService,
     ContratacionImportacionService,
+    ContratacionCotizacionesEdificioService,
     ContratacionIndiceService,
     ContratacionSincronizacionService,
   ],
-  exports: [ContratacionIndiceService, ContratacionImportacionService],
+  exports: [ContratacionIndiceService, ContratacionImportacionService, ContratacionCotizacionesEdificioService],
 })
 export class MonitoreoContratacionModule {}

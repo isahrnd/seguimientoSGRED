@@ -5,6 +5,7 @@ import { ACTIVIDAD_ETQ, BASE_ETQ, PENDIENTE, SELECCION_ETQ, cantidadConUnidad, c
 import type { Comparacion, DetalleExpediente, LineaPrecio } from "@/types/contratacion";
 import { PALETA } from "@/theme/theme";
 import { SoporteLink, urlVisor } from "./soporte-link";
+import { ofertasSinTotal } from "@/lib/oferta";
 
 export function ResultadoPct({ r }: { r: Comparacion }) {
   return r.comparable
@@ -43,6 +44,7 @@ const H2 = ({ id, children }: { id: string; children: React.ReactNode }) => <h2 
 
 export function ComparacionCotizaciones({ d }: { d: DetalleExpediente }) {
   const c = d.comparacion;
+  const sinTotal = ofertasSinTotal(d);
   const resumenDe = (clave: string) => c.cotizaciones_resumen.find((x) => x.clave === clave);
   // Revisiones de una misma oferta se agrupan; ofertas de empresas distintas quedan separadas.
   const porEmpresa = new Map<string, typeof d.cotizaciones>();
@@ -100,7 +102,7 @@ export function ComparacionCotizaciones({ d }: { d: DetalleExpediente }) {
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", alignItems: "center" }}>
                       {ofertas.length > 1 && <Tag color="blue">Revisión {o.revision}</Tag>}
                       <span>Fecha: {fechaCorta(o.fecha_oferta)}</span>
-                      <span>Valor cotizado: {r && r.valor_cotizado.length > 0 ? r.valor_cotizado.map((v, k) => <span key={k} style={{ marginRight: 10 }}><strong className="cifra">{cop(v.importe)}</strong> <SoporteLink soporte={v.soporte} corto /></span>) : <span className="texto-secundario">{PENDIENTE}</span>}</span>
+                      <span>Valor cotizado: {r && r.valor_cotizado.length > 0 ? r.valor_cotizado.map((v, k) => <span key={k} style={{ marginRight: 10 }}><strong className="cifra">{cop(v.importe)}</strong> <SoporteLink soporte={v.soporte} corto /></span>) : (() => { const st = sinTotal.find((x) => x.proveedor === o.proveedor); return <span><strong style={{ color: PALETA.ambar }}>Total de la oferta pendiente de soporte</strong>{st?.sumaCostoDirecto != null && <> · suma de costos directos de las {st.partidas} partidas: <strong className="cifra">{cop(st.sumaCostoDirecto)}</strong></>}</span>; })()}</span>
                       <SoporteLink soporte={o.soporte} />
                     </div>
                     <div style={{ marginTop: 12 }}><TablaLineas lineas={o.lineas} /></div>

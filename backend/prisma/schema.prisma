@@ -30,7 +30,10 @@ model ContratacionExpediente {
   edificios   ContratacionExpedienteEdificio[]
   alertas     ContratacionAlertaCifra[]
 
+  cotizaciones_edificio ContratacionCotizacionEdificio[]
+
   @@index([tipo], map: "idx_contratacion_exp_tipo")
+
   @@map("tbl_contratacion_expedientes")
 }
 
@@ -79,6 +82,7 @@ model ContratacionDocumentoVersion {
 
   @@unique([documento_id, numero], map: "uq_contratacion_ver_doc_num")
   ocr_paginas ContratacionOcrPagina[]
+  cotizaciones_edificio ContratacionCotizacionEdificio[]
 
   @@map("tbl_contratacion_doc_versiones")
 }
@@ -342,6 +346,7 @@ model ContratacionEdificio {
   expedientes ContratacionExpedienteEdificio[]
   documentos  ContratacionDocumentoEdificio[]
   resoluciones ContratacionResolucionEdificio[]
+  cotizaciones ContratacionCotizacionEdificio[]
 
   @@map("tbl_contratacion_edificios")
 }
@@ -479,4 +484,32 @@ model ContratacionOcrPagina {
 
   @@unique([version_id, pagina])
   @@map("tbl_contratacion_ocr_paginas")
+}
+
+/// Importe de una cotización atribuido a una edificación, con su fuente (PDF/página o Excel/hoja/celda).
+/// Un expediente solo se asocia con un número de proceso verificable (existente); si no, queda solo ligada al edificio.
+model ContratacionCotizacionEdificio {
+  id            Int      @id @default(autoincrement())
+  clave         String   @unique
+  edificio_id   Int
+  version_id    Int
+  expediente_id Int?
+  proveedor     String
+  concepto      String
+  importe       Decimal  @db.Decimal(18, 2)
+  base          String   @db.VarChar(30)
+  total_oferta  Decimal? @db.Decimal(18, 2)
+  alcance_oferta String?
+  pagina        Int?
+  hoja          String?
+  celda         String?
+  verificacion  String   @db.VarChar(30)
+  nota          String?
+  creado_en     DateTime @default(now())
+
+  edificio ContratacionEdificio @relation(fields: [edificio_id], references: [id], onDelete: Cascade)
+  version  ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Restrict)
+  expediente ContratacionExpediente? @relation(fields: [expediente_id], references: [id], onDelete: SetNull)
+
+  @@map("tbl_contratacion_cotizaciones_edificio")
 }
