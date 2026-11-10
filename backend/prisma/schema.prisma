@@ -34,6 +34,7 @@ model ContratacionExpediente {
   alertas     ContratacionAlertaCifra[]
 
   cotizaciones_edificio ContratacionCotizacionEdificio[]
+  matriz_filas          ContratacionMatrizFila[]
 
   @@index([tipo], map: "idx_contratacion_exp_tipo")
 
@@ -87,6 +88,8 @@ model ContratacionDocumentoVersion {
   ocr_paginas ContratacionOcrPagina[]
   doc_contrato ContratacionDocContrato?
   cotizaciones_edificio ContratacionCotizacionEdificio[]
+  matriz_filas          ContratacionMatrizFila[]
+  matriz_lectura        ContratacionMatrizLectura?
 
   @@map("tbl_contratacion_doc_versiones")
 }
@@ -554,4 +557,50 @@ model ContratacionDocContrato {
   version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
 
   @@map("tbl_contratacion_doc_contrato")
+}
+
+/// Lectura de una versión de Excel con forma de matriz de contratación (o constancia de que no lo es). Idempotente por versión.
+model ContratacionMatrizLectura {
+  version_id Int      @id
+  estado     String
+  hojas      String?
+  filas      Int      @default(0)
+  /// Identificador del archivo en el origen (Drive) cuando existe; la versión se identifica por su huella.
+  origen_id  String?
+  leida_en   DateTime @default(now())
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@map("tbl_contratacion_matriz_lecturas")
+}
+
+/// Una fila de la matriz (hoja COMPRAS o ADICION). Conserva los identificadores tal como están escritos y la celda de cada dato.
+model ContratacionMatrizFila {
+  id                Int      @id @default(autoincrement())
+  version_id        Int
+  hoja              String
+  fila              Int
+  tipo_hoja         String
+  proceso_original  String?
+  contrato_original String?
+  proceso_norm      String?
+  contrato_norm     String?
+  modalidad         String?
+  objeto            String?
+  valor             Decimal? @db.Decimal(20, 2)
+  estado            String?
+  contratista       String?
+  secop_url         String?
+  celdas            Json
+  alcance           String
+  expediente_id     Int?
+  vinculo           String?
+  creado_en         DateTime @default(now())
+
+  version    ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+  expediente ContratacionExpediente?      @relation(fields: [expediente_id], references: [id], onDelete: SetNull)
+
+  @@unique([version_id, hoja, fila], map: "uq_contratacion_matriz_fila")
+  @@index([expediente_id], map: "idx_contratacion_matriz_exp")
+  @@map("tbl_contratacion_matriz_filas")
 }

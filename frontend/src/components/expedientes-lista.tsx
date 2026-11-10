@@ -8,7 +8,8 @@ import { useEdificios, useExpedientes } from "@/hooks/queries";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useScrollRestore } from "@/hooks/use-scroll-restore";
 import { ESTADO_ETQ, PENDIENTE, cop, etiquetaProceso, fechaCorta } from "@/lib/format";
-import type { ExpedienteFila } from "@/types/contratacion";
+import type { ExpedienteFila, SoporteRef } from "@/types/contratacion";
+import { SoporteLink } from "./soporte-link";
 import { PALETA } from "@/theme/theme";
 import { SinAcceso } from "./estados";
 import { esErrorDeAcceso } from "@/lib/api";
@@ -17,9 +18,10 @@ import dayjs from "dayjs";
 const CLAVES = ["q", "vista", "intervencion", "empresa", "estado", "desde", "hasta"] as const;
 
 export interface CifraPrincipal {
-  etiqueta: "Contrato" | "Ejecución" | "Cotización" | "Presupuesto oficial" | "Sin cifra";
+  etiqueta: "Contrato" | "Ejecución" | "Reportado en matriz" | "Cotización" | "Presupuesto oficial" | "Sin cifra";
   texto: string;
   respaldada: boolean;
+  soporte?: SoporteRef | null;
 }
 
 /** La cifra principal de un expediente y qué representa: nunca un total que mezcle conceptos ni un $0 por ausencia. */
@@ -27,6 +29,7 @@ export function cifraPrincipal(e: ExpedienteFila): CifraPrincipal {
   const v = e.valores;
   if (v.contratado !== null) return { etiqueta: "Contrato", texto: cop(v.contratado), respaldada: true };
   if (v.ejecutado !== null) return { etiqueta: "Ejecución", texto: cop(v.ejecutado), respaldada: true };
+  if (e.valor_matriz) return { etiqueta: "Reportado en matriz", texto: cop(e.valor_matriz.importe), respaldada: false, soporte: e.valor_matriz.soporte };
   if (v.cotizado) return { etiqueta: "Cotización", texto: v.cotizado.min === v.cotizado.max ? cop(v.cotizado.max) : `${cop(v.cotizado.min)} – ${cop(v.cotizado.max)}`, respaldada: false };
   if (v.presupuesto_oficial !== null) return { etiqueta: "Presupuesto oficial", texto: cop(v.presupuesto_oficial), respaldada: false };
   return { etiqueta: "Sin cifra", texto: PENDIENTE, respaldada: false };
@@ -45,6 +48,7 @@ function Cifra({ e }: { e: ExpedienteFila }) {
     <div style={{ textAlign: "right" }}>
       <div className="texto-secundario" style={{ fontSize: 13, fontWeight: 600 }}>{c.etiqueta}</div>
       <div className="cifra" style={{ fontSize: 20, fontWeight: 700, color: c.respaldada ? PALETA.petroleo : PALETA.texto }}>{c.texto}</div>
+      {c.soporte && <SoporteLink soporte={c.soporte} corto />}
     </div>
   );
 }

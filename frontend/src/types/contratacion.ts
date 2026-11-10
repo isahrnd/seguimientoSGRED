@@ -19,7 +19,46 @@ export interface FuenteEstado {
   detalle: string | null;
 }
 
+export interface ValorMatriz {
+  importe: number;
+  concepto: string;
+  hoja: string;
+  fila: number;
+  celda: string | null;
+  soporte: SoporteRef | null;
+  coincide_con_contrato: boolean;
+}
+
+export interface FilaMatriz {
+  id: number;
+  hoja: string;
+  fila: number;
+  tipo_hoja: "COMPRAS" | "ADICION";
+  proceso_original: string | null;
+  contrato_original: string | null;
+  modalidad: string | null;
+  objeto: string | null;
+  valor: number | null;
+  estado: string | null;
+  contratista: string | null;
+  secop: string | null;
+  alcance: string;
+  alcance_nombre: string;
+  vinculo: string | null;
+  soporte_valor: SoporteRef | null;
+  soporte_proceso: SoporteRef | null;
+  soporte_contrato: SoporteRef | null;
+  soporte_enlace: SoporteRef | null;
+}
+
+export interface VistaMatriz {
+  filas: FilaMatriz[];
+  adiciones: FilaMatriz[];
+  valor_reportado: ValorMatriz | null;
+}
+
 export interface ExpedienteFila {
+  valor_matriz?: ValorMatriz | null;
   sectores?: string[];
   tipo_intervencion?: "DEMOLICION" | "IZAJE_GRUAS" | "OTRA";
   reportado_contratado?: boolean;
@@ -122,6 +161,7 @@ export interface Valor {
 }
 
 export interface DetalleExpediente {
+  matriz?: VistaMatriz;
   analisis_precios: AnalisisPrecios;
   sectores: Hecho[];
   expediente: ExpedienteFila & { objeto: string | null };

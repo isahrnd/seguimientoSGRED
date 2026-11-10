@@ -8,6 +8,7 @@ import { diferenciasAlcance, diferenciasSinExplicar, valoresPorSignificado } fro
 import { analizarPrecios, tipoIntervencion } from './contratacion-precios';
 import { normalizar } from './contratacion-sugerencias';
 import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
+import { vistaMatriz } from './contratacion-matriz-vista';
 
 const n = (v: any): number | null => (v === null || v === undefined ? null : typeof v.toNumber === 'function' ? v.toNumber() : Number(v));
 const formatoDe = (mime: string | null | undefined) => (mime === 'application/pdf' ? 'PDF' : mime?.includes('spreadsheetml') ? 'XLSX' : 'OTRO');
@@ -60,12 +61,18 @@ export class ContratacionConsultaService {
         contratado: contratadoLista.length ? contratadoLista.reduce((a: number, b: number) => a + b, 0) : null,
         ejecutado: ejec.length ? ejec.reduce((a: number, b: number) => a + b, 0) : null,
       },
+      valor_matriz: vistaMatriz(e.matriz_filas, e.contratos).valor_reportado,
       pendientes,
     };
   }
 
   private incluir() {
-    return { documentos: { select: { categoria: true } }, hechos: true, ofertas: true, valores: true, contratos: true } as const;
+    return { documentos: { select: { categoria: true } }, hechos: true, ofertas: true, valores: true, contratos: true, matriz_filas: this.filasMatriz() } as const;
+  }
+
+  /** Filas de la matriz de contratación de la versión vigente del Excel, con su documento para citar la celda. */
+  private filasMatriz() {
+    return { where: { version: { vigente: true } }, include: { version: { include: { documento: true } } }, orderBy: [{ tipo_hoja: 'asc' as const }, { fila: 'asc' as const }] };
   }
 
   async listar(f: FiltrosListado) {
@@ -90,7 +97,7 @@ export class ContratacionConsultaService {
     const rows = filas.map((x) => x.r);
     const contratos = filas.flatMap(({ e }) => e.contratos); // cada contrato una sola vez (id único)
     const unicos = new Map<number, number>(contratos.map((c: any) => [c.id, n(c.valor) as number]));
-    const pendientesDocs = await this.prisma.contratacionDocumento.count({ where: { expediente_id: null } });
+    const pendientesDocs = await this.prisma.contratacionDocumento.count({ where: { expediente_id: null, categoria: { not: 'MATRIZ_CONTRATACION' } } });
     return {
       expedientes: rows,
       totales: {
@@ -141,6 +148,7 @@ export class ContratacionConsultaService {
         contratos: { include: { version: { include: { documento: true } } }, orderBy: { id: 'asc' } },
         edificios: { include: { edificio: true } },
         alertas: { where: { estado: 'PENDIENTE' }, orderBy: { id: 'asc' } },
+        matriz_filas: this.filasMatriz(),
       },
     });
     if (!e) throw new NotFoundException('Expediente no encontrado');
@@ -292,6 +300,7 @@ export class ContratacionConsultaService {
     ];
     return {
       expediente: { ...fila, objeto: e.objeto },
+      matriz: vistaMatriz(e.matriz_filas, e.contratos),
       necesidad: {
         edificaciones: e.hechos.filter((h) => h.tipo === 'EDIFICACION').map((h) => ({ clave: h.clave, titulo: h.titulo, detalle: h.detalle, atributos: h.atributos, soporte: S(h) })),
         actividades: e.hechos.filter((h) => h.tipo === 'ACTIVIDAD').map((h) => ({ clave: h.clave, titulo: h.titulo, detalle: h.detalle, soporte: S(h) })),

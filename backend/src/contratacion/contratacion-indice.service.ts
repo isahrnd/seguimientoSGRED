@@ -12,6 +12,7 @@ import { MODELOS_CON_FUENTE, decidirCelda } from './contratacion-cambios';
 import { normalizar, sugerir } from './contratacion-sugerencias';
 import { completarConOcr, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { ContratacionContratosService } from './contratacion-contratos.service';
+import { ContratacionMatrizService } from './contratacion-matriz.service';
 
 interface Candidato {
   tipo: 'LOCAL' | 'DRIVE';
@@ -97,6 +98,7 @@ export class ContratacionIndiceService {
   private secuencia = 0;
   private readonly ocr = new OcrLocal();
   private readonly contratos = new ContratacionContratosService(this.prisma);
+  private readonly matriz = new ContratacionMatrizService(this.prisma);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -123,6 +125,7 @@ export class ContratacionIndiceService {
       await this.reasociarPendientes();
       await this.enriquecer();
       await this.leerContratos();
+      await this.leerMatriz();
       trabajo.resultado = { local, drive };
       trabajo.estado = 'FINALIZADA';
       return { local, drive };
@@ -468,6 +471,19 @@ export class ContratacionIndiceService {
       if (r.leidos) this.log.log(`Contratos leídos: ${r.leidos}; asociados ${r.asociados}; fichas ${r.fichas}; en revisión ${r.revision}`);
     } catch (e) {
       this.log.warn(`Sin lectura de contratos: ${(e as Error).message}`);
+    }
+  }
+
+  /** Lee la matriz de contratación en Excel (celda a celda) y la vincula con los expedientes; un fallo aquí no invalida la actualización. */
+  private async leerMatriz() {
+    try {
+      const r = await this.matriz.procesar(async (md5) => {
+        const cand = this.candidatosVistos.get(md5);
+        return cand ? await cand.leerBytes() : null;
+      });
+      if (r.versiones) this.log.log(`Matriz de contratación leída: ${r.versiones} archivo(s), ${r.filas} fila(s); vinculadas ${r.vinculadas}`);
+    } catch (e) {
+      this.log.warn(`Sin lectura de la matriz de contratación: ${(e as Error).message}`);
     }
   }
 

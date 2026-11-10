@@ -7,7 +7,8 @@ export type CategoriaDoc =
   | 'RESOLUCION_DEMOLICION'
   | 'VISITA_SOPORTE_TECNICO'
   | 'COMPARATIVO_GENERAL'
-  | 'ESTUDIO_MERCADO';
+  | 'ESTUDIO_MERCADO'
+  | 'MATRIZ_CONTRATACION';
 
 export const CATEGORIAS: Record<CategoriaDoc, string> = {
   NECESIDAD_ALCANCE: 'Necesidad y alcance',
@@ -19,6 +20,7 @@ export const CATEGORIAS: Record<CategoriaDoc, string> = {
   VISITA_SOPORTE_TECNICO: 'Visitas y soportes técnicos',
   COMPARATIVO_GENERAL: 'Comparativos generales',
   ESTUDIO_MERCADO: 'Estudio de mercado',
+  MATRIZ_CONTRATACION: 'Matriz de contratación',
 };
 
 const RE_PROCESO = /\b(\d{4}\.\d{3}\.\d{2}\.\d\.\d{3})\s*-\s*(\d{4})\b/;

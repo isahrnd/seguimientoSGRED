@@ -94,3 +94,33 @@ export async function leerCeldas(buf: Buffer, refs: Array<{ hoja: string; celda:
     return v === null || v === undefined ? null : String(v);
   });
 }
+
+export interface CeldaTabla { valor: CeldaVista; enlace: string | null }
+export interface HojaTabla { nombre: string; filas: Map<number, Map<number, CeldaTabla>> }
+
+/**
+ * Lectura de tablas completas (todas las hojas, hasta `maxFilas`), conservando el valor numérico tal cual está almacenado
+ * (centavos incluidos) y el destino de un hipervínculo como texto (nunca se abre ni se sigue). Posiciones 1-indexadas.
+ */
+export async function leerTablas(buf: Buffer, limites = { maxHojas: 8, maxFilas: 500, maxColumnas: 30 }): Promise<HojaTabla[]> {
+  const wb = await cargar(buf);
+  return wb.worksheets.slice(0, limites.maxHojas).map((ws: any) => {
+    const filas = new Map<number, Map<number, CeldaTabla>>();
+    ws.eachRow({ includeEmpty: false }, (row: any, r: number) => {
+      if (r > limites.maxFilas) return;
+      const cols = new Map<number, CeldaTabla>();
+      row.eachCell({ includeEmpty: false }, (cell: any, c: number) => {
+        if (c > limites.maxColumnas) return;
+        const v = cell.value;
+        const enlace = v && typeof v === 'object' && typeof v.hyperlink === 'string' ? v.hyperlink.slice(0, 2000) : null;
+        cols.set(c, { valor: valorComoDato(v), enlace });
+      });
+      filas.set(r, cols);
+    });
+    return { nombre: ws.name as string, filas };
+  });
+}
+
+export function letraColumna(n: number): string {
+  return colLetra(n);
+}
