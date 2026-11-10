@@ -8,6 +8,8 @@ services:
     ports: !reset []
   api:
     ports: !reset []
+    # Lee la carpeta privada (modo 700 del propietario): corre con el uid del usuario que la posee, no con el de otro usuario del servidor.
+    user: "${SGRED_UID:-1000}:${SGRED_GID:-1000}"
   web:
     # Solo loopback del servidor, para comprobaciones locales; el túnel entra por la red de Compose (web:3310).
     ports:
