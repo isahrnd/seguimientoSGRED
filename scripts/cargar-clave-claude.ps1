@@ -3,7 +3,7 @@
 
  Uso (con la VPN activa, desde la carpeta del proyecto):
    .\scripts\cargar-clave-claude.ps1
-   .\scripts\cargar-clave-claude.ps1 -Servidor infogred@192.168.22.19 -Carpeta '~/seguimiento-sgred/app'
+   .\scripts\cargar-clave-claude.ps1 -Servidor infogred@192.168.22.19 -Carpeta '~/seguimiento-sgred/app' -Llave "$HOME\.ssh\seguimiento_deploy"
 
  Qué hace, en orden, y se detiene en el primer fallo (cada paso comprueba el código de salida de SSH o de Docker):
    1. Verifica la carpeta del despliegue y que el Compose del servidor YA inyecta ANTHROPIC_API_KEY en el servicio api
@@ -16,17 +16,37 @@
 #>
 param(
   [string]$Servidor = "infogred@192.168.22.19",
-  [string]$Carpeta = "~/seguimiento-sgred/app"
+  [string]$Carpeta = "~/seguimiento-sgred/app",
+  [string]$Llave = (Join-Path $HOME ".ssh\seguimiento_deploy")
 )
 $ErrorActionPreference = "Stop"
-$ssh = @("-o", "BatchMode=yes", "-o", "ConnectTimeout=15")
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+if (-not (Test-Path $Llave)) { throw "No se encuentra la llave SSH de despliegue en $Llave (use -Llave para indicar otra)." }
 $compose = "docker compose -f docker-compose.yml -f docker-compose.produccion.yml"
+$utf8 = New-Object System.Text.UTF8Encoding($false)
 
+# Ejecuta ssh con un System.Diagnostics.Process: la entrada estándar se escribe como bytes UTF-8 sin BOM ni saltos añadidos
+# (la tubería de Windows PowerShell 5.1 antepone un BOM y termina con CRLF, que dañarían el script y la clave).
+function Invoke-Ssh {
+  param([string]$Remoto, [byte[]]$Entrada = $null)
+  $partes = @("-i", $Llave, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", $Servidor, $Remoto)
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = "ssh"
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardInput = ($null -ne $Entrada)
+  $psi.Arguments = ($partes | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join " "
+  $p = [System.Diagnostics.Process]::Start($psi)
+  if ($null -ne $Entrada) { $p.StandardInput.BaseStream.Write($Entrada, 0, $Entrada.Length); $p.StandardInput.Close() }
+  $p.WaitForExit()
+  return $p.ExitCode
+}
+
+# Ejecuta un script de bash en la carpeta del despliegue. Viaja en base64 por el argumento (no contiene secretos).
 function Invoke-Remoto {
-  param([string]$Etapa, [string]$Script, [string]$Entrada = $null)
-  $texto = ($Script -replace "`r", "") + "`n# fin`n"
-  $texto | & ssh @ssh $Servidor "cd $Carpeta && bash -s"
-  if ($LASTEXITCODE -ne 0) { throw "Falló el paso '$Etapa' (código de salida $LASTEXITCODE). No se continuó." }
+  param([string]$Etapa, [string]$Script, [string]$Canalizar = "bash")
+  $b64 = [Convert]::ToBase64String($utf8.GetBytes(($Script -replace "`r", "") + "`n"))
+  $codigo = Invoke-Ssh "cd $Carpeta && echo $b64 | base64 -d | $Canalizar"
+  if ($codigo -ne 0) { throw "Falló el paso '$Etapa' (código de salida $codigo). No se continuó." }
 }
 
 # 1) Verificación previa: carpeta, Compose actualizado y estado del servicio api. No se imprime ningún secreto.
@@ -36,23 +56,22 @@ set -e
 test -f docker-compose.yml || { echo "No existe docker-compose.yml en $(pwd)."; exit 11; }
 test -f docker-compose.produccion.yml || { echo "Falta docker-compose.produccion.yml."; exit 12; }
 test -f .env || { echo "Falta el .env del servidor."; exit 13; }
-DOCKER_COMPOSE="docker compose -f docker-compose.yml -f docker-compose.produccion.yml"
-$DOCKER_COMPOSE config 2>/dev/null | grep -q "ANTHROPIC_API_KEY" || { echo "El Compose del servidor aún NO inyecta ANTHROPIC_API_KEY en el servicio api: despliegue primero la versión actualizada."; exit 14; }
-$DOCKER_COMPOSE ps --status running api 2>/dev/null | grep -q api || { echo "El servicio api no está en ejecución."; exit 15; }
+C="docker compose -f docker-compose.yml -f docker-compose.produccion.yml"
+$C config 2>/dev/null | grep -q "ANTHROPIC_API_KEY" || { echo "El Compose del servidor aun NO inyecta ANTHROPIC_API_KEY en el servicio api: despliegue primero la version actualizada."; exit 14; }
+$C ps --status running api 2>/dev/null | grep -q api || { echo "El servicio api no esta en ejecucion."; exit 15; }
 echo "Carpeta: $(pwd)"
-echo "Versión: $(git rev-parse --short HEAD 2>/dev/null || echo desconocida)"
-echo "Compose actualizado: sí. Servicio api: en ejecución."
+echo "Version: $(git rev-parse --short HEAD 2>/dev/null || echo desconocida)"
+echo "Compose actualizado: si. Servicio api: en ejecucion."
 '@
 
-# 2) Clave con entrada oculta.
+# 2) Clave con entrada oculta; viaja solo por la entrada estándar y queda en un archivo temporal 600 que el paso siguiente consume y borra.
 $segura = Read-Host "2/5 Clave de la API de Anthropic (no se muestra)" -AsSecureString
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($segura)
 try {
   $clave = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
   if ($clave -notmatch '^sk-ant-[A-Za-z0-9_-]{20,}$') { throw "El valor no tiene el formato de una clave de Anthropic. No se envió nada." }
-  # La clave viaja solo por la entrada estándar y queda en un archivo temporal 600 que el paso siguiente consume y borra.
-  $clave | & ssh @ssh $Servidor "cd $Carpeta && umask 077 && cat > .clave-anthropic.tmp"
-  if ($LASTEXITCODE -ne 0) { throw "No se pudo transferir la clave (código de salida $LASTEXITCODE)." }
+  $codigo = Invoke-Ssh "cd $Carpeta && umask 077 && cat > .clave-anthropic.tmp" $utf8.GetBytes($clave)
+  if ($codigo -ne 0) { throw "No se pudo transferir la clave (código de salida $codigo)." }
 } finally {
   if ($bstr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
   $clave = $null
@@ -65,7 +84,7 @@ set -e
 umask 077
 CLAVE=$(tr -d '\r\n' < .clave-anthropic.tmp)
 rm -f .clave-anthropic.tmp
-test -n "$CLAVE" || { echo "El archivo temporal estaba vacío."; exit 21; }
+test -n "$CLAVE" || { echo "El archivo temporal estaba vacio."; exit 21; }
 grep -v '^ANTHROPIC_API_KEY=' .env > .env.nuevo || true
 printf 'ANTHROPIC_API_KEY=%s\n' "$CLAVE" >> .env.nuevo
 mv .env.nuevo .env
@@ -78,18 +97,20 @@ echo "Clave guardada."
 Write-Host "4/5 Reiniciando solo el servicio api..."
 Invoke-Remoto "reinicio del servicio api" @'
 set -e
-docker compose -f docker-compose.yml -f docker-compose.produccion.yml up -d --no-deps api
+C="docker compose -f docker-compose.yml -f docker-compose.produccion.yml"
+$C up -d --no-deps api
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  docker compose -f docker-compose.yml -f docker-compose.produccion.yml ps --status running api | grep -q api && break
+  $C ps --status running api | grep -q api && break
   sleep 3
 done
-docker compose -f docker-compose.yml -f docker-compose.produccion.yml ps --status running api | grep -q api || { echo "El servicio api no quedó en ejecución."; exit 31; }
-echo "Servicio api en ejecución."
+$C ps --status running api | grep -q api || { echo "El servicio api no quedo en ejecucion."; exit 31; }
+sleep 5
+echo "Servicio api en ejecucion."
 '@
 
 # 5) Solicitud mínima al modelo configurado: solo se imprime el código HTTP y el tipo de error, nunca la clave ni el contenido.
 Write-Host "5/5 Probando una solicitud mínima al modelo configurado..."
-$prueba = @'
+Invoke-Remoto "solicitud mínima al modelo" @'
 const { claudeModelo, claudeApiKey } = require('/app/dist/src/contratacion/contratacion.config');
 const modelo = claudeModelo();
 const clave = claudeApiKey();
@@ -101,11 +122,8 @@ fetch('https://api.anthropic.com/v1/messages', {
 }).then(async (r) => {
   const j = await r.json().catch(() => ({}));
   console.log('Modelo configurado:', modelo);
-  console.log('HTTP', r.status, r.ok ? '- el modelo respondió' : '- ' + (j && j.error && j.error.type ? j.error.type : 'error'));
+  console.log('HTTP', r.status, r.ok ? '- el modelo respondio' : '- ' + (j && j.error && j.error.type ? j.error.type : 'error'));
   process.exit(r.ok ? 0 : 42);
-}).catch(() => { console.log('Sin conexión con api.anthropic.com desde el servidor.'); process.exit(43); });
-'@
-$prueba = ($prueba -replace "`r", "") + "`n"
-$prueba | & ssh @ssh $Servidor "cd $Carpeta && $compose exec -T api node -"
-if ($LASTEXITCODE -ne 0) { throw "La solicitud mínima al modelo falló (código de salida $LASTEXITCODE). La clasificación asistida NO está operativa; la clave quedó guardada y puede volver a ejecutar este script." }
-Write-Host "Listo: la clave está cargada y el modelo respondió. Para ver el consumo: la actualización del índice usa la clave solo para lo que la lectura nativa no resuelve."
+}).catch(() => { console.log('Sin conexion con api.anthropic.com desde el servidor.'); process.exit(43); });
+'@ "$compose exec -T api node -"
+Write-Host "Listo: la clave está cargada y el modelo respondió. La clasificación asistida solo se usa para lo que la lectura nativa no resuelve."
