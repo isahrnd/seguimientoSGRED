@@ -135,7 +135,12 @@ export class ContratacionContratosService {
   private async registrar(versionId: number, documentoId: number, expedienteId: number, c: ContratoExtraido, estado: 'ASOCIADO' | 'FICHA_CREADA', motivo: string) {
     const p = this.prisma;
     await p.$transaction(async (tx: any) => {
-      await tx.contratacionExpediente.update({ where: { id: expedienteId }, data: { numero_contrato: c.numero_contrato } });
+      const exp = await tx.contratacionExpediente.findUniqueOrThrow({ where: { id: expedienteId } });
+      // Una ficha creada desde el contrato (proceso sin verificar) refleja siempre la lectura vigente; un expediente verificado no se toca.
+      await tx.contratacionExpediente.update({
+        where: { id: expedienteId },
+        data: exp.proceso_verificado ? { numero_contrato: c.numero_contrato } : { numero_contrato: c.numero_contrato, objeto: c.objeto, intervencion: this.titulo(c.objeto) },
+      });
       const datos = {
         oferta_id: null, // la selección de oferta tiene sus propios soportes
         tipo_acto: 'CONTRATO', numero: c.numero_contrato, fecha_acto: c.firma.fecha ? new Date(`${c.firma.fecha}T00:00:00Z`) : null,
