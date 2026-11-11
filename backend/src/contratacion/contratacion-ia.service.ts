@@ -96,8 +96,8 @@ export class ContratacionIaService {
   }
 
   // ------------------------------------------------------------------ procesamiento
-  /** `opciones.versiones`: ejecución MANUAL sobre versiones concretas (no depende del interruptor automático). */
-  async procesar(lectura: LecturaPdf, opciones: { versiones?: number[] } = {}): Promise<ResumenIa> {
+  /** `opciones.versiones`: ejecución MANUAL sobre versiones concretas (no depende del interruptor automático). `forzar`: interpreta aunque la lectura nativa ya resuelva (para medir precisión). */
+  async procesar(lectura: LecturaPdf, opciones: { versiones?: number[]; forzar?: boolean } = {}): Promise<ResumenIa> {
     const r: ResumenIa = { revisadas: 0, nativas: 0, desde_cache: 0, llamadas: 0, pendientes: 0, errores: 0, ocr_paginas: 0, tokens_entrada: 0, tokens_salida: 0, limite_alcanzado: false, detenido: null };
     if (this.enCurso) return r; // un solo procesamiento a la vez (actualización manual y sincronización automática no se pisan)
     this.enCurso = true;
@@ -124,7 +124,7 @@ export class ContratacionIaService {
         if (r.detenido) break;
         r.revisadas++;
         try {
-          await this.una(v, lectura, puedeLlamar, r, () => llamadasEnEstaEjecucion++, llamadasEnEstaEjecucion);
+          await this.una(v, lectura, puedeLlamar, r, () => llamadasEnEstaEjecucion++, llamadasEnEstaEjecucion, !!opciones.forzar);
         } catch (e) {
           r.errores++;
           this.log.warn(`Sin lectura asistida de una versión: ${(e as Error).message}`);
@@ -147,7 +147,7 @@ export class ContratacionIaService {
     });
   }
 
-  private async una(v: any, lectura: LecturaPdf, puedeLlamar: boolean, r: ResumenIa, contarLlamada: () => void, llamadasPrevias: number) {
+  private async una(v: any, lectura: LecturaPdf, puedeLlamar: boolean, r: ResumenIa, contarLlamada: () => void, llamadasPrevias: number, forzar = false) {
     const doc = v.documento;
     const nombre: string = doc.nombre ?? '';
     if (/transcrip/i.test(nombre)) { await this.guardarFila(v.id, { estado: 'NATIVO' }); r.nativas++; return; }
@@ -169,7 +169,7 @@ export class ContratacionIaService {
       };
     };
     let est = evaluar(paginas);
-    const nativoNecesita = (e: ReturnType<typeof evaluar>) => necesitaInterpretacion({ esMatriz: false, esTranscripcion: false, ...e });
+    const nativoNecesita = (e: ReturnType<typeof evaluar>) => (forzar && e.textoUtil) || necesitaInterpretacion({ esMatriz: false, esTranscripcion: false, ...e });
 
     // 2) OCR selectivo: solo si, con el texto nativo, falta algo y la interpretación podrá usarse; solo páginas sin texto, con tope.
     const sinTexto = paginas.filter((p) => p.texto.trim().length < MIN_TEXTO_NATIVO).map((p) => p.pagina);

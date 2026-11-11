@@ -69,7 +69,7 @@ async function main() {
       if (!lista.length) throw new Error('Indique --versiones=ID,ID,...');
       if (lista.length > 10) throw new Error('Por seguridad, un máximo de 10 versiones por ejecución manual');
       const indice = app.get(ContratacionIndiceService);
-      await indice.reindexar({ ia: { versiones: lista } });
+      await indice.reindexar({ ia: { versiones: lista, forzar: args.includes('--forzar') } });
       const filas = await (indice as any).prisma.contratacionIaExtraccion.findMany({ where: { version_id: { in: lista } }, orderBy: { version_id: 'asc' }, include: { version: { include: { documento: true } } } });
       for (const f of filas) {
         console.log(JSON.stringify({ version: f.version_id, documento: f.version.documento.nombre, estado: f.estado, error: f.error, tokens_entrada: f.tokens_entrada, tokens_salida: f.tokens_salida, descartes: f.descartes, ...(args.includes('--detalle') ? { resultado: f.resultado } : { campos: Object.keys((f.resultado as any)?.campos ?? {}) }) }));
@@ -83,7 +83,7 @@ async function main() {
       if (args.includes('--aplicar')) console.log(JSON.stringify(await svc.aplicar(payload, null), null, 2));
       else { const v = await svc.previsualizar(payload); console.log(JSON.stringify({ valida: v.valida, errores: v.errores, advertencias: v.advertencias, resumen: v.resumen }, null, 2)); }
     } else {
-      console.error('Comandos: reindexar | interpretar --versiones=ID,ID [--detalle] | importar <archivo> [--aplicar] | drive-vincular');
+      console.error('Comandos: reindexar | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
       process.exitCode = 1;
     }
   } finally {
