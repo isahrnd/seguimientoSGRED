@@ -10,6 +10,13 @@ Este documento no contiene datos de personas ni de contratos: solo describe cont
 - Las citas que se guardan en la base pasan otra vez por `depurar()`; el texto completo de los documentos no se guarda en las extracciones.
 - Las respuestas del modelo solo se aceptan si su cita consta en la página enviada; la confianza declarada no publica nada.
 
+## Barrera previa al envío
+- Antes de cada solicitud, `verificarPrivacidad()` examina el texto EXACTO que saldría (sistema, herramienta y fragmentos), después de depurar, seleccionar páginas y armar la solicitud. Es independiente de `depurar()`.
+- Busca: correos, móviles, documentos de identidad (también con «documento», «identificada con», NIT), pasaporte, carné y tarjeta profesional, matrícula profesional, nombre del inspector, nombres tras un tratamiento o antes de un documento y firmantes con cargo.
+- Si encuentra algo, **la solicitud no se envía**: la fila queda en `BLOQUEADA_PRIVACIDAD` con solo los tipos y recuentos (sin el texto) y no se reintenta sola.
+- `verificar-envio --versiones=…` simula el envío (sin llamar a la API ni escribir) y muestra por versión qué páginas saldrían, su tamaño y los hallazgos. Todo lote manual se precede de esa simulación.
+- Los resultados ya verificados de otra versión del extractor se reutilizan si su esquema es compatible y vuelven a pasar por `depurar()` y la barrera; así cambiar los filtros no obliga a repetir llamadas.
+
 ## Registros locales
 - Los registros del servicio (`api`) solo contienen recuentos. Comprobado el 2026-11-11: sin identificaciones, nombres de las personas del piloto ni claves.
 - Tablas con contenido derivado: `tbl_contratacion_ia_extracciones` (campos validados con cita corta), `tbl_contratacion_areas` y `tbl_contratacion_doc_sugerencias`. Se comprobó que no conservan identificaciones.
