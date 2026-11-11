@@ -22,7 +22,7 @@ function Origen({ p }: { p: PrecioM2 }) {
 }
 
 function CifraM2({ p, area }: { p: PrecioM2 | null; area: number | null }) {
-  if (!p || p.valor === null) return <div style={{ color: PALETA.ambar, fontWeight: 650 }}>{area === null ? "Área pendiente" : PENDIENTE}</div>;
+  if (!p || p.valor === null) return <div style={{ color: PALETA.ambar, fontWeight: 650 }}>{area === null ? "Pendiente: superficie por verificar" : PENDIENTE}</div>;
   return (
     <>
       <div className="importe cifra">{cop(p.valor)}<span style={{ fontSize: 15, fontWeight: 500 }}> /m²</span></div>
