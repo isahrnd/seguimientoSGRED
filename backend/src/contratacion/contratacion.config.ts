@@ -99,7 +99,7 @@ export function claudeConfigurado(): boolean {
 export const claudeAutomatico = () => process.env.SEGUIMIENTO_CLAUDE_AUTOMATICO === 'true';
 
 /** Tope de tokens de la respuesta, de documentos interpretados por actualización y de páginas por OCR para la interpretación. */
-export const claudeMaxTokensSalida = () => entero('SEGUIMIENTO_CLAUDE_MAX_TOKENS_SALIDA', 1500, 200, 8000);
+export const claudeMaxTokensSalida = () => entero('SEGUIMIENTO_CLAUDE_MAX_TOKENS_SALIDA', 3500, 200, 8000);
 export const claudeMaxDocsEjecucion = () => entero('SEGUIMIENTO_CLAUDE_MAX_DOCS_EJECUCION', 10, 0, 200);
 export const ocrMaxPaginasIa = () => entero('SEGUIMIENTO_OCR_MAX_PAGINAS_IA', 6, 0, 30);
 

@@ -175,6 +175,7 @@ export interface LecturaAsistida {
   version_id: number;
   documento: string;
   campos: { campo: string; valor: string | number; pagina: number; cita: string }[];
+  partidas?: { edificio: string | null; alcance: string; alcance_literal?: boolean; importe: number; unidad: string; pagina: number; cita: string; relacion: 'EXPLICITA' | 'PENDIENTE_REVISION' }[];
   descartados: number;
 }
 

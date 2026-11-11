@@ -276,8 +276,8 @@ export class ContratacionConsultaService {
     });
     const lectura_asistida = lecturas.map((x) => {
       const r: any = x.resultado ?? {};
-      return { version_id: x.version_id, documento: x.version.documento.nombre, campos: Object.entries(r.campos ?? {}).map(([campo, c]: [string, any]) => ({ campo, valor: c.valor, pagina: c.pagina, cita: c.cita })), descartados: ((x.descartes as any[]) ?? []).length };
-    }).filter((x) => x.campos.length > 0);
+      return { version_id: x.version_id, documento: x.version.documento.nombre, campos: Object.entries(r.campos ?? {}).map(([campo, c]: [string, any]) => ({ campo, valor: c.valor, pagina: c.pagina, cita: c.cita })), partidas: r.partidas ?? [], descartados: ((x.descartes as any[]) ?? []).length };
+    }).filter((x) => x.campos.length > 0 || x.partidas.length > 0);
     const edificiosProceso = e.edificios.map((x) => ({ id: x.edificio.id, nombre: x.edificio.nombre, direccion: x.edificio.direccion, estado_asociacion: x.estado, resolucion: req.get(x.edificio_id) ?? null }));
     const comparacion = {
       valores: significados,

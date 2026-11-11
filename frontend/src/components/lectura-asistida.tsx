@@ -25,6 +25,20 @@ export function LecturaAsistida({ d }: { d: DetalleExpediente }) {
               </li>
             ))}
           </ul>
+          {(x.partidas ?? []).length > 0 && (
+            <table style={{ marginTop: 8, borderCollapse: 'collapse', fontSize: 13.5, width: '100%' }}>
+              <caption style={{ textAlign: 'left', fontWeight: 600 }}>Importes por edificio o alcance (por verificar)</caption>
+              <thead><tr><th style={{ textAlign: 'left' }}>Edificio</th><th style={{ textAlign: 'left' }}>Alcance</th><th style={{ textAlign: 'right' }}>Importe</th><th style={{ textAlign: 'left' }}>Fuente</th><th style={{ textAlign: 'left' }}>Relación</th></tr></thead>
+              <tbody>
+                {x.partidas!.map((p, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid #E6EAF0' }}>
+                    <td>{p.edificio ?? 'Sin edificio inequívoco'}</td><td>{p.alcance}</td><td style={{ textAlign: 'right' }} className="cifra">{cop(p.importe)}{p.unidad !== 'GLOBAL' ? ` / ${p.unidad}` : ''}</td>
+                    <td>p. {p.pagina}</td><td>{p.relacion === 'EXPLICITA' ? 'Explícita en la cita' : 'Pendiente de revisión'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       ))}
     </section>

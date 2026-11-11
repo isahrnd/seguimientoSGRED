@@ -82,6 +82,12 @@ describe('depuración y selección de fragmentos', () => {
     expect(t).not.toMatch(/9.111.222|1234567890|98.765.432/);
     expect(t).toContain('EMPRESA SAS');
   });
+  it('suprime el nombre de la persona natural junto a su documento y el del inspector (nombres inventados)', () => {
+    const t = depurar('CONTRATISTA: MARIA LUISA GOMEZ DIAZ , C.C.# 9.111.222.333 R/L. EMPRESA SAS. Inspector Nombre Pedro Pablo Ejemplo Prueba Código de brigada 050 Identificación 1234567890');
+    expect(t).not.toMatch(/MARIA LUISA|GOMEZ|Pedro Pablo|Ejemplo Prueba|9\.111|1234567890/);
+    expect(t).toContain('EMPRESA SAS');
+    expect(t).toContain('050');
+  });
   it('la cita que se guarda también va depurada', () => {
     const pag = [{ pagina: 1, texto: 'CONTRATISTA: JUANA PEREZ , C.C.# [documento de identidad] R/L. EMPRESA SAS' }];
     const r = validarRespuesta({ contratista: { valor: 'EMPRESA SAS', pagina: 1, cita: 'JUANA PEREZ , C.C.# 9.111.222.333 R/L. EMPRESA SAS' } }, pag);
@@ -149,6 +155,32 @@ describe('validación de la respuesta contra el texto enviado', () => {
   it('tolera espacios, tildes y mayúsculas distintas en la cita', () => {
     const r = validarRespuesta({ contratista: { valor: 'empresa uno s.a.s.', pagina: 1, cita: 'CONTRATISTA:  EMPRESA  UNO  S.A.S.' } }, frag);
     expect(r.campos.contratista).toBeDefined();
+  });
+});
+
+describe('partidas por edificio (tabla ficticia con un total por columna)', () => {
+  const tabla = [{ pagina: 2, texto: 'item parametro ed. alfa ed. beta 1 diseños y planes 100.000.000 00 200.000.000 00 2 retiro de escombros 50.000.000 00 60.000.000 00 total 150.000.000 00 260.000.000 00 el edificio gamma consta: valor 70.000.000 00' }];
+  it('acepta importes con su cita; sin edificio y importe en la misma cita, la relación queda pendiente de revisión', () => {
+    const r = validarRespuesta({ partidas: [
+      { edificio: 'ed. alfa', alcance: 'total', importe: 150000000, unidad: 'GLOBAL', pagina: 2, cita: 'total 150.000.000 00 260.000.000 00' },
+      { edificio: 'ed. beta', alcance: 'total', importe: 260000000, unidad: 'GLOBAL', pagina: 2, cita: 'total 150.000.000 00 260.000.000 00' },
+      { edificio: 'el edificio gamma', alcance: 'valor', importe: 70000000, unidad: 'GLOBAL', pagina: 2, cita: 'el edificio gamma consta: valor 70.000.000 00' },
+    ] }, tabla);
+    expect(r.partidas.map((p) => [p.edificio, p.importe, p.relacion])).toEqual([
+      ['ed. alfa', 150000000, 'PENDIENTE_REVISION'], ['ed. beta', 260000000, 'PENDIENTE_REVISION'], ['el edificio gamma', 70000000, 'EXPLICITA'],
+    ]);
+    expect(r.descartes).toEqual([]);
+  });
+  it('descarta importes que no están en la cita, alcances vacíos o páginas inexistentes y no inventa edificios', () => {
+    const r = validarRespuesta({ partidas: [
+      { edificio: 'ed. alfa', alcance: 'total', importe: 999, unidad: 'GLOBAL', pagina: 2, cita: 'total 150.000.000 00' },
+      { edificio: 'ed. alfa', alcance: '', importe: 150000000, unidad: 'GLOBAL', pagina: 2, cita: 'total 150.000.000 00' },
+      { edificio: 'ed. alfa', alcance: 'total', importe: 150000000, unidad: 'GLOBAL', pagina: 7, cita: 'total 150.000.000 00' },
+      { edificio: 'edificio inventado', alcance: 'total', importe: 150000000, unidad: 'KG', pagina: 2, cita: 'total 150.000.000 00' },
+    ] }, tabla);
+    expect(r.partidas).toHaveLength(1);
+    expect(r.partidas[0]).toMatchObject({ edificio: null, unidad: 'OTRA', relacion: 'PENDIENTE_REVISION', alcance_literal: true });
+    expect(r.descartes).toHaveLength(3);
   });
 });
 

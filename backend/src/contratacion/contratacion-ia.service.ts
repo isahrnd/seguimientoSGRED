@@ -234,7 +234,7 @@ export class ContratacionIaService {
       });
       const previo = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: v.id, extractor: EXTRACTOR_VERSION } } });
       const valida = validarRespuesta(resp.entrada, fragmentos);
-      const resultado = { campos: valida.campos, areas: valida.areas };
+      const resultado = { campos: valida.campos, areas: valida.areas, partidas: valida.partidas };
       await this.aplicar(v, doc, resultado, edificiosDoc);
       await this.guardarFila(v.id, {
         estado: 'OK', huella, modelo, resultado: resultado as any, descartes: valida.descartes as any, error: null, proximo_intento: null,
@@ -273,7 +273,7 @@ export class ContratacionIaService {
   }
 
   /** Sugerencias con evidencia y superficies; nunca crea asociaciones confirmadas ni toca importes, contratos o expedientes. */
-  private async aplicar(v: any, doc: any, res: Pick<Extraccion, 'campos' | 'areas'>, edificiosDoc: number[]) {
+  private async aplicar(v: any, doc: any, res: Pick<Extraccion, 'campos' | 'areas'> & { partidas?: unknown }, edificiosDoc: number[]) {
     const c = res.campos ?? {};
     const sug = async (tipo: string, valor: string | number | undefined, pagina: number | undefined) => {
       if (valor === undefined || pagina === undefined) return;
