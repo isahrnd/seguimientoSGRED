@@ -49,6 +49,9 @@ export interface TrabajoIndice {
   resultado: { local: ResumenFuente; drive: ResumenFuente } | null;
   cambios: CambioIndice[];
   error: string | null;
+  /** Fase real en curso y, al terminar, qué se leyó de nuevo y qué se reutilizó. */
+  fase: string;
+  lectura: { pdf_revisados: number; pdf_leidos: number; reutilizados: number; excel_leidos: number; bloqueados: number; llamadas_api: number } | null;
 }
 
 export async function textoPrimeraPagina(buf: Buffer, mime: string): Promise<string> {
@@ -121,16 +124,22 @@ export class ContratacionIndiceService {
     if (this.enCurso) throw new Error('Ya hay una actualización del índice en curso');
     this.enCurso = true;
     this.confirmarVacia = opciones.confirmarVacia !== false;
-    const trabajo: TrabajoIndice = { id: ++this.secuencia, origen: opciones.origen ?? 'MANUAL', estado: 'EN_CURSO', iniciado_en: new Date().toISOString(), finalizado_en: null, resultado: null, cambios: [], error: null };
+    const trabajo: TrabajoIndice = { id: ++this.secuencia, origen: opciones.origen ?? 'MANUAL', estado: 'EN_CURSO', iniciado_en: new Date().toISOString(), finalizado_en: null, resultado: null, cambios: [], error: null, fase: 'Revisando las fuentes de documentos', lectura: null };
     this.trabajo = trabajo;
     try {
       const local = await this.fuente('LOCAL', () => this.candidatosLocal());
       const drive = await this.fuente('DRIVE', () => this.candidatosDrive());
+      trabajo.fase = 'Indexando los documentos nuevos o modificados';
       await this.reasociarPendientes();
       await this.enriquecer();
+      trabajo.fase = 'Leyendo contratos y matriz de contratación';
       await this.leerContratos();
       await this.leerMatriz();
+      trabajo.fase = 'Extrayendo datos de los documentos (solo los nuevos o cambiados)';
       await this.interpretarDocumentos(opciones.ia);
+      const ri = this.ultimoResumenIa;
+      trabajo.lectura = ri ? { pdf_revisados: ri.revisadas, pdf_leidos: ri.pdf_leidos, reutilizados: ri.reutilizadas + ri.desde_cache, excel_leidos: ri.excel_leidos, bloqueados: ri.bloqueadas, llamadas_api: ri.llamadas } : null;
+      trabajo.fase = 'Finalizada';
       trabajo.resultado = { local, drive };
       trabajo.estado = 'FINALIZADA';
       return { local, drive };

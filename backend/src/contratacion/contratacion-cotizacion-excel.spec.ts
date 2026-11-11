@@ -33,14 +33,27 @@ const RESUMEN = hoja('RESUMEN', {
   49: { C: 'CONDICIONES COMERCIALES', D: 'No. Cotización', G: 'C-001' },
   50: { C: 'CONDICIONES COMERCIALES', D: 'Fecha de la cotización', G: '2030-01-02' },
 });
-const PLANTILLA_OTRO = hoja('RESUMEN (2)', { 9: { C: 'NOMBRE DEL PROYECTO', D: 'OBRAS CIVILES PARA OTRO PROYECTO' } });
+const PLANTILLA_OTRO = hoja('RESUMEN (2)', { 9: { C: 'NOMBRE DEL PROYECTO', D: 'OBRAS CIVILES PARA CALDERA SUCROAL', H: '2025-01-31' }, 27: { C: 'ITEM', D: 'Descripción', H: 'VR. PARCIAL' }, 29: { C: '1', D: 'Acero de refuerzo', H: null } });
+const HOJA_MISMO_PROYECTO = hoja('RESUMEN (2)', { 9: { C: 'NOMBRE DEL PROYECTO', D: 'Edificio Ejemplo Alfa: Localizado en la Calle 1 # 2-3' }, 28: { C: 'ITEM', D: 'Descripción', H: 'VR. PARCIAL' }, 29: { C: '1', D: 'Otra actividad', H: 10 }, 31: { G: 'SUBTOTAL', H: 10 } });
 
 describe('lectura nativa de una cotización en Excel', () => {
   const r = leerCotizacionExcel([PLANTILLA_OTRO, RESUMEN]);
   it('lee la hoja RESUMEN y descarta la plantilla de otro proyecto', () => {
     expect(r.aplica).toBe(true);
     expect(r.hoja).toBe('RESUMEN');
-    expect(r.hojas_descartadas).toEqual([{ hoja: 'RESUMEN (2)', motivo: 'hoja de plantilla de otro proyecto: no se usa' }]);
+    expect(r.hojas_descartadas).toHaveLength(1);
+    expect(r.hojas_descartadas[0].hoja).toBe('RESUMEN (2)');
+    expect(r.hojas_descartadas[0].motivo).toMatch(/otro proyecto: nombre «OBRAS CIVILES PARA CALDERA SUCROAL» \(RESUMEN \(2\), celda D9, fecha 2025-01-31\)/);
+  });
+  it('una hoja «RESUMEN (2)» SIN evidencia de otro proyecto no se descarta por su nombre: se lee y se marca para revisión', () => {
+    const x = leerCotizacionExcel([HOJA_MISMO_PROYECTO, RESUMEN].reverse());
+    expect(x.hojas_descartadas[0].motivo).toMatch(/SIN evidencia de otro proyecto/);
+    expect(x.partidas.some((p) => p.alcance === '[hoja RESUMEN (2)] Otra actividad' && p.importe === 10)).toBe(true);
+    expect(x.controles_aritmeticos.some((c) => c.control.includes('(hoja RESUMEN (2))'))).toBe(true);
+  });
+  it('una hoja sin la plantilla de cotización (p. ej. registro fotográfico) se ignora sin descartarla como otro proyecto', () => {
+    const x = leerCotizacionExcel([RESUMEN, hoja('REGISTRO FOTOGRAFICO', {})]);
+    expect(x.hojas_descartadas).toEqual([]);
   });
   it('extrae edificio, proveedor (solo la empresa, sin nombres de personas), NIT, número y fecha con su celda', () => {
     expect(r.campos.edificio).toMatchObject({ valor: 'Edificio Ejemplo Alfa', fuente: 'Hoja RESUMEN, celda D9' });

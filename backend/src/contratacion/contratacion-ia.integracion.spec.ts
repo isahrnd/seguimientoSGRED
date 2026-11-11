@@ -435,7 +435,7 @@ d('lectura asistida (BD)', () => {
     await prisma.contratacionDocumentoOrigen.create({ data: { version_id: ver.id, tipo: 'DRIVE', id_origen: 'x-1', nombre_original: 'cotizacion.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
     const c = new ClienteFalso(); c.responder = respuestaBuena;
     await servicio(c).procesar(lectura);
-    const f = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id, extractor: 'xlsx-1' } });
+    const f = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id, extractor: 'xlsx-2' } });
     expect(f.estado).toBe('OK');
     const r: any = f.resultado;
     expect(r.hoja_calculo).toBe(true);
@@ -444,7 +444,7 @@ d('lectura asistida (BD)', () => {
     expect(r.controles_aritmeticos[0]).toMatchObject({ estado: 'CUADRA', calculado: 400, declarado: 400 });
     expect(c.llamadas).toHaveLength(0);
     await servicio(c).procesar(lectura);
-    expect(await prisma.contratacionIaExtraccion.count({ where: { version_id: ver.id, extractor: 'xlsx-1' } })).toBe(1);
+    expect(await prisma.contratacionIaExtraccion.count({ where: { version_id: ver.id, extractor: 'xlsx-2' } })).toBe(1);
   });
 
   it('no interpreta la matriz de contratación ni las transcripciones', async () => {

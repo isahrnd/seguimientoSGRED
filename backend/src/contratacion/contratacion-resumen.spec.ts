@@ -53,7 +53,7 @@ describe('resumen por contrato', () => {
 describe('exportación de la lectura de documentos', () => {
   it('lista cada fila con su nivel y fuente, y no suma subtotales ni totales a las partidas', async () => {
     const lectura = [{
-      documento: 'oferta.pdf', origen: 'ASISTIDA', campos: [{ campo: 'edificio', valor: 'Edificio Alfa', pagina: 1, cita: 'x', fuente: null }], no_encontrados: [{ campo: 'proceso', motivo: 'no consta' }],
+      documento: 'oferta.pdf', version_id: 7, origen: 'ASISTIDA', campos: [{ campo: 'edificio', valor: 'Edificio Alfa', pagina: 1, cita: 'x', fuente: null }], no_encontrados: [{ campo: 'proceso', motivo: 'no consta' }],
       partidas: [
         { nivel: 'PARTIDA', edificio: 'Edificio Alfa', alcance: 'Alt 1', importe: 100, unidad: 'GLOBAL', pagina: 5, relacion: 'EXPLICITA', coincidencia: null },
         { nivel: 'TOTAL', edificio: null, alcance: 'Alt 1 - Total', importe: 100, unidad: 'GLOBAL', pagina: 5, relacion: 'PENDIENTE_REVISION', coincidencia: null },

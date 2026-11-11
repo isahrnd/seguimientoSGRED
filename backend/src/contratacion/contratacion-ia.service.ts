@@ -20,7 +20,7 @@ import {
 
 const MAX_PAGINAS_LECTURA = 150;
 /** Identificador del lector nativo de cotizaciones en Excel (no usa la API); versiona sus resultados aparte de los de la lectura asistida. */
-export const EXTRACTOR_XLSX = 'xlsx-1';
+export const EXTRACTOR_XLSX = 'xlsx-2';
 /** Documentos de nivel edificio: una resolución de demolición o una visita técnica pertenece a un edificio, no a un proceso; no necesitan número de proceso. */
 const NIVEL_EDIFICIO = new Set(['RESOLUCION_DEMOLICION', 'VISITA_SOPORTE_TECNICO']);
 const BLOQUEO_PRESUPUESTO = 7102; // pg_advisory_xact_lock: serializa la reserva de llamadas entre procesos
@@ -34,7 +34,7 @@ export interface LecturaPdf {
 export interface ResumenIa {
   revisadas: number; nativas: number; desde_cache: number; llamadas: number; pendientes: number; errores: number;
   ocr_paginas: number; tokens_entrada: number; tokens_salida: number; limite_alcanzado: boolean; detenido: string | null;
-  bloqueadas: number; reutilizadas: number;
+  bloqueadas: number; reutilizadas: number; pdf_leidos: number; excel_leidos: number;
   /** Solo en simulación: qué haría cada versión y la verificación de privacidad del texto exacto que saldría. */
   simulacion?: Array<{ version_id: number; accion: string; paginas_enviadas: number[]; caracteres: number; tokens_estimados: number; hallazgos: HallazgoPrivacidad[] }>;
 }
@@ -112,7 +112,7 @@ export class ContratacionIaService {
   // ------------------------------------------------------------------ procesamiento
   /** `opciones.versiones`: ejecución MANUAL sobre versiones concretas (no depende del interruptor automático). `forzar`: interpreta aunque la lectura nativa ya resuelva (para medir precisión). */
   async procesar(lectura: LecturaPdf, opciones: { versiones?: number[]; forzar?: boolean; simular?: boolean } = {}): Promise<ResumenIa> {
-    const r: ResumenIa = { revisadas: 0, nativas: 0, desde_cache: 0, llamadas: 0, pendientes: 0, errores: 0, ocr_paginas: 0, tokens_entrada: 0, tokens_salida: 0, limite_alcanzado: false, detenido: null, bloqueadas: 0, reutilizadas: 0, ...(opciones.simular ? { simulacion: [] } : {}) };
+    const r: ResumenIa = { revisadas: 0, nativas: 0, desde_cache: 0, llamadas: 0, pendientes: 0, errores: 0, ocr_paginas: 0, tokens_entrada: 0, tokens_salida: 0, limite_alcanzado: false, detenido: null, bloqueadas: 0, reutilizadas: 0, pdf_leidos: 0, excel_leidos: 0, ...(opciones.simular ? { simulacion: [] } : {}) };
     if (this.enCurso) return r; // un solo procesamiento a la vez (actualización manual y sincronización automática no se pisan)
     this.enCurso = true;
     try {
@@ -136,7 +136,7 @@ export class ContratacionIaService {
         orderBy: { id: 'asc' },
         take: 300,
       });
-      if (!opciones.simular) await this.procesarExcel(lectura, manual ? opciones.versiones! : null);
+      if (!opciones.simular) r.excel_leidos = await this.procesarExcel(lectura, manual ? opciones.versiones! : null);
       let llamadasEnEstaEjecucion = 0;
       for (const v of versiones) {
         if (r.detenido) break;
@@ -158,7 +158,8 @@ export class ContratacionIaService {
   }
 
   /** Cotizaciones en Excel: lectura directa por hojas y celdas, sin OCR ni API. Una vez por versión del archivo. */
-  private async procesarExcel(lectura: LecturaPdf, soloVersiones: number[] | null) {
+  private async procesarExcel(lectura: LecturaPdf, soloVersiones: number[] | null): Promise<number> {
+    let leidos = 0;
     const hechas = await this.prisma.contratacionIaExtraccion.findMany({ where: { extractor: EXTRACTOR_XLSX }, select: { version_id: true } });
     const vs = await this.prisma.contratacionDocumentoVersion.findMany({
       where: { vigente: true, id: { notIn: hechas.map((h) => h.version_id), ...(soloVersiones ? { in: soloVersiones } : {}) }, origenes: { some: { estado: 'ACTIVO', mime: { contains: 'spreadsheetml' } } }, documento: { categoria: 'COTIZACIONES' } },
@@ -176,10 +177,12 @@ export class ContratacionIaService {
           create: { version_id: v.id, extractor: EXTRACTOR_XLSX, estado: c.aplica ? 'OK' : 'NO_APLICA', resultado: resultado as any },
           update: { estado: c.aplica ? 'OK' : 'NO_APLICA', resultado: resultado as any },
         });
+        leidos++;
       } catch (e) {
         this.log.warn(`Sin lectura de una cotización en Excel: ${(e as Error).message}`);
       }
     }
+    return leidos;
   }
 
   private async guardarFila(versionId: number, datos: Record<string, any>) {
@@ -204,6 +207,7 @@ export class ContratacionIaService {
 
     // 1) Lectura nativa (y OCR ya guardado, que no cuesta nada).
     const nativas = (await lectura.paginas(v.md5, MAX_PAGINAS_LECTURA)) ?? [];
+    r.pdf_leidos++;
     let paginas: Fragmento[] = nativas.map((texto, i) => ({ pagina: i + 1, texto }));
     const guardadas = await this.prisma.contratacionOcrPagina.findMany({ where: { version_id: v.id }, select: { pagina: true, texto: true } });
     const porOcr = new Map(guardadas.map((g) => [g.pagina, g.texto]));

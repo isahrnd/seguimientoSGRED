@@ -486,6 +486,8 @@ export interface TrabajoIndice {
   resultado: ResumenReindexado | null;
   cambios: CambioIndice[];
   error: string | null;
+  fase?: string;
+  lectura?: { pdf_revisados: number; pdf_leidos: number; reutilizados: number; excel_leidos: number; bloqueados: number; llamadas_api: number } | null;
 }
 
 export interface DocumentoPendiente {

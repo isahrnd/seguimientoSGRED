@@ -51,7 +51,7 @@ export function IndiceControl() {
   const panel = (
     <div style={{ width: 360, maxWidth: "80vw" }} aria-live="polite">
       {act.enCurso && (
-        <p style={{ margin: 0 }}><LoadingOutlined /> Actualizando el índice de documentos…</p>
+        <p style={{ margin: 0 }}><LoadingOutlined /> {t?.fase ?? "Actualizando el índice de documentos…"}</p>
       )}
       {act.aviso && <Alert type="info" showIcon message={act.aviso} style={{ marginBottom: 8 }} />}
       {act.errorConsulta && <Alert type="error" showIcon message="No se pudo consultar el avance." style={{ marginBottom: 8 }} />}
@@ -62,6 +62,11 @@ export function IndiceControl() {
             <FilaFuente tipo="LOCAL" r={t.resultado.local} />
             <FilaFuente tipo="DRIVE" r={t.resultado.drive} />
           </ul>
+          {t.lectura && (
+            <p className="texto-secundario" style={{ margin: "8px 0 0", fontSize: 13 }}>
+              Lectura de documentos: {t.lectura.pdf_leidos} PDF leídos de nuevo, {t.lectura.excel_leidos} Excel leídos, {t.lectura.reutilizados} resultados reutilizados, {t.lectura.llamadas_api} llamadas a la API{t.lectura.bloqueados ? `, ${t.lectura.bloqueados} bloqueados por privacidad` : ""}.
+            </p>
+          )}
           {t.cambios.length > 0 && (
             <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
               {t.cambios.slice(0, 6).map((c, i) => <li key={i} className="largo">{c.tipo === "NUEVO" ? "Nuevo" : c.tipo === "MODIFICADO" ? "Modificado" : "Retirado"}: {c.nombre}</li>)}

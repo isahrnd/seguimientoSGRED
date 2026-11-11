@@ -380,6 +380,23 @@ d('Monitoreo de contratación (integración, datos ficticios)', () => {
       expect((await consulta.listar({})).totales.contratado).toBeNull();
     });
 
+    it('actualizar el índice sin cambios no vuelve a leer los PDF: informa fases reales y cuántos se leyeron, y solo finaliza al terminar', async () => {
+      subir('1. EDIF PRUEBA ALFA/COTIZACIONES/2. EMPRESA UNO.pdf', pdf('cotizacion para el conteo de lecturas'));
+      subir('1. EDIF PRUEBA ALFA/RESOLUCION/res.pdf', pdf('texto de otra pieza'));
+      const durante: string[] = [];
+      const p = indice.reindexar();
+      durante.push(indice.estadoTrabajo()!.estado);
+      await p;
+      const primero = indice.estadoTrabajo()!;
+      expect(durante[0]).toBe('EN_CURSO');
+      expect(primero.estado).toBe('FINALIZADA');
+      expect(primero.fase).toBe('Finalizada');
+      expect(primero.lectura!.pdf_leidos).toBeGreaterThan(0);
+      await indice.reindexar();
+      const segundo = indice.estadoTrabajo()!;
+      expect(segundo.lectura).toMatchObject({ pdf_leidos: 0, excel_leidos: 0, llamadas_api: 0 });
+    });
+
     it('el mismo archivo en las carpetas de dos edificios sugiere ambos edificios, sin confirmar nada', async () => {
       const b = pdf('cotizacion compartida por dos edificios');
       subir('1. EDIF PRUEBA ALFA/COTIZACIONES/2. EMPRESA UNO.pdf', b);

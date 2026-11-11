@@ -36,20 +36,20 @@ export async function construirLibroResumen(filas: FilaResumen[], lectura: any[]
     for (const d of lectura) {
       for (const p of d.partidas ?? []) {
         wl.addRow({
-          doc: d.documento, origen: origen[d.origen] ?? d.origen, edificio: p.edificio ?? d.campos?.find((c: any) => c.campo === 'edificio')?.valor ?? '', alcance: p.alcance, nivel: NIVEL[p.nivel ?? 'PARTIDA'], importe: p.importe, unidad: p.unidad ?? '',
+          doc: `${d.documento} (v${d.version_id})`, origen: origen[d.origen] ?? d.origen, edificio: p.edificio ?? d.campos?.find((c: any) => c.campo === 'edificio')?.valor ?? '', alcance: p.alcance, nivel: NIVEL[p.nivel ?? 'PARTIDA'], importe: p.importe, unidad: p.unidad ?? '',
           fuente: p.fuente ?? (p.pagina ? 'p. ' + p.pagina : ''), estado: p.relacion === 'EXPLICITA' ? 'Por verificar (relación explícita)' : 'Por verificar (relación pendiente)',
           registrado: p.coincidencia ? (p.coincidencia.estado === 'SIN_COINCIDENCIA' ? 'Sin edificio registrado' : (p.coincidencia.estado === 'COINCIDE' ? 'Igual a ' : 'Parecido a ') + p.coincidencia.edificio + (p.coincidencia.vinculado_al_documento ? ' (vinculado)' : ' (no vinculado)')) : '',
         });
       }
       const controles = [...(d.controles_de_suma ?? []).filter((c: any) => c.estado !== 'SIN_TOTAL_DECLARADO').map((c: any) => [c.grupo, c.suma_partidas, c.total_declarado, c.estado]), ...(d.controles_aritmeticos ?? []).map((c: any) => [c.control, c.calculado, c.declarado, c.estado])];
-      if ((d.partidas ?? []).length) wl.addRow({ doc: d.documento, alcance: 'Suma solo de partidas (los subtotales, totales e impuestos NO se suman)', nivel: 'Control', importe: d.suma_solo_partidas, estado: controles.map((c) => c[0] + ': ' + (c[3] === 'CUADRA' ? 'cuadra' : 'no cuadra')).join(' | ') });
+      if ((d.partidas ?? []).length) wl.addRow({ doc: `${d.documento} (v${d.version_id})`, alcance: 'Suma solo de partidas (los subtotales, totales e impuestos NO se suman)', nivel: 'Control', importe: d.suma_solo_partidas, estado: controles.map((c) => c[0] + ': ' + (c[3] === 'CUADRA' ? 'cuadra' : 'no cuadra')).join(' | ') });
     }
     const wn = wb.addWorksheet('Datos extraídos');
     wn.columns = [{ header: 'Documento', width: 40 }, { header: 'Origen', width: 24 }, { header: 'Dato', width: 28 }, { header: 'Valor', width: 40 }, { header: 'Fuente', width: 34 }, { header: 'Estado', width: 40 }];
     wn.getRow(1).font = { bold: true };
     for (const d of lectura) {
-      for (const c of d.campos ?? []) wn.addRow([d.documento, origen[d.origen] ?? d.origen, c.campo, c.valor, c.fuente ?? (c.pagina ? 'p. ' + c.pagina : ''), 'Por verificar']);
-      for (const n of d.no_encontrados ?? []) wn.addRow([d.documento, origen[d.origen] ?? d.origen, n.campo, '', '', 'Dato no encontrado por el extractor: ' + n.motivo]);
+      for (const c of d.campos ?? []) wn.addRow([`${d.documento} (v${d.version_id})`, origen[d.origen] ?? d.origen, c.campo, c.valor, c.fuente ?? (c.pagina ? 'p. ' + c.pagina : ''), 'Por verificar']);
+      for (const n of d.no_encontrados ?? []) wn.addRow([`${d.documento} (v${d.version_id})`, origen[d.origen] ?? d.origen, n.campo, '', '', 'Dato no encontrado por el extractor: ' + n.motivo]);
     }
   }
   const nota = wb.addWorksheet('Cómo leerlo');
