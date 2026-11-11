@@ -43,7 +43,7 @@ export async function construirLibroResumen(filas: FilaResumen[], lectura: any[]
         });
       }
       const controles = [...(d.controles_de_suma ?? []).filter((c: any) => c.estado !== 'SIN_TOTAL_DECLARADO').map((c: any) => [c.grupo, c.suma_partidas, c.total_declarado, c.estado]), ...(d.controles_aritmeticos ?? []).map((c: any) => [c.control, c.calculado, c.declarado, c.estado])];
-      if ((d.partidas ?? []).length && !d.excluida_de_indicadores) wl.addRow({ doc: `${d.documento} (v${d.version_id})`, alcance: 'Suma solo de partidas (los subtotales, totales e impuestos NO se suman)', nivel: 'Control', importe: d.suma_solo_partidas, estado: controles.map((c) => c[0] + ': ' + (c[3] === 'CUADRA' ? 'cuadra' : 'no cuadra')).join(' | ') });
+      if ((d.partidas ?? []).length && !d.excluida_de_indicadores) wl.addRow({ doc: `${d.documento} (v${d.version_id})`, alcance: (d.suma_solo_partidas ?? 0) > 0 ? 'Suma solo de partidas (los subtotales, totales e impuestos NO se suman)' : (d.partidas ?? []).some((p: any) => p.nivel === 'TOTAL' || p.nivel === 'SUBTOTAL') ? 'Se identificaron totales; desglose pendiente de verificación (los subtotales, totales e impuestos NO se suman)' : 'Contenido adicional pendiente de revisión', nivel: 'Control', importe: (d.suma_solo_partidas ?? 0) > 0 ? d.suma_solo_partidas : null, estado: controles.map((c) => c[0] + ': ' + (c[3] === 'CUADRA' ? 'cuadra' : 'no cuadra')).join(' | ') });
     }
     const wn = wb.addWorksheet('Datos extraídos');
     wn.columns = [{ header: 'Documento', width: 40 }, { header: 'Origen', width: 24 }, { header: 'Dato', width: 28 }, { header: 'Valor', width: 40 }, { header: 'Fuente', width: 34 }, { header: 'Estado', width: 40 }];

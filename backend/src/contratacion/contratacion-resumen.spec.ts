@@ -92,4 +92,13 @@ describe('exportación de la lectura de documentos', () => {
     const controles: string[] = []; ws.eachRow((r) => { if (r.getCell(col('Nivel')).value === 'Control') controles.push(String(r.getCell(1).value)); });
     expect(controles).toEqual(['hoja.xlsx (v8)']);
   });
+
+  it('un documento con solo totales no muestra una suma de partidas en cero: dice que el desglose está pendiente', async () => {
+    const lectura = [{ documento: 'solo-total.pdf', version_id: 9, origen: 'ASISTIDA', campos: [], no_encontrados: [], partidas: [{ nivel: 'TOTAL', alcance: 'Total oferta', importe: 500, unidad: 'GLOBAL', pagina: 8, relacion: 'PENDIENTE_REVISION', coincidencia: null }], suma_solo_partidas: 0, controles_de_suma: [], controles_aritmeticos: [] }];
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load((await construirLibroResumen([], lectura)) as any);
+    const ws = wb.getWorksheet('Lectura de documentos')!;
+    const texto: string[] = []; ws.eachRow((r) => texto.push(String(r.getCell(4).value)));
+    expect(texto.join('|')).toMatch(/Se identificaron totales; desglose pendiente de verificación/);
+    expect(texto.join('|')).not.toMatch(/Suma solo de partidas/);
+  });
 });
