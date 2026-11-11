@@ -42,7 +42,8 @@ d('lectura asistida (BD)', () => {
   let prisma: PrismaClient;
   let n = 0;
   const textos = new Map<string, string[]>();
-  const lectura: LecturaPdf = { paginas: async (md5) => textos.get(md5) ?? null, bytes: async () => Buffer.from('pdf') };
+  const bytesPorMd5 = new Map<string, Buffer>();
+  const lectura: LecturaPdf = { paginas: async (md5) => textos.get(md5) ?? null, bytes: async (md5) => bytesPorMd5.get(md5) ?? Buffer.from('pdf') };
   const guardarEnv: Record<string, string | undefined> = {};
 
   const fijarEnv = (k: string, v: string) => { if (!(k in guardarEnv)) guardarEnv[k] = process.env[k]; process.env[k] = v; };
@@ -78,6 +79,7 @@ d('lectura asistida (BD)', () => {
   beforeEach(async () => {
     n = 0;
     textos.clear();
+    bytesPorMd5.clear();
     for (const k of Object.keys(guardarEnv)) { if (guardarEnv[k] === undefined) delete process.env[k]; else process.env[k] = guardarEnv[k]; delete guardarEnv[k]; }
     process.env.SEGUIMIENTO_CLAUDE_AUTOMATICO = 'true'; // las pruebas del procesamiento automático lo activan; la pausa tiene sus propias pruebas
     await prisma.$executeRawUnsafe('TRUNCATE tbl_contratacion_ia_extracciones, tbl_contratacion_ia_llamadas, tbl_contratacion_areas, tbl_contratacion_ocr_paginas, tbl_contratacion_doc_sugerencias, tbl_contratacion_doc_indice, tbl_contratacion_documento_edificios, tbl_contratacion_doc_origenes, tbl_contratacion_doc_versiones, tbl_contratacion_documentos, tbl_contratacion_edificios RESTART IDENTITY CASCADE');
@@ -349,6 +351,100 @@ d('lectura asistida (BD)', () => {
     const r = await servicio(c).procesar(lectura);
     expect(r).toMatchObject({ llamadas: 0, nativas: 3 });
     expect(c.llamadas).toHaveLength(0);
+  });
+
+  it('barrera de privacidad: un dato personal que depurar no suprime bloquea la solicitud, sin llamar a la API ni registrar el dato', async () => {
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    const { ver } = await documento('a.pdf', [TEXTO(630) + ' Titular con pasaporte No. AB1234567 del contratista.']);
+    const r = await servicio(c).procesar(lectura);
+    expect(r).toMatchObject({ llamadas: 0, bloqueadas: 1 });
+    expect(c.llamadas).toHaveLength(0);
+    expect(await prisma.contratacionIaLlamada.count()).toBe(0);
+    const f = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } });
+    expect(f.estado).toBe('BLOQUEADA_PRIVACIDAD');
+    expect(f.error).toMatch(/^PRIVACIDAD:documento_extranjero_o_profesional/);
+    expect(JSON.stringify(f)).not.toContain('AB1234567');
+    // Un bloqueo no se reintenta solo en las actualizaciones automáticas.
+    const r2 = await servicio(c).procesar(lectura);
+    expect(r2.revisadas).toBe(0);
+  });
+
+  it('simulación: muestra qué saldría y la verificación de privacidad, sin llamar a la API ni escribir nada', async () => {
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    const limpio = await documento('limpio.pdf', [TEXTO(630)]);
+    const sucio = await documento('sucio.pdf', [TEXTO(631) + ' Titular con pasaporte No. AB1234567.']);
+    const r = await servicio(c).procesar(lectura, { versiones: [limpio.ver.id, sucio.ver.id], simular: true });
+    expect(c.llamadas).toHaveLength(0);
+    expect(r.simulacion!.map((s) => [s.version_id, s.accion])).toEqual([[limpio.ver.id, 'LLAMARIA_API'], [sucio.ver.id, 'BLOQUEARIA_PRIVACIDAD']]);
+    expect(r.simulacion![1].hallazgos).toEqual([{ tipo: 'documento_extranjero_o_profesional', cantidad: 1 }]);
+    expect(r.simulacion![0].paginas_enviadas).toEqual([1]);
+    expect(await prisma.contratacionIaExtraccion.count()).toBe(0);
+    expect(await prisma.contratacionIaLlamada.count()).toBe(0);
+  });
+
+  it('reutiliza un resultado verificado de otra versión del extractor con el esquema vigente, sin llamar a la API, y deja la trazabilidad', async () => {
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    const { ver } = await documento('a.pdf', [TEXTO(630)]);
+    await prisma.contratacionIaExtraccion.create({
+      data: {
+        version_id: ver.id, extractor: 'ia-0', estado: 'OK', modelo: 'modelo-previo', tokens_entrada: 500, tokens_salida: 50,
+        resultado: { esquema: 2, campos: { contratista: { valor: 'EMPRESA UNO S.A.S.', pagina: 1, cita: 'Contratista: EMPRESA UNO S.A.S.' } }, areas: [], partidas: [{ nivel: 'PARTIDA', edificio: null, alcance: 'x', alcance_literal: false, importe: 10, unidad: 'GLOBAL', pagina: 1, cita: 'cita 10', relacion: 'PENDIENTE_REVISION' }] },
+      },
+    });
+    const r = await servicio(c).procesar(lectura, { versiones: [ver.id] });
+    expect(r).toMatchObject({ llamadas: 0, reutilizadas: 1 });
+    expect(c.llamadas).toHaveLength(0);
+    const f = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id, extractor: EXTRACTOR_VERSION } });
+    expect(f).toMatchObject({ estado: 'OK', tokens_entrada: 0, modelo: 'modelo-previo' });
+    expect((f.resultado as any).trazabilidad).toMatchObject({ reutilizado_de: 'ia-0', extractor_vigente: EXTRACTOR_VERSION });
+    expect(await prisma.contratacionIaExtraccion.count({ where: { version_id: ver.id, extractor: 'ia-0' } })).toBe(1); // el original se conserva
+  });
+
+  it('un documento clasificado (edificio vinculado) se extrae de forma nativa: deja datos hallados y lo que no encontró', async () => {
+    const ed = await prisma.contratacionEdificio.create({ data: { nombre: 'Conjunto Ejemplo', nombre_norm: 'conjunto ejemplo' } });
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    const { ver } = await documento('resolucion.pdf', ['RESOLUCIÓN No. 9999.001.21.1.500 DE 2030 POR LA CUAL SE ORDENA LA DEMOLICIÓN DE UN INMUEBLE ubicado en la calle 9 #44-11 barrio Centro.'], { edificio: ed.id, categoria: 'RESOLUCION_DEMOLICION' });
+    const r = await servicio(c).procesar(lectura);
+    expect(r).toMatchObject({ llamadas: 0, nativas: 1 });
+    const f = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } });
+    expect(f.estado).toBe('NATIVO');
+    const res: any = f.resultado;
+    expect(res.nativo).toBe(true);
+    expect(res.campos.intervencion).toMatchObject({ valor: 'DEMOLICION', pagina: 1 });
+    expect(res.campos.resolucion_numero.valor).toBe('9999.001.21.1.500-2030');
+    expect(res.no_encontrados.map((x: any) => x.campo)).toEqual(['matricula_inmobiliaria']);
+  });
+
+  it('cotización en Excel: lectura nativa por hojas y celdas, con la fuente de cada dato, sin API y una sola vez', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('RESUMEN');
+    ws.getCell('C9').value = 'NOMBRE DEL PROYECTO'; ws.getCell('D9').value = 'Edificio Ejemplo Alfa: Localizado en la Calle 1 # 2-3';
+    ['ITEM', 'Descripción', 'UNIDAD', 'CANTIDAD', 'VR. UNITARIO', 'VR. PARCIAL'].forEach((t, i) => { ws.getRow(28).getCell(3 + i).value = t; });
+    ws.getCell('C29').value = '1'; ws.getCell('D29').value = 'ESTUDIO'; ws.getCell('H29').value = 100;
+    ws.getCell('C30').value = '4'; ws.getCell('D30').value = 'DEMOLICIONES'; ws.getCell('E30').value = 'GL'; ws.getCell('H30').value = 300;
+    ws.getCell('G33').value = 'SUBTOTAL'; ws.getCell('H33').value = 400;
+    ws.getCell('C35').value = 'COSTOS DIRECTOS'; ws.getCell('H35').value = 400;
+    ws.getCell('C36').value = 'TOTAL PROYECTO'; ws.getCell('H36').value = 400;
+    const buf = Buffer.from(await wb.xlsx.writeBuffer());
+    const md5 = String(++n).padStart(32, '0');
+    bytesPorMd5.set(md5, buf);
+    const doc = await prisma.contratacionDocumento.create({ data: { nombre: 'cotizacion.xlsx', categoria: 'COTIZACIONES' } });
+    const ver = await prisma.contratacionDocumentoVersion.create({ data: { documento_id: doc.id, numero: 1, md5 } });
+    await prisma.contratacionDocumentoOrigen.create({ data: { version_id: ver.id, tipo: 'DRIVE', id_origen: 'x-1', nombre_original: 'cotizacion.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    await servicio(c).procesar(lectura);
+    const f = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id, extractor: 'xlsx-1' } });
+    expect(f.estado).toBe('OK');
+    const r: any = f.resultado;
+    expect(r.hoja_calculo).toBe(true);
+    expect(r.campos.edificio).toMatchObject({ valor: 'Edificio Ejemplo Alfa', fuente: 'Hoja RESUMEN, celda D9' });
+    expect(r.partidas.filter((p: any) => p.nivel === 'PARTIDA').map((p: any) => [p.alcance, p.importe, p.fuente])).toEqual([['ESTUDIO', 100, 'Hoja RESUMEN, celda H29'], ['DEMOLICIONES', 300, 'Hoja RESUMEN, celda H30']]);
+    expect(r.controles_aritmeticos[0]).toMatchObject({ estado: 'CUADRA', calculado: 400, declarado: 400 });
+    expect(c.llamadas).toHaveLength(0);
+    await servicio(c).procesar(lectura);
+    expect(await prisma.contratacionIaExtraccion.count({ where: { version_id: ver.id, extractor: 'xlsx-1' } })).toBe(1);
   });
 
   it('no interpreta la matriz de contratación ni las transcripciones', async () => {

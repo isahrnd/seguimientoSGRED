@@ -173,11 +173,36 @@ export interface AreaPrecio {
 
 export interface CoincidenciaEdificioVista { estado: 'COINCIDE' | 'POSIBLE' | 'SIN_COINCIDENCIA'; edificio_id: number | null; edificio: string | null; vinculado_al_documento: boolean | null; similitud: number }
 
+export interface PartidaLeida {
+  nivel?: "PARTIDA" | "SUBTOTAL" | "TOTAL" | "IMPUESTO_O_AIU" | "COMPONENTE_SIN_VALOR";
+  edificio: string | null;
+  alcance: string;
+  alcance_literal?: boolean;
+  item?: string | null;
+  importe: number | null;
+  unidad?: string | null;
+  cantidad?: number | null;
+  precio_unitario?: number | null;
+  porcentaje?: number | null;
+  pagina?: number | null;
+  fuente?: string | null;
+  cita?: string;
+  relacion?: "EXPLICITA" | "PENDIENTE_REVISION";
+  coincidencia?: CoincidenciaEdificioVista | null;
+}
+
 export interface LecturaAsistida {
   version_id: number;
   documento: string;
-  campos: { campo: string; valor: string | number; pagina: number; cita: string }[];
-  partidas?: { edificio: string | null; alcance: string; alcance_literal?: boolean; importe: number; unidad: string; pagina: number; cita: string; relacion: 'EXPLICITA' | 'PENDIENTE_REVISION'; coincidencia?: CoincidenciaEdificioVista | null }[];
+  origen?: "ASISTIDA" | "NATIVA" | "HOJA_DE_CALCULO";
+  trazabilidad?: { extractor?: string; modelo?: string; reutilizado_de?: string; extractor_vigente?: string } | null;
+  campos: { campo: string; valor: string | number; pagina: number | null; cita: string; fuente?: string | null }[];
+  coincidencia_edificio?: CoincidenciaEdificioVista | null;
+  partidas?: PartidaLeida[];
+  suma_solo_partidas?: number;
+  controles_de_suma?: { grupo: string; suma_partidas: number; total_declarado: number | null; estado: "CUADRA" | "NO_CUADRA" | "SIN_TOTAL_DECLARADO"; diferencia: number | null }[];
+  controles_aritmeticos?: { control: string; calculado: number; declarado: number; estado: "CUADRA" | "NO_CUADRA"; diferencia: number }[];
+  no_encontrados?: { campo: string; motivo: string }[];
   edificios_en_tabla?: number;
   edificios_vinculados_al_documento?: number;
   edificios_sin_vinculo?: string[];

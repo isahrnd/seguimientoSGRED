@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { parseNumero } from './contratacion-areas';
 import { tipoPorSegmento } from './contratacion-identificadores';
+import { NivelPartida, nivelPartida } from './contratacion-partidas';
 import { normalizar } from './contratacion-sugerencias';
 
 /**
@@ -145,7 +146,15 @@ export interface CampoValidado<T = string | number> { valor: T; pagina: number; 
 export interface AreaValidada { valor: number; tipo: string; edificio: string | null; pagina: number; cita: string }
 export type NombreCampo = 'proceso' | 'contrato' | 'contratista' | 'importe' | 'edificio' | 'intervencion' | 'etapa';
 /** `relacion`: EXPLICITA solo si el edificio y el importe constan en la misma cita; si no (p. ej. columnas de una tabla), queda PENDIENTE_REVISION. */
-export interface PartidaValidada { edificio: string | null; alcance: string; alcance_literal: boolean; importe: number; unidad: string; pagina: number; cita: string; relacion: 'EXPLICITA' | 'PENDIENTE_REVISION' }
+export const ESQUEMA_RESULTADO = 2; // 2: con partidas. Un resultado de otra versión del extractor con este esquema es compatible y se reutiliza.
+
+/** Limpia de nuevo las citas de un resultado ya guardado (p. ej. al reutilizarlo bajo filtros más estrictos). */
+export function depurarResultado<T>(res: T): T {
+  const rec = (x: any): any => (Array.isArray(x) ? x.map(rec) : x && typeof x === 'object' ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === 'cita' && typeof v === 'string' ? depurar(v) : rec(v)])) : x);
+  return rec(res);
+}
+
+export interface PartidaValidada { nivel: NivelPartida; edificio: string | null; alcance: string; alcance_literal: boolean; importe: number; unidad: string; pagina: number; cita: string; relacion: 'EXPLICITA' | 'PENDIENTE_REVISION' }
 export interface Extraccion {
   campos: Partial<Record<NombreCampo, CampoValidado>>;
   areas: AreaValidada[];
@@ -214,6 +223,7 @@ export function validarRespuesta(entrada: unknown, fragmentos: Fragmento[]): Ext
     const enPagina = typeof p.edificio === 'string' && compacto(p.edificio).length >= 4 && p.edificio.length <= 160 && porPagina.get(p.pagina)!.includes(compacto(p.edificio));
     const edificio = enPagina ? String(p.edificio).trim() : null;
     salida.partidas.push({
+      nivel: nivelPartida(p.alcance, p.cita),
       // El alcance es una descripción (en una fila de totales sin rótulo no consta literalmente): se informa si aparece tal cual en la página.
       edificio, alcance: p.alcance.trim(), alcance_literal: porPagina.get(p.pagina)!.includes(compacto(p.alcance)), importe: Math.round(p.importe * 100) / 100,
       unidad: (UNIDADES_PARTIDA as readonly string[]).includes(p.unidad) ? p.unidad : 'OTRA', pagina: p.pagina, cita: depurar(String(p.cita).trim()).slice(0, 240),

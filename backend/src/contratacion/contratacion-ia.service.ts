@@ -5,16 +5,22 @@ import { ClienteClaude, ClienteClaudeHttp, ErrorClaude } from './contratacion-cl
 import { extraerProceso } from './contratacion-clasificador';
 import { tipoPorSegmento } from './contratacion-identificadores';
 import {
-  CATEGORIA_POR_ETAPA, EXTRACTOR_VERSION, Extraccion, Fragmento, construirSolicitud, estimarTokens, huellaContenido, necesitaInterpretacion,
+  CATEGORIA_POR_ETAPA, ESQUEMA_RESULTADO, EXTRACTOR_VERSION, depurarResultado, Extraccion, Fragmento, construirSolicitud, estimarTokens, huellaContenido, necesitaInterpretacion,
   seleccionarFragmentos, validarRespuesta,
 } from './contratacion-ia';
 import { EjecutorOcr, MIN_TEXTO_NATIVO, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { normalizar } from './contratacion-sugerencias';
+import { extraerNativo } from './contratacion-nativo';
+import { leerTablas } from './contratacion-excel';
+import { leerCotizacionExcel } from './contratacion-cotizacion-excel';
+import { textoDeSolicitud, verificarPrivacidad, HallazgoPrivacidad } from './contratacion-privacidad';
 import {
   claudeApiKey, claudeAutomatico, claudeMaxDocsEjecucion, claudeMaxLlamadasDia, claudeMaxTokensEntrada, claudeMaxTokensSalida, claudeModelo, claudeTarifaUsd, ocrMaxPaginasIa,
 } from './contratacion.config';
 
 const MAX_PAGINAS_LECTURA = 150;
+/** Identificador del lector nativo de cotizaciones en Excel (no usa la API); versiona sus resultados aparte de los de la lectura asistida. */
+export const EXTRACTOR_XLSX = 'xlsx-1';
 /** Documentos de nivel edificio: una resolución de demolición o una visita técnica pertenece a un edificio, no a un proceso; no necesitan número de proceso. */
 const NIVEL_EDIFICIO = new Set(['RESOLUCION_DEMOLICION', 'VISITA_SOPORTE_TECNICO']);
 const BLOQUEO_PRESUPUESTO = 7102; // pg_advisory_xact_lock: serializa la reserva de llamadas entre procesos
@@ -28,6 +34,9 @@ export interface LecturaPdf {
 export interface ResumenIa {
   revisadas: number; nativas: number; desde_cache: number; llamadas: number; pendientes: number; errores: number;
   ocr_paginas: number; tokens_entrada: number; tokens_salida: number; limite_alcanzado: boolean; detenido: string | null;
+  bloqueadas: number; reutilizadas: number;
+  /** Solo en simulación: qué haría cada versión y la verificación de privacidad del texto exacto que saldría. */
+  simulacion?: Array<{ version_id: number; accion: string; paginas_enviadas: number[]; caracteres: number; tokens_estimados: number; hallazgos: HallazgoPrivacidad[] }>;
 }
 
 const hoy = () => new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
@@ -51,6 +60,8 @@ export class ContratacionIaService {
   private readonly log = new Logger(ContratacionIaService.name);
   private readonly carril = new Carril();
   private enCurso = false;
+  private simulando = false;
+  private simulacion: NonNullable<ResumenIa['simulacion']> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -100,16 +111,19 @@ export class ContratacionIaService {
 
   // ------------------------------------------------------------------ procesamiento
   /** `opciones.versiones`: ejecución MANUAL sobre versiones concretas (no depende del interruptor automático). `forzar`: interpreta aunque la lectura nativa ya resuelva (para medir precisión). */
-  async procesar(lectura: LecturaPdf, opciones: { versiones?: number[]; forzar?: boolean } = {}): Promise<ResumenIa> {
-    const r: ResumenIa = { revisadas: 0, nativas: 0, desde_cache: 0, llamadas: 0, pendientes: 0, errores: 0, ocr_paginas: 0, tokens_entrada: 0, tokens_salida: 0, limite_alcanzado: false, detenido: null };
+  async procesar(lectura: LecturaPdf, opciones: { versiones?: number[]; forzar?: boolean; simular?: boolean } = {}): Promise<ResumenIa> {
+    const r: ResumenIa = { revisadas: 0, nativas: 0, desde_cache: 0, llamadas: 0, pendientes: 0, errores: 0, ocr_paginas: 0, tokens_entrada: 0, tokens_salida: 0, limite_alcanzado: false, detenido: null, bloqueadas: 0, reutilizadas: 0, ...(opciones.simular ? { simulacion: [] } : {}) };
     if (this.enCurso) return r; // un solo procesamiento a la vez (actualización manual y sincronización automática no se pisan)
     this.enCurso = true;
     try {
       const manual = Array.isArray(opciones.versiones);
-      const puedeLlamar = this.cliente.disponible() && claudeMaxLlamadasDia() > 0 && (manual || claudeAutomatico());
+      // En simulación nunca se llama a la API ni se escribe nada: solo se muestra qué saldría y si pasa la barrera de privacidad.
+      const puedeLlamar = !opciones.simular && this.cliente.disponible() && claudeMaxLlamadasDia() > 0 && (manual || claudeAutomatico());
+      this.simulando = !!opciones.simular;
+      this.simulacion = r.simulacion ?? null;
       const ahora = new Date();
       const vistas = await this.prisma.contratacionIaExtraccion.findMany({ where: { extractor: EXTRACTOR_VERSION }, select: { version_id: true, estado: true, proximo_intento: true } });
-      const hechas = new Set(vistas.filter((v) => manual ? v.estado === 'OK' : v.estado === 'NATIVO' || v.estado === 'OK' || (v.estado === 'PENDIENTE_IA' && !puedeLlamar) || (v.estado === 'ERROR' && v.proximo_intento && v.proximo_intento > ahora)).map((v) => v.version_id));
+      const hechas = new Set(vistas.filter((v) => manual ? v.estado === 'OK' : v.estado === 'NATIVO' || v.estado === 'OK' || v.estado === 'BLOQUEADA_PRIVACIDAD' || (v.estado === 'PENDIENTE_IA' && !puedeLlamar) || (v.estado === 'ERROR' && v.proximo_intento && v.proximo_intento > ahora)).map((v) => v.version_id));
       const versiones = await this.prisma.contratacionDocumentoVersion.findMany({
         where: {
           vigente: true,
@@ -122,6 +136,7 @@ export class ContratacionIaService {
         orderBy: { id: 'asc' },
         take: 300,
       });
+      if (!opciones.simular) await this.procesarExcel(lectura, manual ? opciones.versiones! : null);
       let llamadasEnEstaEjecucion = 0;
       for (const v of versiones) {
         if (r.detenido) break;
@@ -142,9 +157,35 @@ export class ContratacionIaService {
     return r;
   }
 
+  /** Cotizaciones en Excel: lectura directa por hojas y celdas, sin OCR ni API. Una vez por versión del archivo. */
+  private async procesarExcel(lectura: LecturaPdf, soloVersiones: number[] | null) {
+    const hechas = await this.prisma.contratacionIaExtraccion.findMany({ where: { extractor: EXTRACTOR_XLSX }, select: { version_id: true } });
+    const vs = await this.prisma.contratacionDocumentoVersion.findMany({
+      where: { vigente: true, id: { notIn: hechas.map((h) => h.version_id), ...(soloVersiones ? { in: soloVersiones } : {}) }, origenes: { some: { estado: 'ACTIVO', mime: { contains: 'spreadsheetml' } } }, documento: { categoria: 'COTIZACIONES' } },
+      select: { id: true, md5: true },
+    });
+    for (const v of vs) {
+      try {
+        const buf = await lectura.bytes(v.md5);
+        if (!buf) continue;
+        const c = leerCotizacionExcel(await leerTablas(buf));
+        const no_encontrados = c.aplica ? ['edificio', 'proveedor', 'numero_cotizacion', 'fecha_cotizacion', 'importe'].filter((k) => !c.campos[k]).map((k) => ({ campo: k, motivo: 'no consta en la hoja' })) : [{ campo: 'cotizacion', motivo: c.motivo ?? 'plantilla no reconocida' }];
+        const resultado = { hoja_calculo: true, esquema: ESQUEMA_RESULTADO, trazabilidad: { extractor: EXTRACTOR_XLSX, origen: 'HOJA_DE_CALCULO' }, aplica: c.aplica, hoja: c.hoja ?? null, campos: c.campos, partidas: c.partidas, controles_aritmeticos: c.controles_aritmeticos, hojas_descartadas: c.hojas_descartadas, no_encontrados };
+        await this.prisma.contratacionIaExtraccion.upsert({
+          where: { version_id_extractor: { version_id: v.id, extractor: EXTRACTOR_XLSX } },
+          create: { version_id: v.id, extractor: EXTRACTOR_XLSX, estado: c.aplica ? 'OK' : 'NO_APLICA', resultado: resultado as any },
+          update: { estado: c.aplica ? 'OK' : 'NO_APLICA', resultado: resultado as any },
+        });
+      } catch (e) {
+        this.log.warn(`Sin lectura de una cotización en Excel: ${(e as Error).message}`);
+      }
+    }
+  }
+
   private async guardarFila(versionId: number, datos: Record<string, any>) {
     // Una lectura ya completada (OK) nunca se degrada a NATIVO o PENDIENTE_IA: otro proceso (la actualización automática del servidor) pudo listarla
     // como pendiente antes de que una ejecución manual la terminara.
+    if (this.simulando) return;
     if (datos.estado === 'PENDIENTE_IA' || datos.estado === 'NATIVO') {
       const actual = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: versionId, extractor: EXTRACTOR_VERSION } }, select: { estado: true } });
       if (actual?.estado === 'OK') return;
@@ -203,14 +244,52 @@ export class ContratacionIaService {
     }
 
     // 3) Superficies declaradas de forma expresa (sin API).
-    await this.registrarAreas(v, edificiosDoc, extraerAreasNativas(paginas).map((a) => ({ ...a, edificio: null as string | null })), 'NATIVO', null);
+    if (!this.simulando) await this.registrarAreas(v, edificiosDoc, extraerAreasNativas(paginas).map((a) => ({ ...a, edificio: null as string | null })), 'NATIVO', null);
 
-    if (!nativoNecesita(est)) { await this.guardarFila(v.id, { estado: 'NATIVO', paginas_ocr: 0 }); r.nativas++; return; }
-    if (!puedeLlamar) { await this.guardarFila(v.id, { estado: 'PENDIENTE_IA' }); r.pendientes++; return; }
+    // La clasificación (edificio y proceso ya resueltos) NO demuestra que se hayan extraído los datos útiles del documento: se extraen de forma nativa y
+    // se deja constancia de lo hallado y de lo que el extractor no encontró.
+    if (!nativoNecesita(est)) {
+      const nat = extraerNativo(paginas, doc.categoria);
+      const resultado = depurarResultado({ nativo: true, esquema: ESQUEMA_RESULTADO, trazabilidad: { extractor: EXTRACTOR_VERSION, origen: 'NATIVO' }, campos: nat.campos, areas: [], partidas: [], no_encontrados: nat.no_encontrados });
+      await this.guardarFila(v.id, { estado: 'NATIVO', paginas_ocr: 0, resultado: resultado as any });
+      this.anotar(v.id, 'NATIVO', [], 0, []);
+      r.nativas++;
+      return;
+    }
+
+    // Un resultado ya verificado de otra versión del extractor, con el esquema vigente, se reutiliza: cambiar los filtros no obliga a repetir la llamada.
+    const anterior = await this.prisma.contratacionIaExtraccion.findFirst({ where: { version_id: v.id, estado: 'OK', extractor: { not: EXTRACTOR_VERSION } }, orderBy: { id: 'desc' } });
+    const prev: any = anterior?.resultado;
+    if (anterior && prev && Array.isArray(prev.partidas) && !forzar) {
+      const limpio: any = depurarResultado(prev);
+      if (verificarPrivacidad(JSON.stringify(limpio)).length === 0) {
+        this.anotar(v.id, 'REUTILIZARIA', [], 0, []);
+        if (!this.simulando) {
+          limpio.esquema = ESQUEMA_RESULTADO;
+          limpio.trazabilidad = { ...(limpio.trazabilidad ?? {}), reutilizado_de: anterior.extractor, modelo: anterior.modelo, extractor_vigente: EXTRACTOR_VERSION };
+          await this.aplicar(v, doc, limpio, edificiosDoc);
+          await this.guardarFila(v.id, { estado: 'OK', huella: anterior.huella, modelo: anterior.modelo, resultado: limpio, descartes: anterior.descartes as any, tokens_entrada: 0, tokens_salida: 0 });
+        }
+        r.reutilizadas++;
+        return;
+      }
+    }
+    if (!puedeLlamar && !this.simulando) { await this.guardarFila(v.id, { estado: 'PENDIENTE_IA' }); r.pendientes++; return; }
 
     // 4) Interpretación con la API, con caché por contenido.
     const fragmentos = seleccionarFragmentos(paginas, claudeMaxTokensEntrada());
     if (fragmentos.length === 0) { await this.guardarFila(v.id, { estado: 'NATIVO' }); r.nativas++; return; }
+    const solicitudPrevia = construirSolicitud(fragmentos, claudeMaxTokensSalida());
+    // Barrera de privacidad sobre el texto EXACTO de la solicitud, después de todas las transformaciones. Si detecta algo, no se envía.
+    const hallazgos = verificarPrivacidad(textoDeSolicitud(solicitudPrevia));
+    this.anotar(v.id, hallazgos.length ? 'BLOQUEARIA_PRIVACIDAD' : 'LLAMARIA_API', fragmentos.map((f) => f.pagina), textoDeSolicitud(solicitudPrevia).length, hallazgos);
+    if (this.simulando) return;
+    if (hallazgos.length) {
+      await this.guardarFila(v.id, { estado: 'BLOQUEADA_PRIVACIDAD', error: ('PRIVACIDAD:' + hallazgos.map((h) => `${h.tipo}x${h.cantidad}`).join(',')).slice(0, 60) });
+      this.log.warn(`Solicitud bloqueada por privacidad (versión ${v.id}): ${hallazgos.map((h) => `${h.tipo}x${h.cantidad}`).join(', ')}`);
+      r.bloqueadas++;
+      return;
+    }
     const huella = huellaContenido(fragmentos);
     const previa = await this.prisma.contratacionIaExtraccion.findFirst({ where: { huella, extractor: EXTRACTOR_VERSION, estado: 'OK' } });
     if (previa?.resultado) {
@@ -244,7 +323,7 @@ export class ContratacionIaService {
       });
       const previo = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: v.id, extractor: EXTRACTOR_VERSION } } });
       const valida = validarRespuesta(resp.entrada, fragmentos);
-      const resultado = { campos: valida.campos, areas: valida.areas, partidas: valida.partidas };
+      const resultado = { esquema: ESQUEMA_RESULTADO, trazabilidad: { extractor: EXTRACTOR_VERSION, modelo }, campos: valida.campos, areas: valida.areas, partidas: valida.partidas };
       await this.aplicar(v, doc, resultado, edificiosDoc);
       await this.guardarFila(v.id, {
         estado: 'OK', huella, modelo, resultado: resultado as any, descartes: valida.descartes as any, error: null, proximo_intento: null,
@@ -260,6 +339,10 @@ export class ContratacionIaService {
       r.errores++;
       if (codigo === 'CLAVE_RECHAZADA' || codigo === 'LIMITE_API' || codigo === 'SIN_CLAVE') r.detenido = codigo;
     }
+  }
+
+  private anotar(versionId: number, accion: string, paginas: number[], caracteres: number, hallazgos: HallazgoPrivacidad[]) {
+    if (this.simulacion) this.simulacion.push({ version_id: versionId, accion, paginas_enviadas: paginas, caracteres, tokens_estimados: estimarTokens(caracteres), hallazgos });
   }
 
   // ------------------------------------------------------------------ aplicación de resultados

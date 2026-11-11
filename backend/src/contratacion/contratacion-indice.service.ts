@@ -100,6 +100,8 @@ export class ContratacionIndiceService {
   private readonly ocr = new OcrLocal();
   private readonly contratos = new ContratacionContratosService(this.prisma);
   readonly ia = new ContratacionIaService(this.prisma);
+  /** Resumen de la última lectura asistida de esta instancia (lo usa el CLI para informar). */
+  ultimoResumenIa: any = null;
   private readonly matriz = new ContratacionMatrizService(this.prisma);
 
   constructor(
@@ -115,7 +117,7 @@ export class ContratacionIndiceService {
    * `confirmarVacia` (por defecto true: actualización manual): permite retirar todos los documentos de una fuente que
    * aparece vacía. La sincronización programada lo desactiva y no retira nada ante una carpeta vacía inesperada.
    */
-  async reindexar(opciones: { confirmarVacia?: boolean; origen?: 'MANUAL' | 'AUTOMATICA'; ia?: { versiones: number[]; forzar?: boolean } } = {}): Promise<{ local: ResumenFuente; drive: ResumenFuente }> {
+  async reindexar(opciones: { confirmarVacia?: boolean; origen?: 'MANUAL' | 'AUTOMATICA'; ia?: { versiones: number[]; forzar?: boolean; simular?: boolean } } = {}): Promise<{ local: ResumenFuente; drive: ResumenFuente }> {
     if (this.enCurso) throw new Error('Ya hay una actualización del índice en curso');
     this.enCurso = true;
     this.confirmarVacia = opciones.confirmarVacia !== false;
@@ -498,14 +500,14 @@ export class ContratacionIndiceService {
   }
 
   /** Lectura asistida de lo que la lectura nativa no resolvió (sin clave queda pendiente); un fallo aquí no invalida la actualización. */
-  private async interpretarDocumentos(ia?: { versiones: number[]; forzar?: boolean }) {
+  private async interpretarDocumentos(ia?: { versiones: number[]; forzar?: boolean; simular?: boolean }) {
     try {
-      await this.ia.procesar(
+      this.ultimoResumenIa = await this.ia.procesar(
         {
         paginas: async (md5, max) => { const cand = this.candidatosVistos.get(md5); return cand && cand.mime === 'application/pdf' ? await paginasPdf(await cand.leerBytes(), max) : null; },
         bytes: async (md5) => { const cand = this.candidatosVistos.get(md5); return cand ? await cand.leerBytes() : null; },
         },
-        ia ? { versiones: ia.versiones, forzar: ia.forzar } : {},
+        ia ? { versiones: ia.versiones, forzar: ia.forzar, simular: ia.simular } : {},
       );
     } catch (e) {
       this.log.warn(`Sin lectura asistida: ${(e as Error).message}`);

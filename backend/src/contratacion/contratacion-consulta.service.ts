@@ -415,7 +415,7 @@ export class ContratacionConsultaService {
   async resumenPorContrato(): Promise<Buffer> {
     const exps = await this.prisma.contratacionExpediente.findMany({ select: { id: true }, orderBy: [{ fecha_documento: 'desc' }, { proceso: 'asc' }] });
     const detalles: any[] = await Promise.all(exps.map((x) => this.detalle(x.id)));
-    return construirLibroResumen(detalles.map(filaResumen));
+    return construirLibroResumen(detalles.map(filaResumen), await vistaLecturaAsistida(this.prisma, {}));
   }
 
   async pendientes() {

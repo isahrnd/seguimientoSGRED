@@ -66,6 +66,14 @@ async function main() {
   try {
     if (cmd === 'reindexar') {
       console.log(JSON.stringify(await app.get(ContratacionIndiceService).reindexar(), null, 2));
+    } else if (cmd === 'verificar-envio') {
+      // Simulación: arma la solicitud de cada versión y aplica la barrera de privacidad al texto EXACTO que saldría. No llama a la API ni escribe nada.
+      const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      if (!lista.length) throw new Error('Indique --versiones=ID,ID,...');
+      const indice = app.get(ContratacionIndiceService);
+      await indice.reindexar({ ia: { versiones: lista, forzar: args.includes('--forzar'), simular: true } });
+      for (const s of indice.ultimoResumenIa?.simulacion ?? []) console.log(JSON.stringify(s));
+      console.log(JSON.stringify({ simulacion: true, versiones: lista.length, bloquearian: (indice.ultimoResumenIa?.simulacion ?? []).filter((s: any) => s.hallazgos.length).length }));
     } else if (cmd === 'interpretar') {
       // Ejecución MANUAL de la lectura asistida sobre versiones concretas: --versiones=12,15,20 [--detalle]
       const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
@@ -73,6 +81,7 @@ async function main() {
       if (lista.length > 10) throw new Error('Por seguridad, un máximo de 10 versiones por ejecución manual');
       const indice = app.get(ContratacionIndiceService);
       await indice.reindexar({ ia: { versiones: lista, forzar: args.includes('--forzar') } });
+      console.log(JSON.stringify({ resumen: { llamadas: indice.ultimoResumenIa?.llamadas, bloqueadas: indice.ultimoResumenIa?.bloqueadas, reutilizadas: indice.ultimoResumenIa?.reutilizadas, nativas: indice.ultimoResumenIa?.nativas } }));
       const filas = await (indice as any).prisma.contratacionIaExtraccion.findMany({ where: { version_id: { in: lista } }, orderBy: { version_id: 'asc' }, include: { version: { include: { documento: true } } } });
       for (const f of filas) {
         console.log(JSON.stringify({ version: f.version_id, documento: f.version.documento.nombre, estado: f.estado, error: f.error, tokens_entrada: f.tokens_entrada, tokens_salida: f.tokens_salida, descartes: f.descartes, ...(args.includes('--detalle') ? { resultado: f.resultado } : { campos: Object.keys((f.resultado as any)?.campos ?? {}) }) }));
@@ -121,7 +130,7 @@ async function main() {
       if (args.includes('--aplicar')) console.log(JSON.stringify(await svc.aplicar(payload, null), null, 2));
       else { const v = await svc.previsualizar(payload); console.log(JSON.stringify({ valida: v.valida, errores: v.errores, advertencias: v.advertencias, resumen: v.resumen }, null, 2)); }
     } else {
-      console.error('Comandos: reindexar | proponer-vinculos-carpeta --documento=ID [--aplicar] | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
+      console.error('Comandos: reindexar | verificar-envio --versiones=ID,ID [--forzar] | proponer-vinculos-carpeta --documento=ID [--aplicar] | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
       process.exitCode = 1;
     }
   } finally {
