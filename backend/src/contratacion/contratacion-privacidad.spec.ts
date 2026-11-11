@@ -28,14 +28,14 @@ describe('barrera de privacidad', () => {
   });
 
   it('un móvil con prefijo de país, partido por saltos de línea o espacios dobles, se suprime sin tocar importes ni cifras financieras', () => {
-    const crudo = 'Comuníquese al teléfono o WhatsApp al +57 313\n503  7777 o al fijo 602 555 0000. Total $ 9.402.324.207,02; ítem $ 781.227.904; suma 13.038.128.470; cotización 136; NIT 900.123.456-1';
+    const crudo = 'Comuníquese al teléfono o WhatsApp al +57 300\n555  0199 o al fijo 602 555 0000. Total $ 8.765.432.109,87; ítem $ 123.456.789; suma 7.654.321.098; cotización 999; NIT 900.123.456-1';
     expect(verificarPrivacidad(crudo.replace(/\s+/g, ' ')).map((h) => h.tipo)).toContain('movil');
     const limpio = depurar(crudo);
     expect(verificarPrivacidad(limpio.replace(/\s+/g, ' '))).toEqual([]);
-    expect(limpio).toContain('$ 9.402.324.207,02');
-    expect(limpio).toContain('$ 781.227.904');
-    expect(limpio).toContain('13.038.128.470');
-    expect(limpio).toContain('cotización 136');
+    expect(limpio).toContain('$ 8.765.432.109,87');
+    expect(limpio).toContain('$ 123.456.789');
+    expect(limpio).toContain('7.654.321.098');
+    expect(limpio).toContain('cotización 999');
   });
 
   it('un número de proceso, de contrato o un importe no se confunden con una identificación', () => {

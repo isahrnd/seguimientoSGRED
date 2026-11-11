@@ -78,7 +78,7 @@ describe('exportación de la lectura de documentos', () => {
   it('conserva cantidad, precio unitario, unidad y nivel; el contenido adicional queda rotulado y sin fila de suma', async () => {
     const lectura = [
       { documento: 'hoja.xlsx', version_id: 8, origen: 'HOJA_DE_CALCULO', campos: [], no_encontrados: [], partidas: [{ nivel: 'PARTIDA', alcance: 'Excavación', cantidad: 12, precio_unitario: 50, importe: 600, unidad: 'M3', fuente: 'Hoja RESUMEN, celda H30', coincidencia: null }], suma_solo_partidas: 600, controles_de_suma: [], controles_aritmeticos: [] },
-      { documento: 'hoja.xlsx — hoja RESUMEN (2)', version_id: 8, origen: 'HOJA_DE_CALCULO', excluida_de_indicadores: true, campos: [], no_encontrados: [], partidas: [{ nivel: 'PARTIDA', alcance: 'Otra', cantidad: 2, precio_unitario: 5, importe: 10, unidad: 'UND', fuente: 'Hoja RESUMEN (2), celda H9', coincidencia: null }], suma_solo_partidas: null, controles_de_suma: [], controles_aritmeticos: [] },
+      { documento: 'hoja.xlsx — hoja RESUMEN (2)', version_id: 8, origen: 'HOJA_DE_CALCULO', excluida_de_indicadores: true, correspondencia_pendiente: { proyecto: { nombre: 'OBRAS CIVILES PARA CALDERA', celda: 'D9', fecha: '2025-01-31' }, senales: ['el nombre del proyecto no comparte palabras con el de la hoja RESUMEN'] }, campos: [], no_encontrados: [], partidas: [{ nivel: 'PARTIDA', alcance: 'Otra', cantidad: 2, precio_unitario: 5, importe: 10, unidad: 'UND', fuente: 'Hoja RESUMEN (2), celda H9', coincidencia: null }], suma_solo_partidas: null, controles_de_suma: [], controles_aritmeticos: [] },
     ];
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load((await construirLibroResumen([], lectura)) as any);
     const ws = wb.getWorksheet('Lectura de documentos')!;
@@ -87,10 +87,18 @@ describe('exportación de la lectura de documentos', () => {
     expect(ws.getRow(2).getCell(col('Precio unitario')).value).toBe(50);
     expect(ws.getRow(2).getCell(col('Unidad')).value).toBe('M3');
     expect(ws.getRow(2).getCell(col('Importe')).value).toBe(600);
-    expect(ws.getRow(4).getCell(col('Estado de revisión')).value).toMatch(/Contenido adicional pendiente de revisión/);
-    // La fila de suma (control) es solo de la hoja principal: tras la principal y la adicional hay 1 fila de control, no 2.
-    const controles: string[] = []; ws.eachRow((r) => { if (r.getCell(col('Nivel')).value === 'Control') controles.push(String(r.getCell(1).value)); });
-    expect(controles).toEqual(['hoja.xlsx (v8)']);
+    // El contenido adicional NO está en la lectura principal: tiene su propia hoja, con su procedencia.
+    expect(ws.rowCount).toBe(3); // encabezado, la partida y su control
+    const filasMain: string[] = []; ws.eachRow((r) => filasMain.push(String(r.getCell(1).value)));
+    expect(filasMain.join('|')).not.toMatch(/RESUMEN (2)/);
+    const wa = wb.getWorksheet('Contenido adicional')!;
+    const cola = (n: string) => { let i = 0; wa.getRow(1).eachCell((c, k) => { if (c.value === n) i = k; }); return i; };
+    expect(wa.getRow(2).getCell(1).value).toBe('hoja.xlsx — hoja RESUMEN (2) (v8)');
+    expect(wa.getRow(2).getCell(cola('Estado de revisión')).value).toMatch(/Contenido adicional pendiente de revisión/);
+    expect(wa.getRow(2).getCell(cola('Cantidad')).value).toBe(2);
+    expect(wa.getRow(2).getCell(cola('Fuente')).value).toBe('Hoja RESUMEN (2), celda H9');
+    expect(wa.getRow(2).getCell(cola('Proyecto citado en la hoja (celda)')).value).toMatch(/CALDERA/);
+    expect(String(wa.getRow(2).getCell(cola('Señales para revisión')).value)).toMatch(/no comparte palabras/);
   });
 
   it('un documento con solo totales no muestra una suma de partidas en cero: dice que el desglose está pendiente', async () => {

@@ -18,7 +18,8 @@ export interface PartidaPresupuesto {
   pagina: number;
   cita: string;
   relacion: 'EXPLICITA' | 'PENDIENTE_REVISION';
-  origen: 'NATIVO_POR_ORDEN';
+  origen: 'NATIVO_POR_ORDEN' | 'OCR_LOCAL';
+  importe_en_el_texto?: number;
 }
 export interface ControlPresupuesto { control: string; calculado: number; declarado: number; estado: 'CUADRA' | 'NO_CUADRA'; diferencia: number }
 export interface PresupuestoNativo {
@@ -121,5 +122,82 @@ export function fusionarPresupuestoNativo<T extends { partidas?: any[]; trazabil
       controles_aritmeticos: [...(resultado.controles_aritmeticos ?? []), ...p.controles_aritmeticos],
       trazabilidad: { ...(resultado.trazabilidad ?? {}), desglose: `NATIVO_POR_ORDEN (p. ${p.pagina}; asociación aceptada porque los ${p.controles_aritmeticos.length} controles aritméticos cuadran)` },
     },
+  };
+}
+
+// ------------------------------------------------------------------ cierre de la oferta leído por OCR local
+/** Importe del final de una línea de OCR, tolerante a separadores mal leídos («1,955.719,270,44»): los dos últimos dígitos son centavos si los precede un separador. */
+export function montoDeLinea(s: string): number | null {
+  const m = /([\d][\d.,\s]*\d)\s*$/.exec(s.trim());
+  if (!m) return null;
+  const digitos = m[1].replace(/\D/g, '');
+  if (digitos.length < 4) return null;
+  return /[.,]\d{2}$/.test(m[1]) ? Number(digitos) / 100 : Number(digitos);
+}
+
+export type ResultadoCierre = { ok: true; partidas: PartidaPresupuesto[]; controles: ControlPresupuesto[] } | { ok: false; motivo: string };
+
+/**
+ * Bloque de cierre de una oferta cuya tabla es una imagen (administración, utilidad, total antes de IVA, IVA y total), leído por OCR local de esa
+ * página. Solo se acepta si las operaciones aritméticas entre las propias líneas cuadran (el OCR confunde separadores y dígitos; una cifra que no
+ * cuadra no se acepta). No recupera los ítems por edificio ni las filas que el OCR no lee.
+ */
+export function extraerCierreOcr(texto: string, pagina: number): ResultadoCierre {
+  const lineas = texto.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const buscar = (re: RegExp) => lineas.map((l) => re.exec(l)).find((m) => m) ?? null;
+  const pct = (m: RegExpExecArray | null) => (m ? Number(m[1].replace(',', '.')) : null);
+  const mAdm = buscar(/^ADMINISTRACI[ÓO]N:?\s*(\d+(?:,\d+)?)\s*%\s*(.+)$/i);
+  const mUti = buscar(/^UTILIDAD:?\s*(\d+(?:,\d+)?)\s*%\s*(.+)$/i);
+  const mAntes = buscar(/^TOTAL ANTES DE IVA\s*(.+)$/i);
+  const mIva = buscar(/^IVA SOBRE UTILIDAD\s*(\d+(?:,\d+)?)\s*%\s*(.+)$/i);
+  const mTot = buscar(/^TOTAL\s+(\d[\d.,\s]*)$/i);
+  if (!mAdm || !mUti || !mAntes || !mIva || !mTot) return { ok: false, motivo: 'el OCR no lee todas las líneas del cierre (administración, utilidad, total antes de IVA, IVA y total)' };
+  const adm = montoDeLinea(mAdm[2]); const uti = montoDeLinea(mUti[2]); const antes = montoDeLinea(mAntes[1]); const iva = montoDeLinea(mIva[2]); const total = montoDeLinea(mTot[1]);
+  const pA = pct(mAdm); const pU = pct(mUti); const pI = pct(mIva);
+  if ([adm, uti, antes, iva, total, pA, pU, pI].some((x) => x === null)) return { ok: false, motivo: 'alguna cifra del cierre no es legible' };
+  const controles: ControlPresupuesto[] = [];
+  const control = (nombre: string, calculado: number, declarado: number, tol: number) => {
+    const dif = r2(declarado - calculado);
+    controles.push({ control: nombre, calculado: r2(calculado), declarado, estado: Math.abs(dif) <= tol ? 'CUADRA' : 'NO_CUADRA', diferencia: dif });
+  };
+  control(`IVA ${pI}% sobre la utilidad`, uti! * pI! / 100, iva!, 1);
+  control(`Administración ${pA}% = utilidad ${pU}% × ${pA}/${pU}`, uti! * pA! / pU!, adm!, 1);
+  control('Total antes de IVA + IVA = total de la oferta', antes! + iva!, total!, 0.02);
+  const mal = controles.find((c) => c.estado === 'NO_CUADRA');
+  if (mal) return { ok: false, motivo: `el cierre leído por OCR no pasa el control «${mal.control}»` };
+  const mk = (nivel: NivelPartida, alcance: string, importe: number, cita: string): PartidaPresupuesto => ({
+    nivel, edificio: null, alcance, alcance_literal: false, importe, unidad: 'GLOBAL', pagina, cita: cita.slice(0, 120), relacion: 'PENDIENTE_REVISION', origen: 'OCR_LOCAL',
+  });
+  return {
+    ok: true, controles,
+    partidas: [
+      mk('IMPUESTO_O_AIU', `Administración ${pA}% (AIU) — cierre de la oferta`, adm!, mAdm[0]),
+      mk('IMPUESTO_O_AIU', `Utilidad ${pU}% (AIU) — cierre de la oferta`, uti!, mUti[0]),
+      mk('SUBTOTAL', 'Total antes de IVA — cierre de la oferta', antes!, mAntes[0]),
+      mk('IMPUESTO_O_AIU', `IVA ${pI}% sobre la utilidad — cierre de la oferta`, iva!, mIva[0]),
+      mk('TOTAL', 'Total de la oferta (con centavos, leído del cierre)', total!, mTot[0]),
+    ],
+  };
+}
+
+/**
+ * Incorpora el cierre leído por OCR. Si el resultado ya traía un total de esa página que el texto expresa sin centavos (p. ej. «$ 9.402.324.207»),
+ * ese total pasa a llevar los centavos documentados y se conserva el importe del texto; si no, se añade. Deja constancia de que el desglose por
+ * ítem sigue pendiente: esto NO completa el desglose.
+ */
+export function fusionarCierreOcr<T extends { partidas?: any[]; trazabilidad?: any; controles_aritmeticos?: any[]; no_encontrados?: any[] }>(resultado: T, cierre: Extract<ResultadoCierre, { ok: true }>, pagina: number): T {
+  const partidas = [...(resultado.partidas ?? [])];
+  const nuevo = cierre.partidas.find((p) => p.nivel === 'TOTAL')!;
+  const i = partidas.findIndex((p) => p.pagina === pagina && p.nivel === 'TOTAL' && Math.abs(p.importe - nuevo.importe) < 1);
+  const resto = cierre.partidas.filter((p) => p !== nuevo || i < 0).filter((p) => !partidas.some((q) => q.pagina === pagina && q.origen === 'OCR_LOCAL' && q.alcance === p.alcance));
+  if (i >= 0) partidas[i] = { ...partidas[i], importe: nuevo.importe, importe_en_el_texto: partidas[i].importe_en_el_texto ?? partidas[i].importe, origen: 'OCR_LOCAL', cita: String(partidas[i].cita).includes('centavos según OCR') ? partidas[i].cita : `${partidas[i].cita} · centavos según OCR local p. ${pagina}: ${nuevo.cita}`.slice(0, 240) };
+  const motivo = 'los ítems por edificio de la tabla (imagen) y la fila de imprevistos no se leen con el OCR local; el desglose por ítem sigue pendiente (valores verificados en imagen: ver cotizaciones del edificio)';
+  const no = (resultado.no_encontrados ?? []).filter((n: any) => n.campo !== 'desglose');
+  return {
+    ...resultado,
+    partidas: [...partidas, ...resto],
+    controles_aritmeticos: [...(resultado.controles_aritmeticos ?? []).filter((c: any) => !cierre.controles.some((x) => x.control === c.control)), ...cierre.controles],
+    no_encontrados: [...no, { campo: 'desglose', motivo }],
+    trazabilidad: { ...(resultado.trazabilidad ?? {}), cierre: `OCR_LOCAL (p. ${pagina}; ${cierre.controles.length} controles aritméticos cuadran)` },
   };
 }

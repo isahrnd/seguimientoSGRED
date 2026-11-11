@@ -8,7 +8,7 @@ import {
   CATEGORIA_POR_ETAPA, ESQUEMA_RESULTADO, EXTRACTOR_VERSION, depurarResultado, Extraccion, Fragmento, construirSolicitud, estimarTokens, huellaContenido, necesitaInterpretacion,
   seleccionarFragmentos, validarRespuesta,
 } from './contratacion-ia';
-import { fusionarPresupuestoNativo } from './contratacion-presupuesto-nativo';
+import { extraerCierreOcr, fusionarCierreOcr, fusionarPresupuestoNativo } from './contratacion-presupuesto-nativo';
 import { EjecutorOcr, MIN_TEXTO_NATIVO, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { normalizar } from './contratacion-sugerencias';
 import { extraerNativo } from './contratacion-nativo';
@@ -205,6 +205,27 @@ export class ContratacionIaService {
       out.push({ version_id: id, aplicado: true, partidas: (f.resultado as any).partidas.length });
     }
     return out;
+  }
+
+  /**
+   * OCR local selectivo de UNA página (el cierre de una oferta cuya tabla es una imagen). Guarda el texto OCR de esa página como evidencia y, solo si las
+   * operaciones aritméticas del cierre cuadran, lo incorpora a la lectura aceptada. Sin llamadas a la API; no toca valores verificados ni otras páginas.
+   */
+  async completarCierreOcr(versionId: number, pagina: number, pdf: Buffer): Promise<{ version_id: number; aplicado: boolean; motivo?: string; centavos?: boolean }> {
+    if (!this.ocr.disponible()) return { version_id: versionId, aplicado: false, motivo: 'OCR local no disponible' };
+    const fila = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: versionId, extractor: EXTRACTOR_VERSION } } });
+    if (!fila || fila.estado !== 'OK' || !fila.resultado) return { version_id: versionId, aplicado: false, motivo: 'sin lectura aceptada (OK) del extractor vigente' };
+    const texto = this.ocr.paginas(pdf, [pagina])[0] ?? '';
+    if (!texto) return { version_id: versionId, aplicado: false, motivo: 'el OCR no devolvió texto' };
+    await this.prisma.contratacionOcrPagina.upsert({
+      where: { version_id_pagina: { version_id: versionId, pagina } },
+      create: { version_id: versionId, pagina, texto, motor: MOTOR_OCR }, update: { texto, motor: MOTOR_OCR },
+    });
+    const cierre = extraerCierreOcr(texto, pagina);
+    if (cierre.ok === false) return { version_id: versionId, aplicado: false, motivo: cierre.motivo };
+    const res: any = fusionarCierreOcr(fila.resultado as any, cierre, pagina);
+    await this.prisma.contratacionIaExtraccion.update({ where: { id: fila.id }, data: { resultado: res } });
+    return { version_id: versionId, aplicado: true, centavos: res.partidas.some((p: any) => p.importe_en_el_texto !== undefined) };
   }
 
   private async guardarFila(versionId: number, datos: Record<string, any>) {

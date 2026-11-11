@@ -1,4 +1,4 @@
-import { extraerPresupuestoNativo, fusionarPresupuestoNativo } from './contratacion-presupuesto-nativo';
+import { extraerCierreOcr, extraerPresupuestoNativo, fusionarCierreOcr, fusionarPresupuestoNativo, montoDeLinea } from './contratacion-presupuesto-nativo';
 
 // Cifras INVENTADAS. Costo directo 1.000.000.000,00; AIU 15/3/5 %; IVA 19 % sobre la utilidad.
 const CABEZA = 'Cotización # 000001 Página 9 3. PRESUPUESTO El valor total de la presente propuesta para el edificio Torre Ejemplo asciende a la suma de: UN MIL SETENTA Y CINCO MILLONES PESOS M/L ($ 1.209.500.000,00) 1. DESMONTAJE ÍTEM DESCRIPCIÓN UND CANT. VR. TOTAL';
@@ -61,5 +61,52 @@ describe('desglose nativo del presupuesto de una cotización', () => {
     const sin = fusionarPresupuestoNativo(previo, [{ pagina: 1, texto: 'nada' }]);
     expect(sin.aplicado).toBe(false);
     expect(sin.resultado).toBe(previo);
+  });
+});
+
+// Cierre leído por OCR (valores SINTÉTICOS). Utilidad 5 % = 40.000.000,40; administración 15 % = 120.000.001,20; IVA 19 % de la utilidad = 7.600.000,08;
+// total antes de IVA 1.000.000.001,01; total 1.007.600.001,09.
+const OCR = [
+  'PROPUESTA ECONÓMICA', 'DESMONTAJE Y DEMOLICIÓN MECANICA', 'EAT DESCRIPCION TO UNO TOCAN O)',
+  'ADMINISTRACIÓN: 15,00% 120,000.001,20', 'UTILIDAD 5,00% 40.000.000,40', 'TOTAL ANTES DE IVA 1.000.000.001,01',
+  'IVA SOBRE UTILIDAD 19% 7.600.000,08', 'SUB- TOTAL 1.007.600.001,09', 'TOTAL 1.007.600.001,09', 'Todo el material resultante',
+].join('\n');
+
+describe('cierre de una oferta leído por OCR local', () => {
+  it('tolera separadores mal leídos y conserva los centavos', () => {
+    expect(montoDeLinea('120,000.001,20')).toBe(120000001.2);
+    expect(montoDeLinea('1.007.600.001,09')).toBe(1007600001.09);
+    expect(montoDeLinea('16.160')).toBe(16160);
+  });
+
+  it('acepta el cierre solo si cuadra la aritmética y no inventa filas que el OCR no lee', () => {
+    const r = extraerCierreOcr(OCR, 8);
+    expect(r.ok).toBe(true);
+    if (r.ok === false) return;
+    expect(r.partidas.map((p) => [p.nivel, p.importe])).toEqual([
+      ['IMPUESTO_O_AIU', 120000001.2], ['IMPUESTO_O_AIU', 40000000.4], ['SUBTOTAL', 1000000001.01], ['IMPUESTO_O_AIU', 7600000.08], ['TOTAL', 1007600001.09],
+    ]);
+    expect(r.partidas.every((p) => p.origen === 'OCR_LOCAL' && p.pagina === 8)).toBe(true);
+    expect(r.controles.every((c) => c.estado === 'CUADRA')).toBe(true);
+  });
+
+  it('rechaza el cierre si una cifra leída no cuadra o falta una línea', () => {
+    expect(extraerCierreOcr(OCR.replace('7.600.000,08', '7.600.900,08'), 8).ok).toBe(false);
+    expect(extraerCierreOcr(OCR.replace('UTILIDAD 5,00% 40.000.000,40', ''), 8).ok).toBe(false);
+  });
+
+  it('un total que el texto expresa sin centavos pasa a llevar los centavos documentados, conserva el importe del texto y no marca el desglose como completo', () => {
+    const cierre = extraerCierreOcr(OCR, 8);
+    if (cierre.ok === false) throw new Error('cierre');
+    const previo: any = { partidas: [{ pagina: 8, nivel: 'TOTAL', alcance: 'Valor total', importe: 1007600001, cita: 'PESOS ML ( $ 1.007.600.001 )' }], no_encontrados: [], trazabilidad: { extractor: 'ia-8' } };
+    const f: any = fusionarCierreOcr(previo, cierre, 8);
+    const totales = f.partidas.filter((p: any) => p.nivel === 'TOTAL');
+    expect(totales).toHaveLength(1);
+    expect(totales[0]).toMatchObject({ importe: 1007600001.09, importe_en_el_texto: 1007600001, origen: 'OCR_LOCAL' });
+    expect(f.partidas).toHaveLength(5);
+    expect(f.no_encontrados.some((n: any) => n.campo === 'desglose' && /sigue pendiente/.test(n.motivo))).toBe(true);
+    expect(f.trazabilidad.cierre).toMatch(/OCR_LOCAL/);
+    // repetir no duplica filas
+    expect(fusionarCierreOcr(f, cierre, 8).partidas).toHaveLength(5);
   });
 });

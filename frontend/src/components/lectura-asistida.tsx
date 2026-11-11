@@ -67,7 +67,7 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
                   {x.partidas!.map((p, i) => (
                     <tr key={i} style={{ borderTop: "1px solid #E6EAF0", color: p.nivel && p.nivel !== "PARTIDA" ? "#5B6577" : undefined }}>
                       <td>{p.edificio ?? "—"}</td><td>{p.alcance}</td><td>{NIVEL[p.nivel ?? "PARTIDA"]}</td>
-                      <td style={{ textAlign: "right" }} className="cifra">{p.importe === null ? "—" : cop(p.importe)}{p.unidad && p.unidad !== "GLOBAL" && p.unidad !== "GL" ? ` / ${p.unidad}` : ""}</td>
+                      <td style={{ textAlign: "right" }} className="cifra">{p.importe === null ? "—" : cop(p.importe)}{p.unidad && p.unidad !== "GLOBAL" && p.unidad !== "GL" ? ` / ${p.unidad}` : ""}{p.importe_en_el_texto !== undefined && <div className="texto-secundario" style={{ fontSize: 12 }}>El texto lo expresa sin centavos ({cop(p.importe_en_el_texto)}); con centavos según OCR local de la página.</div>}</td>
                       <td>{fuente(p)}</td>
                       <td>{!p.coincidencia ? "—" : p.coincidencia.estado === "SIN_COINCIDENCIA" ? "Sin edificio registrado con ese nombre" : `${p.coincidencia.estado === "COINCIDE" ? "Igual a" : "Parecido a"} ${p.coincidencia.edificio}${p.coincidencia.vinculado_al_documento ? " (vinculado)" : " (no vinculado)"}`}</td>
                       <td>{p.relacion ? (p.relacion === "EXPLICITA" ? "Explícita en la cita" : "Pendiente de revisión") : "—"}</td>

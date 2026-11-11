@@ -105,6 +105,17 @@ async function main() {
         bytes: async () => null,
       };
       for (const r of await ia.completarDesgloseNativo(lectura as any, lista)) console.log(JSON.stringify(r));
+    } else if (cmd === 'cierre-ocr') {
+      // OCR local selectivo de una página (--pagina=N) para leer el cierre de una oferta cuya tabla es una imagen. Sin API; solo se acepta si cuadra la aritmética.
+      const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      const pagina = Number((args.find((a) => a.startsWith('--pagina=')) ?? '').slice(9));
+      if (!lista.length || !Number.isInteger(pagina) || pagina < 1) throw new Error('Indique --versiones=ID,ID y --pagina=N');
+      const docs = app.get(ContratacionDocumentosService);
+      const ia = app.get(ContratacionIndiceService).ia;
+      for (const id of lista) {
+        const { buf } = await docs.leerBytes(id, 15 * 1024 * 1024);
+        console.log(JSON.stringify(await ia.completarCierreOcr(id, pagina, buf)));
+      }
     } else if (cmd === 'proponer-vinculos-carpeta') {
       // Un mismo archivo en varias carpetas de Drive (una por edificio): propone como SUGERIDA la edificación de cada carpeta aún sin vínculo.
       // Solo crea sugerencias (evidencia: la ruta de la carpeta). No confirma vínculos ni toca importes, contratos o expedientes.

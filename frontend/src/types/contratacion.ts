@@ -180,6 +180,9 @@ export interface PartidaLeida {
   alcance_literal?: boolean;
   item?: string | null;
   importe: number | null;
+  /** El texto del PDF expresa este importe sin centavos; `importe` lleva los centavos documentados (OCR local de la página). */
+  importe_en_el_texto?: number;
+  origen?: string;
   unidad?: string | null;
   cantidad?: number | null;
   precio_unitario?: number | null;

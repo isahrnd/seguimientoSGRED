@@ -23,34 +23,49 @@ export async function construirLibroResumen(filas: FilaResumen[], lectura: any[]
   for (const f of filas) ws.addRow(f);
   ws.eachRow((r, i) => { if (i > 1) r.alignment = { wrapText: true, vertical: 'top' }; });
   // Lectura de documentos (ofertas, partidas, subtotales y totales): por verificar, nunca valor contratado, y sin sumar niveles distintos.
+  // El contenido adicional (otras hojas de un archivo cuya correspondencia con el edificio no está confirmada) va en su propia hoja, con su procedencia.
   if (lectura.length) {
     const NIVEL: Record<string, string> = { PARTIDA: 'Partida', SUBTOTAL: 'Subtotal', TOTAL: 'Total', IMPUESTO_O_AIU: 'AIU / impuesto', COMPONENTE_SIN_VALOR: 'Componente sin valor' };
-    const wl = wb.addWorksheet('Lectura de documentos', { views: [{ state: 'frozen', ySplit: 1 }] });
-    wl.columns = [
+    const origen: Record<string, string> = { ASISTIDA: 'Lectura asistida', NATIVA: 'Lectura nativa', HOJA_DE_CALCULO: 'Hoja de cálculo' };
+    const principales = lectura.filter((d) => !d.excluida_de_indicadores);
+    const adicionales = lectura.filter((d) => d.excluida_de_indicadores);
+    const columnasPartida = [
       { header: 'Documento', key: 'doc', width: 40 }, { header: 'Origen', key: 'origen', width: 24 }, { header: 'Edificio', key: 'edificio', width: 30 }, { header: 'Alcance', key: 'alcance', width: 50 },
       { header: 'Nivel', key: 'nivel', width: 18 }, { header: 'Cantidad', key: 'cantidad', width: 12 }, { header: 'Precio unitario', key: 'unitario', width: 20, style: { numFmt: '"$"#,##0.00' } },
       { header: 'Importe', key: 'importe', width: 20, style: { numFmt: '"$"#,##0.00' } }, { header: 'Unidad', key: 'unidad', width: 10 },
       { header: 'Fuente', key: 'fuente', width: 30 }, { header: 'Estado de revisión', key: 'estado', width: 26 }, { header: 'Edificio registrado', key: 'registrado', width: 40 },
     ];
+    const filaPartida = (d: any, p: any) => ({
+      doc: `${d.documento} (v${d.version_id})`, origen: origen[d.origen] ?? d.origen, edificio: p.edificio ?? d.campos?.find((c: any) => c.campo === 'edificio')?.valor ?? '', alcance: p.alcance, nivel: NIVEL[p.nivel ?? 'PARTIDA'],
+      cantidad: p.cantidad ?? null, unitario: p.precio_unitario ?? null, importe: p.importe, unidad: p.unidad ?? '',
+      fuente: p.fuente ?? (p.pagina ? 'p. ' + p.pagina : ''), estado: p.relacion === 'EXPLICITA' ? 'Por verificar (relación explícita)' : 'Por verificar (relación pendiente)',
+      registrado: p.coincidencia ? (p.coincidencia.estado === 'SIN_COINCIDENCIA' ? 'Sin edificio registrado' : (p.coincidencia.estado === 'COINCIDE' ? 'Igual a ' : 'Parecido a ') + p.coincidencia.edificio + (p.coincidencia.vinculado_al_documento ? ' (vinculado)' : ' (no vinculado)')) : '',
+    });
+    const wl = wb.addWorksheet('Lectura de documentos', { views: [{ state: 'frozen', ySplit: 1 }] });
+    wl.columns = columnasPartida;
     wl.getRow(1).font = { bold: true };
-    const origen: Record<string, string> = { ASISTIDA: 'Lectura asistida', NATIVA: 'Lectura nativa', HOJA_DE_CALCULO: 'Hoja de cálculo' };
-    for (const d of lectura) {
-      for (const p of d.partidas ?? []) {
-        wl.addRow({
-          doc: `${d.documento} (v${d.version_id})`, origen: origen[d.origen] ?? d.origen, edificio: p.edificio ?? d.campos?.find((c: any) => c.campo === 'edificio')?.valor ?? '', alcance: p.alcance, nivel: NIVEL[p.nivel ?? 'PARTIDA'], cantidad: p.cantidad ?? null, unitario: p.precio_unitario ?? null, importe: p.importe, unidad: p.unidad ?? '',
-          fuente: p.fuente ?? (p.pagina ? 'p. ' + p.pagina : ''), estado: d.excluida_de_indicadores ? 'Contenido adicional pendiente de revisión (fuera de indicadores)' : p.relacion === 'EXPLICITA' ? 'Por verificar (relación explícita)' : 'Por verificar (relación pendiente)',
-          registrado: p.coincidencia ? (p.coincidencia.estado === 'SIN_COINCIDENCIA' ? 'Sin edificio registrado' : (p.coincidencia.estado === 'COINCIDE' ? 'Igual a ' : 'Parecido a ') + p.coincidencia.edificio + (p.coincidencia.vinculado_al_documento ? ' (vinculado)' : ' (no vinculado)')) : '',
-        });
-      }
+    for (const d of principales) {
+      for (const p of d.partidas ?? []) wl.addRow(filaPartida(d, p));
       const controles = [...(d.controles_de_suma ?? []).filter((c: any) => c.estado !== 'SIN_TOTAL_DECLARADO').map((c: any) => [c.grupo, c.suma_partidas, c.total_declarado, c.estado]), ...(d.controles_aritmeticos ?? []).map((c: any) => [c.control, c.calculado, c.declarado, c.estado])];
-      if ((d.partidas ?? []).length && !d.excluida_de_indicadores) wl.addRow({ doc: `${d.documento} (v${d.version_id})`, alcance: (d.suma_solo_partidas ?? 0) > 0 ? 'Suma solo de partidas (los subtotales, totales e impuestos NO se suman)' : (d.partidas ?? []).some((p: any) => p.nivel === 'TOTAL' || p.nivel === 'SUBTOTAL') ? 'Se identificaron totales; desglose pendiente de verificación (los subtotales, totales e impuestos NO se suman)' : 'Contenido adicional pendiente de revisión', nivel: 'Control', importe: (d.suma_solo_partidas ?? 0) > 0 ? d.suma_solo_partidas : null, estado: controles.map((c) => c[0] + ': ' + (c[3] === 'CUADRA' ? 'cuadra' : 'no cuadra')).join(' | ') });
+      if ((d.partidas ?? []).length) wl.addRow({ doc: `${d.documento} (v${d.version_id})`, alcance: (d.suma_solo_partidas ?? 0) > 0 ? 'Suma solo de partidas (los subtotales, totales e impuestos NO se suman)' : (d.partidas ?? []).some((p: any) => p.nivel === 'TOTAL' || p.nivel === 'SUBTOTAL') ? 'Se identificaron totales; desglose pendiente de verificación (los subtotales, totales e impuestos NO se suman)' : 'Contenido adicional pendiente de revisión', nivel: 'Control', importe: (d.suma_solo_partidas ?? 0) > 0 ? d.suma_solo_partidas : null, estado: controles.map((c) => c[0] + ': ' + (c[3] === 'CUADRA' ? 'cuadra' : 'no cuadra')).join(' | ') });
     }
     const wn = wb.addWorksheet('Datos extraídos');
     wn.columns = [{ header: 'Documento', width: 40 }, { header: 'Origen', width: 24 }, { header: 'Dato', width: 28 }, { header: 'Valor', width: 40 }, { header: 'Fuente', width: 34 }, { header: 'Estado', width: 40 }];
     wn.getRow(1).font = { bold: true };
-    for (const d of lectura) {
+    for (const d of principales) {
       for (const c of d.campos ?? []) wn.addRow([`${d.documento} (v${d.version_id})`, origen[d.origen] ?? d.origen, c.campo, c.valor, c.fuente ?? (c.pagina ? 'p. ' + c.pagina : ''), 'Por verificar']);
       for (const n of d.no_encontrados ?? []) wn.addRow([`${d.documento} (v${d.version_id})`, origen[d.origen] ?? d.origen, n.campo, '', '', 'Dato no encontrado por el extractor: ' + n.motivo]);
+    }
+    if (adicionales.length) {
+      const wa = wb.addWorksheet('Contenido adicional', { views: [{ state: 'frozen', ySplit: 1 }] });
+      wa.columns = [...columnasPartida.slice(0, 3), { header: 'Proyecto citado en la hoja (celda)', key: 'proyecto', width: 44 }, { header: 'Señales para revisión', key: 'senales', width: 60 }, ...columnasPartida.slice(3)];
+      wa.getRow(1).font = { bold: true };
+      for (const d of adicionales) {
+        const pr = d.correspondencia_pendiente?.proyecto;
+        const meta = { proyecto: pr ? `${pr.nombre} (${pr.celda})` : '', senales: (d.correspondencia_pendiente?.senales ?? []).join('; ') };
+        for (const p of d.partidas ?? []) wa.addRow({ ...filaPartida(d, p), ...meta, estado: 'Contenido adicional pendiente de revisión: correspondencia sin confirmar; no entra en indicadores' });
+        for (const c of d.campos ?? []) wa.addRow({ doc: `${d.documento} (v${d.version_id})`, origen: origen[d.origen] ?? d.origen, alcance: 'Dato: ' + c.campo + ' = ' + c.valor, fuente: c.fuente ?? '', estado: 'Contenido adicional pendiente de revisión', ...meta });
+      }
     }
   }
   const nota = wb.addWorksheet('Cómo leerlo');
@@ -59,6 +74,7 @@ export async function construirLibroResumen(filas: FilaResumen[], lectura: any[]
     'Si la matriz y el contrato traen el mismo importe, es una sola cifra con dos fuentes.',
     'El precio por m² es un cálculo (valor ÷ área documentada) y solo aparece con un edificio y un área respaldados.',
     'Las celdas vacías indican información no documentada; no se estiman.',
+    'Hoja «Contenido adicional»: otras hojas de un mismo archivo cuya correspondencia con el edificio no está confirmada; se conservan con su procedencia y no entran en la lectura principal ni en los indicadores.',
     'Hoja «Lectura de documentos»: ofertas y partidas leídas de los documentos, por verificar. Una oferta nunca es un valor contratado; los subtotales, totales e impuestos resumen a las partidas y no se suman a ellas.',
     '«Dato no encontrado por el extractor» no significa que el soporte no exista: indica que la lectura automática no lo halló.',
   ].forEach((t) => nota.addRow([t]));
