@@ -9,7 +9,7 @@ import { normalizar } from './contratacion-sugerencias';
  * declare el modelo no publica nada.
  * Cambiar el prompt, el esquema o las reglas de validación exige subir EXTRACTOR_VERSION (invalida la caché).
  */
-export const EXTRACTOR_VERSION = 'ia-3';
+export const EXTRACTOR_VERSION = 'ia-4';
 
 export const ETAPAS = ['NECESIDAD', 'COTIZACION', 'ANALISIS_SECTOR', 'CONTRATACION', 'EJECUCION', 'RESOLUCION', 'OTRA'] as const;
 export const INTERVENCIONES = ['DEMOLICION', 'IZAJE_GRUAS', 'MAQUINARIA', 'RCD', 'OTRA'] as const;
@@ -22,7 +22,7 @@ export interface Fragmento { pagina: number; texto: string }
 export function depurar(texto: string): string {
   return texto
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '[correo]')
-    .replace(/\b(?:c\.?\s?c\.?|c[eé]dula(?:\s+de\s+ciudadan[ií]a)?|nit|identificad[oa]\s+con)\s*(?:n[oº°.]*\s*)?[\d][\d.\s-]{5,14}\d/gi, '[documento de identidad]')
+    .replace(/\b(?:c\.?\s?c\.?|c[eé]dula(?:\s+de\s+ciudadan[ií]a)?|nit|identificaci[oó]n|identificad[oa]\s+con)\s*[#:]?\s*(?:n[oº°.]*\s*)?[\d][\d.\s-]{5,14}\d/gi, '[documento de identidad]')
     .replace(/\b(?:tel[eé]fono|tel\.?|celular|cel\.?|m[oó]vil)\s*:?\s*[\d()+\s-]{7,20}\d/gi, '[teléfono]')
     .replace(/\b3\d{2}[\s-]?\d{3}[\s-]?\d{4}\b/g, '[teléfono]')
     .replace(/\b(?:cuenta(?:\s+(?:de\s+)?(?:ahorros|corriente))?|iban)\s*(?:n[oº°.]*\s*)?[\d][\d\s-]{7,24}\d/gi, '[cuenta]')
@@ -149,7 +149,7 @@ export function validarRespuesta(entrada: unknown, fragmentos: Fragmento[]): Ext
     if (m) { salida.descartes.push({ campo: nombre, motivo: m }); return; }
     const v = comprobar(c.valor, String(c.cita));
     if (v === null) { salida.descartes.push({ campo: nombre, motivo: 'el valor no coincide con la cita' }); return; }
-    salida.campos[nombre] = { valor: v, pagina: c.pagina, cita: String(c.cita).trim().slice(0, 240) };
+    salida.campos[nombre] = { valor: v, pagina: c.pagina, cita: depurar(String(c.cita).trim()).slice(0, 240) };
   };
   const identificador = (v: any, cita: string) => {
     const m = typeof v === 'string' ? v.match(RE_ID) : null;
@@ -172,7 +172,7 @@ export function validarRespuesta(entrada: unknown, fragmentos: Fragmento[]): Ext
       salida.descartes.push({ campo: 'areas', motivo: 'la cita no declara esa superficie' }); continue;
     }
     if (!(TIPOS_AREA as readonly string[]).includes(a.tipo)) { salida.descartes.push({ campo: 'areas', motivo: 'tipo de área inválido' }); continue; }
-    salida.areas.push({ valor: Math.round(a.valor * 100) / 100, tipo: a.tipo, edificio: typeof a.edificio === 'string' ? a.edificio.slice(0, 160) : null, pagina: a.pagina, cita: String(a.cita).trim().slice(0, 240) });
+    salida.areas.push({ valor: Math.round(a.valor * 100) / 100, tipo: a.tipo, edificio: typeof a.edificio === 'string' ? a.edificio.slice(0, 160) : null, pagina: a.pagina, cita: depurar(String(a.cita).trim()).slice(0, 240) });
   }
   return salida;
 }

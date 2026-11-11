@@ -77,6 +77,16 @@ describe('depuración y selección de fragmentos', () => {
     expect(t).toContain('9999.001.32.1.630-2026');
     expect(t).toContain('$123.456.789,12');
   });
+  it('suprime la cédula con # o dos puntos y la identificación del inspector (formatos hallados en el piloto, números inventados)', () => {
+    const t = depurar('CONTRATISTA: JUANA PEREZ , C.C.# 9.111.222.333 R/L. EMPRESA SAS. Inspector identificacion 1234567890 entidad voluntario. cedula: 98.765.432');
+    expect(t).not.toMatch(/9.111.222|1234567890|98.765.432/);
+    expect(t).toContain('EMPRESA SAS');
+  });
+  it('la cita que se guarda también va depurada', () => {
+    const pag = [{ pagina: 1, texto: 'CONTRATISTA: JUANA PEREZ , C.C.# [documento de identidad] R/L. EMPRESA SAS' }];
+    const r = validarRespuesta({ contratista: { valor: 'EMPRESA SAS', pagina: 1, cita: 'JUANA PEREZ , C.C.# 9.111.222.333 R/L. EMPRESA SAS' } }, pag);
+    expect(JSON.stringify(r)).not.toMatch(/9.111.222/);
+  });
   it('respeta el tope de entrada y conserva el número de página', () => {
     const grandes = Array.from({ length: 30 }, (_, i) => ({ pagina: i + 1, texto: `contrato proceso valor ${'x '.repeat(1600)}` }));
     const f = seleccionarFragmentos(grandes, 3000);
