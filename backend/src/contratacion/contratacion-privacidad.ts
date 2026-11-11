@@ -11,9 +11,19 @@ const NOMBRES = String.raw`${NOMBRE}(?:\s+${NOMBRE}){1,3}`;
 // Cifras con formato de documento de identidad: 1.234.567.890, 1 234 567, 1234567…
 const CIFRA_ID = String.raw`(?:\d{1,3}(?:[.\s]\d{3}){2,}|\d{7,})`;
 
+/**
+ * Teléfonos colombianos. Separadores: espacios, guiones y saltos de línea (nunca puntos ni comas: así no se confunden con importes).
+ * - Con prefijo (+57, (57), 0057): código de área o móvil de 1 a 3 dígitos y 7 u 8 dígitos más, agrupados 3-3-2-2, 3-3-4 o 3-4.
+ * - Móvil sin prefijo (3xx): 3-3-4 o 3-3-2-2.
+ * Un número precedido o seguido de dígitos, puntos o comas (importes, números de proceso) no coincide.
+ */
+export const reTelefonoConPrefijo = () => /(?<![\d.,])(?:\+\s?57|\(\s?\+?57\s?\)|00\s?57)[\s-]{0,3}\(?\d{1,3}\)?[\s-]{0,3}\d{3}[\s-]{0,3}\d{2}[\s-]{0,3}\d{2}(?!\d|[.,]\d)/g;
+export const reMovilSinPrefijo = () => /(?<![\d.,])3\d{2}[\s-]{0,3}\d{3}[\s-]{0,3}\d{2}[\s-]{0,3}\d{2}(?!\d|[.,]\d)/g;
+
 const PATRONES: Array<[string, RegExp]> = [
   ['correo', /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g],
-  ['movil', /\b3\d{2}[\s-]?\d{3}[\s-]?\d{4}\b/g],
+  ['movil', reMovilSinPrefijo()],
+  ['telefono_con_prefijo', reTelefonoConPrefijo()],
   ['documento_identidad', new RegExp(String.raw`\b(?:c\.?\s?c\.?|c[eé]dula(?:\s+de\s+ciudadan[ií]a)?|identificaci[oó]n|documento(?:\s+de\s+identidad)?|identificad[oa]\s+con|nit)\s*[#:]?\s*(?:n[oº°.]*\s*)?${CIFRA_ID}`, 'gi')],
   ['documento_extranjero_o_profesional', new RegExp(String.raw`\b(?:pasaporte|carn[eé]|tarjeta\s+profesional|t\.\s?p\.)\s*[#:]?\s*(?:n[oº°.]*\s*)?[A-Za-z]{0,3}\d{4,}`, 'gi')],
   ['matricula_profesional', /matr[ií]cula\s+profesional\s*(?:n[oº°.]*\s*)?[A-Za-z0-9]/gi],

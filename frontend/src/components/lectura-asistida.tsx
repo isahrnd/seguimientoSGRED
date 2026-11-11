@@ -86,8 +86,8 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
                 </p>
               )}
               {[...(x.controles_de_suma ?? []).filter((c) => c.estado !== "SIN_TOTAL_DECLARADO"), ...((x.controles_aritmeticos ?? []).map((c) => ({ grupo: c.control, suma_partidas: c.calculado, total_declarado: c.declarado, estado: c.estado, diferencia: c.diferencia })))].map((c, i) => (
-                <p key={i} className="texto-secundario" style={{ margin: "2px 0 0", fontSize: 13 }}>
-                  {c.grupo}: calculado {cop(c.suma_partidas)} · declarado {cop(c.total_declarado as number)} — {c.estado === "CUADRA" ? "cuadra" : `no cuadra (diferencia ${cop(c.diferencia as number)})`}
+                <p key={i} className="texto-secundario" style={{ margin: "2px 0 0", fontSize: c.estado !== "CUADRA" && Math.abs(c.diferencia as number) < 1 ? 12 : 13 }}>
+                  {c.grupo}: calculado {cop(c.suma_partidas)} · declarado {cop(c.total_declarado as number)} — {c.estado === "CUADRA" ? "cuadra" : Math.abs(c.diferencia as number) < 1 ? `Diferencia aritmética de ${cop(Math.abs(c.diferencia as number))} entre las cifras documentadas` : `no cuadra (diferencia ${cop(c.diferencia as number)})`}
                 </p>
               ))}
             </div>

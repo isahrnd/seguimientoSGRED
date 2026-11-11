@@ -3,6 +3,7 @@ import { parseNumero } from './contratacion-areas';
 import { tipoPorSegmento } from './contratacion-identificadores';
 import { NivelPartida, nivelPartida } from './contratacion-partidas';
 import { normalizar } from './contratacion-sugerencias';
+import { reMovilSinPrefijo, reTelefonoConPrefijo } from './contratacion-privacidad';
 
 /**
  * Interpretación asistida (Claude) de documentos ambiguos. Este módulo es puro: depura datos personales, elige los fragmentos
@@ -36,8 +37,9 @@ export function depurar(texto: string): string {
     // Firmantes: «Nombre: JUANA PEREZ Cargo: Representante Legal» (el cargo se conserva).
     .replace(/(\bnombre\s*:\s*)(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})(?:\s+(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})){1,4}(?=\s+cargo\b)/gi, '$1[nombre]')
     .replace(/\b(?:tel[eé]fono|tel\.?|celular|cel\.?|m[oó]vil)\s*:?\s*[\d()+\s-]{7,20}\d/gi, '[teléfono]')
-    // Móvil de 10 cifras (3xx xxx xxxx), también con prefijo de país y separado por espacios, guiones o saltos de línea. No toca importes (llevan puntos o comas).
-    .replace(/(?<![\d.,])3\d{2}[\s-]{0,3}\d{3}[\s-]{0,3}\d{4}(?![\d]|[.,]\d)/g, '[teléfono]')
+    // Teléfonos con prefijo (+57, (57), 0057) y móviles de 10 cifras (3xx), agrupados 3-3-4 o 3-3-2-2 y separados por espacios, guiones o saltos de línea. No toca importes ni números de proceso.
+    .replace(reTelefonoConPrefijo(), '[teléfono]')
+    .replace(reMovilSinPrefijo(), '[teléfono]')
     .replace(/\b(?:cuenta(?:\s+(?:de\s+)?(?:ahorros|corriente))?|iban)\s*(?:n[oº°.]*\s*)?[\d][\d\s-]{7,24}\d/gi, '[cuenta]')
     .replace(/\b(?:firma|firmado\s+por|fdo\.?)\s*:?[^\n]{0,60}/gi, '[firma]');
 }

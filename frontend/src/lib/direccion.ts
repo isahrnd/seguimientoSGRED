@@ -13,55 +13,42 @@ export function extraerDirecciones(texto: string | null | undefined): DireccionN
   return out;
 }
 
-/** Direcciones citadas en nombres de documentos que difieren de la dirección registrada (misma vía, distinta placa). */
-export function discrepanciasDireccion(registrada: string | null | undefined, nombres: string[]): string[] {
-  const base = extraerDirecciones(registrada);
-  if (base.length === 0) return [];
-  const claves = new Set(base.map((b) => b.clave));
-  const vias = new Set(base.map((b) => b.clave.split("#")[0]));
-  const dif = new Set<string>();
-  for (const nombre of nombres) {
-    for (const d of extraerDirecciones(nombre)) {
-      if (!claves.has(d.clave) && vias.has(d.clave.split("#")[0])) dif.add(`“${d.texto}” en ${nombre}`);
-    }
-  }
-  return [...dif];
-}
-
-export interface DiscrepanciaDireccion {
+export interface DireccionPorVerificar {
   documento: string;
-  /** Dirección leída en el contenido del documento (página original). */
-  en_pagina?: { texto: string; pagina: number | null };
-  /** Dirección escrita en el nombre del archivo. */
-  en_nombre?: string;
+  version_id: number | null;
+  /** Dirección tal como consta. */
+  texto: string;
+  /** De dónde sale: del contenido de una página del documento o solo del nombre del archivo (que no es evidencia). */
+  origen: "PAGINA" | "NOMBRE_DE_ARCHIVO";
+  pagina: number | null;
 }
 
 /**
- * Direcciones que difieren de la registrada (misma vía, distinta placa), distinguiendo de dónde sale cada una: la que consta en la página del
- * documento y la que solo está escrita en el nombre del archivo. Un nombre de archivo no es evidencia de la dirección del documento.
+ * Direcciones que constan en los documentos de una edificación y difieren de la registrada. Se muestran todas, aunque cambie la vía («Carrera» por
+ * «Calle»): pueden ser accesos distintos a un mismo predio o un error, y eso lo decide una persona. Nunca cambia la dirección registrada ni los vínculos.
  */
-export function discrepanciasDireccionDocumentos(
+export function direccionesPorVerificar(
   registrada: string | null | undefined,
-  nombres: string[],
-  lectura: Array<{ documento: string; campos: Array<{ campo: string; valor: string | number; pagina: number | null }> }> = [],
-): DiscrepanciaDireccion[] {
+  documentos: Array<{ nombre: string; version_id: number | null }>,
+  lectura: Array<{ documento: string; version_id: number; campos: Array<{ campo: string; valor: string | number; pagina: number | null }> }> = [],
+): DireccionPorVerificar[] {
   const base = extraerDirecciones(registrada);
   if (base.length === 0) return [];
   const claves = new Set(base.map((b) => b.clave));
-  const vias = new Set(base.map((b) => b.clave.split("#")[0]));
-  const distinta = (d: DireccionNorm) => !claves.has(d.clave) && vias.has(d.clave.split("#")[0]);
-  const porDoc = new Map<string, DiscrepanciaDireccion>();
-  const fila = (documento: string) => { if (!porDoc.has(documento)) porDoc.set(documento, { documento }); return porDoc.get(documento)!; };
-  for (const nombre of nombres) {
-    const d = extraerDirecciones(nombre).find(distinta);
-    if (d) fila(nombre).en_nombre = d.texto;
-  }
+  const salida: DireccionPorVerificar[] = [];
+  const visto = new Set<string>();
+  const agrega = (x: DireccionPorVerificar, clave: string) => {
+    const k = `${x.documento}|${x.origen}|${clave}`;
+    if (!visto.has(k)) { visto.add(k); salida.push(x); }
+  };
   for (const l of lectura) {
     for (const c of l.campos) {
       if (c.campo !== "direccion") continue;
-      const d = extraerDirecciones(String(c.valor)).find(distinta);
-      if (d) fila(l.documento).en_pagina = { texto: d.texto, pagina: c.pagina };
+      for (const d of extraerDirecciones(String(c.valor))) if (!claves.has(d.clave)) agrega({ documento: l.documento, version_id: l.version_id, texto: d.texto, origen: "PAGINA", pagina: c.pagina }, d.clave);
     }
   }
-  return [...porDoc.values()];
+  for (const doc of documentos) {
+    for (const d of extraerDirecciones(doc.nombre)) if (!claves.has(d.clave)) agrega({ documento: doc.nombre, version_id: doc.version_id, texto: d.texto, origen: "NOMBRE_DE_ARCHIVO", pagina: null }, d.clave);
+  }
+  return salida;
 }

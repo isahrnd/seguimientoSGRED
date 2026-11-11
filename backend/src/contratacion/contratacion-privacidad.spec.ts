@@ -49,3 +49,40 @@ describe('barrera de privacidad', () => {
     expect(verificarPrivacidad(textoDeSolicitud(sucio)).map((x) => x.tipo)).toEqual(['documento_extranjero_o_profesional']);
   });
 });
+
+describe('teléfonos con prefijo y agrupaciones distintas (datos SINTÉTICOS)', () => {
+  const TELEFONOS = [
+    'WhatsApp +57 300 555 01 99',
+    'Tel. (57) 300 555 0199',
+    'Contacto 300 555 01 99',
+    'Línea 300-555-01-99',
+    'Escríbanos al +57 300\n555\n01 99',
+    'Oficina +57 (601) 555 01 00',
+    'Oficina (57) 601 555 0100',
+    'Marque 0057 300 555 0199',
+    'Móvil 3005550199',
+  ];
+  it.each(TELEFONOS)('suprime el teléfono y no deja nada que la barrera detecte: %j', (crudo) => {
+    const limpio = depurar(`Texto previo ${crudo} texto posterior`);
+    expect(limpio).toContain('[teléfono]');
+    expect(verificarPrivacidad(limpio.replace(/\s+/g, ' '))).toEqual([]);
+    expect(limpio).toContain('Texto previo');
+    expect(limpio).toContain('texto posterior');
+  });
+
+  it('la barrera detecta un teléfono con prefijo o agrupado 3-3-2-2 en el texto crudo', () => {
+    expect(verificarPrivacidad('al +57 300 555 01 99').map((h) => h.tipo)).toEqual(expect.arrayContaining(['telefono_con_prefijo']));
+    expect(verificarPrivacidad('al 300 555 01 99').map((h) => h.tipo)).toContain('movil');
+    expect(verificarPrivacidad('(57) 601 555 0100').map((h) => h.tipo)).toContain('telefono_con_prefijo');
+  });
+
+  it('no elimina importes, números de proceso o contrato, códigos ATC, NIT, matrículas ni números de cotización', () => {
+    const texto = 'Total $ 3.321.860.000,00; valor asegurado $ 14.492.016.807; ítem 2.680.000.000,00; proceso 9999.001.32.1.331-2026; contrato 9999.001.26.1.300-2030; '
+      + 'ATC 76001-1-0360012 y 76001-1-0300004; NIT 900.123.456-1; matrícula inmobiliaria 370 - 107419; cotización # 001830; 300.555.0199 no es un teléfono; página 3 de 15.';
+    const limpio = depurar(texto);
+    for (const trozo of ['$ 3.321.860.000,00', '$ 14.492.016.807', '2.680.000.000,00', '9999.001.32.1.331-2026', '9999.001.26.1.300-2030', '76001-1-0360012', '76001-1-0300004', '370 - 107419', '# 001830', '300.555.0199']) {
+      expect(limpio).toContain(trozo);
+    }
+    expect(limpio).not.toContain('[teléfono]');
+  });
+});

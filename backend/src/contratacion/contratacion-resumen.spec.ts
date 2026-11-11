@@ -109,4 +109,16 @@ describe('exportación de la lectura de documentos', () => {
     expect(texto.join('|')).toMatch(/Se identificaron totales; desglose pendiente de verificación/);
     expect(texto.join('|')).not.toMatch(/Suma solo de partidas/);
   });
+
+  it('una diferencia menor a un peso se presenta como diferencia aritmética entre las cifras documentadas, sin atribuirle causa ni ajustar valores', async () => {
+    const lectura = [{ documento: 'oferta.pdf', version_id: 3, origen: 'ASISTIDA', campos: [], no_encontrados: [], partidas: [{ nivel: 'PARTIDA', alcance: 'Ítem', importe: 1000, unidad: 'GLOBAL', pagina: 1 }], suma_solo_partidas: 1000, controles_de_suma: [],
+      controles_aritmeticos: [{ control: 'Ítems + AIU = total antes de IVA', calculado: 1500.4, declarado: 1500, estado: 'NO_CUADRA', diferencia: -0.4 }, { control: 'Otro control', calculado: 10, declarado: 20, estado: 'NO_CUADRA', diferencia: 10 }] }];
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load((await construirLibroResumen([], lectura)) as any);
+    const ws = wb.getWorksheet('Lectura de documentos')!;
+    const textos: string[] = []; ws.eachRow((r) => textos.push(r.values ? (r.values as any[]).join(' ') : ''));
+    const todo = textos.join('\n');
+    expect(todo).toMatch(/Diferencia aritmética de \$0,40 entre las cifras documentadas/);
+    expect(todo).toMatch(/Otro control: no cuadra/);
+    expect(todo).not.toMatch(/redondeo/i);
+  });
 });

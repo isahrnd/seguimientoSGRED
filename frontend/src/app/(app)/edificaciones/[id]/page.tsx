@@ -12,7 +12,8 @@ import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "@/components/soporte-link";
 import { LecturaAsistida } from "@/components/lectura-asistida";
 import { agruparCotizaciones } from "@/lib/oferta";
-import { discrepanciasDireccionDocumentos } from "@/lib/direccion";
+import { direccionesPorVerificar } from "@/lib/direccion";
+import { urlVisor } from "@/components/soporte-link";
 
 const Caja = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
   <section style={{ background: "#fff", border: `1px solid ${PALETA.borde}`, borderRadius: 8, padding: 18 }}>
@@ -28,7 +29,7 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
   if (q.isLoading) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (q.isError || !q.data) return <ErrorCarga texto="No fue posible cargar la edificación." onReintentar={() => q.refetch()} />;
   const d = q.data;
-  const discrepancias = discrepanciasDireccionDocumentos(d.edificio.direccion, [...d.visitas_y_soportes_tecnicos, ...d.grupos.flatMap((g) => g.documentos)].map((x) => x.nombre), d.lectura_asistida ?? []);
+  const discrepancias = direccionesPorVerificar(d.edificio.direccion, [...d.visitas_y_soportes_tecnicos, ...d.grupos.flatMap((g) => g.documentos)].map((x) => ({ nombre: x.nombre, version_id: x.version_id })), d.lectura_asistida ?? []);
   const resto = d.grupos.filter((g) => g.codigo !== "VISITA_SOPORTE_TECNICO");
 
   return (
@@ -42,19 +43,19 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
       <LecturaAsistida lectura={d.lectura_asistida} />
 
       {discrepancias.length > 0 && (
-        <Alert type="warning" showIcon message="Discrepancia documental de dirección por aclarar"
+        <Alert type="warning" showIcon message="Direcciones por verificar"
           description={<>
-            La dirección registrada es <strong>{d.edificio.direccion}</strong>. En estos documentos consta otra:
+            Dirección registrada: <strong>{d.edificio.direccion}</strong>. En los documentos constan otras; pueden ser accesos distintos al mismo predio o un error de un documento. No se cambia la dirección registrada ni se deshace ningún vínculo.
             <ul style={{ margin: "4px 0", paddingLeft: 18 }}>
-              {discrepancias.map((x) => (
-                <li key={x.documento}>
-                  <em>{x.documento}</em>
-                  {x.en_pagina && <> · en la página original{x.en_pagina.pagina ? ` (p. ${x.en_pagina.pagina})` : ""}: <strong>«{x.en_pagina.texto}»</strong></>}
-                  {x.en_nombre && <> · escrita en el nombre del archivo: <strong>«{x.en_nombre}»</strong></>}
+              {discrepancias.map((x, k) => (
+                <li key={k}>
+                  <strong>«{x.texto}»</strong> — <em>{x.documento}</em>
+                  {x.origen === "PAGINA"
+                    ? <> · en el contenido{x.version_id ? <>: <Link href={urlVisor(x.version_id, x.pagina)}>{x.pagina ? `pág. ${x.pagina}` : "abrir documento"}</Link></> : null}</>
+                    : <> · escrita solo en el nombre del archivo (no es evidencia de la dirección)</>}
                 </li>
               ))}
             </ul>
-            El nombre de un archivo no es evidencia de la dirección del documento. No se ha determinado cuál es la correcta.
           </>} />
       )}
 
