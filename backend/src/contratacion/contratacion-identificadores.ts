@@ -10,7 +10,7 @@ export type TipoIdentificador = 'PROCESO' | 'CONTRATO' | 'RESOLUCION' | 'CONVENI
 export const SEGMENTO_TIPO: Record<string, TipoIdentificador> = { '32': 'PROCESO', '26': 'CONTRATO', '21': 'RESOLUCION', '27': 'CONVENIO' };
 
 export interface IdentificadorHallado {
-  /** Forma normalizada «4163.001.32.1.905-2026»; null si la lectura no es fiable (OCR). */
+  /** Forma normalizada «4163.001.32.1.NNN-AAAA»; null si la lectura no es fiable (OCR). */
   valor: string | null;
   leido: string;
   segmento: string | null;
