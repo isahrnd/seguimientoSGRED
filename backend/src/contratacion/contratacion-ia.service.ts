@@ -8,7 +8,7 @@ import {
   CATEGORIA_POR_ETAPA, ESQUEMA_RESULTADO, EXTRACTOR_VERSION, depurarResultado, Extraccion, Fragmento, construirSolicitud, estimarTokens, huellaContenido, necesitaInterpretacion,
   seleccionarFragmentos, validarRespuesta,
 } from './contratacion-ia';
-import { extraerCierreOcr, fusionarCierreOcr, fusionarPresupuestoNativo } from './contratacion-presupuesto-nativo';
+import { extraerCierreOcr, fusionarCierreOcr, fusionarLecturaVisual, fusionarPresupuestoNativo, LecturaVisual } from './contratacion-presupuesto-nativo';
 import { EjecutorOcr, MIN_TEXTO_NATIVO, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { normalizar } from './contratacion-sugerencias';
 import { extraerNativo } from './contratacion-nativo';
@@ -226,6 +226,19 @@ export class ContratacionIaService {
     const res: any = fusionarCierreOcr(fila.resultado as any, cierre, pagina);
     await this.prisma.contratacionIaExtraccion.update({ where: { id: fila.id }, data: { resultado: res } });
     return { version_id: versionId, aplicado: true, centavos: res.partidas.some((p: any) => p.importe_en_el_texto !== undefined) };
+  }
+
+  /**
+   * Incorpora filas leídas visualmente de la imagen original de una página (tabla escaneada). Solo se acepta si la suma de las filas coincide con el total impreso
+   * en la tabla; no se ajusta ninguna cifra. Sin llamadas a la API; no toca valores verificados ni otras páginas.
+   */
+  async incorporarLecturaVisual(versionId: number, lv: LecturaVisual): Promise<{ version_id: number; aplicado: boolean; motivo?: string; controles?: Array<{ control: string; estado: string; diferencia: number }> }> {
+    const fila = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: versionId, extractor: EXTRACTOR_VERSION } } });
+    if (!fila || fila.estado !== 'OK' || !fila.resultado) return { version_id: versionId, aplicado: false, motivo: 'sin lectura aceptada (OK) del extractor vigente' };
+    const r = fusionarLecturaVisual(fila.resultado as any, lv);
+    if (r.ok === false) return { version_id: versionId, aplicado: false, motivo: r.motivo };
+    await this.prisma.contratacionIaExtraccion.update({ where: { id: fila.id }, data: { resultado: r.resultado } });
+    return { version_id: versionId, aplicado: true, controles: r.controles.map((c) => ({ control: c.control, estado: c.estado, diferencia: c.diferencia })) };
   }
 
   private async guardarFila(versionId: number, datos: Record<string, any>) {

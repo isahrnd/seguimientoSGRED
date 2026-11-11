@@ -18,7 +18,7 @@ export interface PartidaPresupuesto {
   pagina: number;
   cita: string;
   relacion: 'EXPLICITA' | 'PENDIENTE_REVISION';
-  origen: 'NATIVO_POR_ORDEN' | 'OCR_LOCAL';
+  origen: 'NATIVO_POR_ORDEN' | 'OCR_LOCAL' | 'LECTURA_VISUAL';
   importe_en_el_texto?: number;
 }
 export interface ControlPresupuesto { control: string; calculado: number; declarado: number; estado: 'CUADRA' | 'NO_CUADRA'; diferencia: number }
@@ -215,4 +215,52 @@ export function fusionarCierreOcr<T extends { partidas?: any[]; trazabilidad?: a
     no_encontrados: [...no, { campo: 'desglose', motivo }],
     trazabilidad: { ...(resultado.trazabilidad ?? {}), cierre: `OCR_LOCAL (p. ${pagina}; ${cierre.controles.length} controles aritméticos cuadran)` },
   };
+}
+
+// ------------------------------------------------------------------ filas leídas visualmente de la imagen original
+export interface LecturaVisual {
+  pagina: number;
+  /** Resolución y método con los que se leyó la imagen (p. ej. «300 ppp, lectura visual por una persona o asistente»). */
+  metodo: string;
+  filas: Array<{ item: number; edificio: string; alcance: string; importe: number; cantidad?: number; unidad?: string }>;
+  /** Total de los ítems impreso en la tabla; la suma de las filas debe coincidir. Nunca se ajusta una cifra para que cuadre. */
+  total_declarado: number;
+  /** Filas del cierre que el OCR no leyó y se leyeron en la imagen (p. ej. imprevistos). */
+  cierre_adicional?: Array<{ alcance: string; importe: number }>;
+}
+export type ResultadoVisual = { ok: true; resultado: any; controles: ControlPresupuesto[] } | { ok: false; motivo: string };
+
+export function fusionarLecturaVisual(resultado: any, lv: LecturaVisual): ResultadoVisual {
+  const suma = r2(lv.filas.reduce((a, f) => a + f.importe, 0));
+  const dif = r2(lv.total_declarado - suma);
+  const controles: ControlPresupuesto[] = [{ control: `Suma de los ${lv.filas.length} ítems leídos = total de ítems impreso en la tabla`, calculado: suma, declarado: lv.total_declarado, estado: Math.abs(dif) <= 0.01 ? 'CUADRA' : 'NO_CUADRA', diferencia: dif }];
+  // Si la suma no coincide con el total impreso, hay una fila mal leída: no se acepta nada (y no se ajusta ninguna cifra).
+  if (controles[0].estado === 'NO_CUADRA') return { ok: false, motivo: `la suma de las filas (${suma}) no coincide con el total impreso (${lv.total_declarado}); alguna fila está mal leída o es ilegible` };
+  const previas: any[] = (resultado.partidas ?? []).filter((p: any) => p.pagina === lv.pagina);
+  const cierre = (re: RegExp) => previas.find((p) => re.test(p.alcance))?.importe as number | undefined;
+  const adm = cierre(/^Administración/); const uti = cierre(/^Utilidad/); const antes = cierre(/^Total antes de IVA/);
+  const imp = lv.cierre_adicional?.find((c) => /^Imprevistos/i.test(c.alcance))?.importe ?? cierre(/^Imprevistos/);
+  if (adm !== undefined && uti !== undefined && antes !== undefined && imp !== undefined) {
+    const calc = r2(lv.total_declarado + adm + imp + uti);
+    const d2 = r2(antes - calc);
+    controles.push({ control: 'Total de ítems + administración + imprevistos + utilidad = total antes de IVA', calculado: calc, declarado: antes, estado: Math.abs(d2) <= 0.01 ? 'CUADRA' : 'NO_CUADRA', diferencia: d2 });
+  }
+  const mk = (p: Partial<PartidaPresupuesto> & { alcance: string; importe: number; nivel: NivelPartida }): any => ({
+    edificio: null, alcance_literal: true, unidad: 'GLOBAL', pagina: lv.pagina, cita: '', relacion: 'PENDIENTE_REVISION', origen: 'LECTURA_VISUAL', ...p,
+  });
+  const nuevas: any[] = lv.filas.map((f) => mk({
+    nivel: 'PARTIDA', edificio: f.edificio, alcance: f.alcance, importe: f.importe, unidad: f.unidad ?? 'GLOBAL', ...(f.cantidad !== undefined ? { cantidad: f.cantidad } : {}),
+    cita: `ítem ${f.item} de la tabla de la p. ${lv.pagina}: ${f.edificio}`.slice(0, 200), relacion: 'EXPLICITA',
+  }));
+  nuevas.push(mk({ nivel: 'SUBTOTAL', alcance: 'Total de ítems (impreso en la tabla)', importe: lv.total_declarado, cita: `TOTAL de la tabla, p. ${lv.pagina}` }));
+  for (const c of lv.cierre_adicional ?? []) if (!previas.some((p) => p.alcance.startsWith(c.alcance.split(' ')[0]))) nuevas.push(mk({ nivel: 'IMPUESTO_O_AIU', alcance: `${c.alcance} — cierre de la oferta`, importe: c.importe, cita: `${c.alcance}, p. ${lv.pagina}` }));
+  const yaVisual = (resultado.partidas ?? []).some((p: any) => p.origen === 'LECTURA_VISUAL' && p.pagina === lv.pagina);
+  const res = {
+    ...resultado,
+    partidas: yaVisual ? resultado.partidas : [...(resultado.partidas ?? []), ...nuevas],
+    controles_aritmeticos: [...(resultado.controles_aritmeticos ?? []).filter((c: any) => !controles.some((x) => x.control === c.control)), ...controles],
+    no_encontrados: (resultado.no_encontrados ?? []).filter((n: any) => n.campo !== 'desglose'),
+    trazabilidad: { ...(resultado.trazabilidad ?? {}), desglose_visual: `LECTURA_VISUAL (p. ${lv.pagina}; ${lv.metodo}); suma de ítems = total impreso` },
+  };
+  return { ok: true, resultado: res, controles };
 }

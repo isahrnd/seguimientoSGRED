@@ -1,4 +1,4 @@
-import { extraerCierreOcr, extraerPresupuestoNativo, fusionarCierreOcr, fusionarPresupuestoNativo, montoDeLinea } from './contratacion-presupuesto-nativo';
+import { extraerCierreOcr, extraerPresupuestoNativo, fusionarCierreOcr, fusionarLecturaVisual, fusionarPresupuestoNativo, montoDeLinea } from './contratacion-presupuesto-nativo';
 
 // Cifras INVENTADAS. Costo directo 1.000.000.000,00; AIU 15/3/5 %; IVA 19 % sobre la utilidad.
 const CABEZA = 'Cotización # 000001 Página 9 3. PRESUPUESTO El valor total de la presente propuesta para el edificio Torre Ejemplo asciende a la suma de: UN MIL SETENTA Y CINCO MILLONES PESOS M/L ($ 1.209.500.000,00) 1. DESMONTAJE ÍTEM DESCRIPCIÓN UND CANT. VR. TOTAL';
@@ -141,5 +141,51 @@ describe('importe «del texto» tras añadir centavos', () => {
     expect(dos.partidas.some((p: any) => p.importe_en_el_texto !== undefined)).toBe(false);
     const mal = { ...dos, partidas: dos.partidas.map((p: any) => (p.nivel === 'TOTAL' ? { ...p, importe_en_el_texto: p.importe } : p)) };
     expect(fusionarCierreOcr(mal, cierre, 8).partidas.some((p: any) => p.importe_en_el_texto !== undefined)).toBe(false);
+  });
+});
+
+describe('filas leídas visualmente de la imagen original', () => {
+  // Cifras SINTÉTICAS: tres ítems suman 600.000.000; administración 15 % = 90.000.000; utilidad 5 % = 30.000.000; imprevistos 3 % = 18.000.000.
+  const previo: any = { partidas: [
+    { pagina: 8, nivel: 'IMPUESTO_O_AIU', alcance: 'Administración 15% (AIU) — cierre de la oferta', importe: 90000000, origen: 'OCR_LOCAL' },
+    { pagina: 8, nivel: 'IMPUESTO_O_AIU', alcance: 'Utilidad 5% (AIU) — cierre de la oferta', importe: 30000000, origen: 'OCR_LOCAL' },
+    { pagina: 8, nivel: 'SUBTOTAL', alcance: 'Total antes de IVA — cierre de la oferta', importe: 738000000, origen: 'OCR_LOCAL' },
+  ], no_encontrados: [{ campo: 'desglose', motivo: 'pendiente' }], controles_aritmeticos: [], trazabilidad: {} };
+  const lv = (importes: number[], total = 600000000): any => ({
+    pagina: 8, metodo: '300 ppp', total_declarado: total, cierre_adicional: [{ alcance: 'Imprevistos 3%', importe: 18000000 }],
+    filas: importes.map((importe, i) => ({ item: i + 1, edificio: 'EDIFICIO SINTETICO ' + (i + 1), alcance: 'Desmontaje y demolición total', importe, cantidad: 1, unidad: 'GLOBAL' })),
+  });
+
+  it('acepta las filas si la suma coincide con el total impreso, y conserva edificio, importe, página y método', () => {
+    const r = fusionarLecturaVisual(previo, lv([100000000, 200000000, 300000000]));
+    expect(r.ok).toBe(true);
+    if (r.ok === false) return;
+    const filas = r.resultado.partidas.filter((p: any) => p.origen === 'LECTURA_VISUAL' && p.nivel === 'PARTIDA');
+    expect(filas.map((p: any) => [p.edificio, p.importe, p.pagina])).toEqual([['EDIFICIO SINTETICO 1', 100000000, 8], ['EDIFICIO SINTETICO 2', 200000000, 8], ['EDIFICIO SINTETICO 3', 300000000, 8]]);
+    expect(r.controles[0].estado).toBe('CUADRA');
+    expect(r.controles[1]).toMatchObject({ estado: 'CUADRA', calculado: 738000000 });
+    expect(r.resultado.no_encontrados.some((n: any) => n.campo === 'desglose')).toBe(false);
+    expect(r.resultado.trazabilidad.desglose_visual).toMatch(/LECTURA_VISUAL/);
+  });
+
+  it('si la suma no coincide con el total impreso no acepta nada ni ajusta cifras', () => {
+    const r = fusionarLecturaVisual(previo, lv([100000000, 200000000, 300000001]));
+    expect(r.ok).toBe(false);
+    if (r.ok === false) expect(r.motivo).toMatch(/mal leída o es ilegible/);
+  });
+
+  it('una diferencia entre el cierre y los ítems se informa como no cuadra, sin corregirla', () => {
+    const r = fusionarLecturaVisual({ ...previo, partidas: previo.partidas.map((p: any) => (p.nivel === 'SUBTOTAL' ? { ...p, importe: 738000000.4 } : p)) }, lv([100000000, 200000000, 300000000]));
+    expect(r.ok).toBe(true);
+    if (r.ok === false) return;
+    expect(r.controles[1]).toMatchObject({ estado: 'NO_CUADRA', diferencia: 0.4 });
+  });
+
+  it('repetir no duplica las filas', () => {
+    const una = fusionarLecturaVisual(previo, lv([100000000, 200000000, 300000000]));
+    if (una.ok === false) throw new Error('una');
+    const dos = fusionarLecturaVisual(una.resultado, lv([100000000, 200000000, 300000000]));
+    if (dos.ok === false) throw new Error('dos');
+    expect(dos.resultado.partidas.filter((p: any) => p.origen === 'LECTURA_VISUAL' && p.nivel === 'PARTIDA')).toHaveLength(3);
   });
 });

@@ -105,6 +105,12 @@ async function main() {
         bytes: async () => null,
       };
       for (const r of await ia.completarDesgloseNativo(lectura as any, lista)) console.log(JSON.stringify(r));
+    } else if (cmd === 'lectura-visual') {
+      // Filas leídas de la imagen original (archivo JSON privado): --version=ID --archivo=ruta. Solo se acepta si la suma coincide con el total impreso.
+      const id = Number((args.find((a) => a.startsWith('--version=')) ?? '').slice(10));
+      const ruta = (args.find((a) => a.startsWith('--archivo=')) ?? '').slice(10);
+      if (!Number.isInteger(id) || id <= 0 || !ruta) throw new Error('Indique --version=ID y --archivo=ruta');
+      console.log(JSON.stringify(await app.get(ContratacionIndiceService).ia.incorporarLecturaVisual(id, JSON.parse(fs.readFileSync(ruta, 'utf8')))));
     } else if (cmd === 'cierre-ocr') {
       // OCR local selectivo de una página (--pagina=N) para leer el cierre de una oferta cuya tabla es una imagen. Sin API; solo se acepta si cuadra la aritmética.
       const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
