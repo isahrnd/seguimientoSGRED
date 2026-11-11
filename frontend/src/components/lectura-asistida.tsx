@@ -63,7 +63,7 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
                 </tbody>
               </table>
               <p className="texto-secundario" style={{ margin: "6px 0 0", fontSize: 13 }}>
-                Suma solo de partidas: <span className="cifra">{cop(x.suma_solo_partidas ?? 0)}</span>. Los subtotales, totales e impuestos resumen a las partidas y no se suman a ellas.
+                {(x.suma_solo_partidas ?? 0) > 0 ? <>Suma solo de partidas: <span className="cifra">{cop(x.suma_solo_partidas ?? 0)}</span>. </> : <>Este documento solo trae totales: no se extrajeron partidas desagregadas. </>}Los subtotales, totales e impuestos resumen a las partidas y no se suman a ellas.
               </p>
               {[...(x.controles_de_suma ?? []).filter((c) => c.estado !== "SIN_TOTAL_DECLARADO"), ...((x.controles_aritmeticos ?? []).map((c) => ({ grupo: c.control, suma_partidas: c.calculado, total_declarado: c.declarado, estado: c.estado, diferencia: c.diferencia })))].map((c, i) => (
                 <p key={i} className="texto-secundario" style={{ margin: "2px 0 0", fontSize: 13 }}>
