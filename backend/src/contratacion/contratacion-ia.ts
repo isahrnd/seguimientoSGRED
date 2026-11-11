@@ -10,7 +10,7 @@ import { normalizar } from './contratacion-sugerencias';
  * declare el modelo no publica nada.
  * Cambiar el prompt, el esquema o las reglas de validación exige subir EXTRACTOR_VERSION (invalida la caché).
  */
-export const EXTRACTOR_VERSION = 'ia-7';
+export const EXTRACTOR_VERSION = 'ia-8';
 
 export const ETAPAS = ['NECESIDAD', 'COTIZACION', 'ANALISIS_SECTOR', 'CONTRATACION', 'EJECUCION', 'RESOLUCION', 'OTRA'] as const;
 export const INTERVENCIONES = ['DEMOLICION', 'IZAJE_GRUAS', 'MAQUINARIA', 'RCD', 'OTRA'] as const;
@@ -28,8 +28,10 @@ export function depurar(texto: string): string {
     .replace(/\b(?:c\.?\s?c\.?|c[eé]dula(?:\s+de\s+ciudadan[ií]a)?|nit|identificaci[oó]n|identificad[oa]\s+con)\s*[#:]?\s*(?:n[oº°.]*\s*)?[\d][\d.\s-]{5,14}\d/gi, '[documento de identidad]')
     // El nombre de la persona natural que antecede a su documento de identidad (ya suprimido): «JUANA PEREZ , [documento de identidad]».
     .replace(/(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})(?:\s+(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})){1,4}(?=\s*,?\s*(?:identificad[oa]\s+con\s+)?\[documento de identidad\])/g, '[nombre]')
+    // Matrícula profesional de ingenieros, arquitectos y abogados.
+    .replace(/\bmatr[ií]cula\s+profesional\s*(?:n[oº°.]*\s*)?[A-Za-z0-9]{3,12}(?:\s*-\s*[A-Za-z0-9]{3,12}){0,2}/gi, '[matrícula profesional]')
     // Tratamientos: «doctor ÁLVARO PÉREZ», «señora JUANA GÓMEZ» (el tratamiento y el cargo que siga se conservan).
-    .replace(/\b((?:Doctor|DOCTOR|doctor|Doctora|DOCTORA|doctora|Dr\.|Dra\.|Se[ñn]or|SE[ÑN]OR|se[ñn]or|Se[ñn]ora|SE[ÑN]ORA|se[ñn]ora)\s+)(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})(?:\s+(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})){1,3}/g, '$1[nombre]')
+    .replace(/\b((?:Doctor|DOCTOR|doctor|Doctora|DOCTORA|doctora|Dr\.|Dra\.|Se[ñn]or|SE[ÑN]OR|se[ñn]or|Se[ñn]ora|SE[ÑN]ORA|se[ñn]ora|Ingeniero|ingeniero|Ingeniera|ingeniera|Arquitecto|arquitecto|Arquitecta|arquitecta|Abogado|abogado|Abogada|abogada)\s+)(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})(?:\s+(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})){1,3}/g, '$1[nombre]')
     // Firmantes: «Nombre: JUANA PEREZ Cargo: Representante Legal» (el cargo se conserva).
     .replace(/(\bnombre\s*:\s*)(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})(?:\s+(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[A-ZÁÉÍÓÚÑ]{2,})){1,4}(?=\s+cargo\b)/gi, '$1[nombre]')
     .replace(/\b(?:tel[eé]fono|tel\.?|celular|cel\.?|m[oó]vil)\s*:?\s*[\d()+\s-]{7,20}\d/gi, '[teléfono]')

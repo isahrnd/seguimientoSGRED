@@ -5,7 +5,7 @@ Este documento no contiene datos de personas ni de contratos: solo describe cont
 ## Qué se envía y qué se suprime
 - A la API solo se envían los fragmentos de página necesarios (con su número de página), no el documento completo.
 - `depurar()` suprime antes de enviar: correos, documentos de identidad (`C.C.`, cédula, identificación, NIT de personas; con `#` o `:` y separadores), teléfonos móviles de formato `3xx xxx xxxx`, cuentas bancarias y líneas de firma.
-- **Nombres de personas:** desde el código de la versión de extractor `ia-6` (aún no desplegado) se suprime el nombre de la persona natural que antecede a su documento y el nombre del inspector en los informes ATC-20. **Hasta ahora ninguna solicitud enviada tuvo supresión de nombres.**
+- **Nombres de personas:** desde la versión de extractor `ia-8` se suprimen el nombre de la persona natural que antecede a su documento (incluido «identificada con»), el del inspector en los informes ATC-20, el de firmantes junto a «Cargo», el que sigue a un tratamiento (doctor, señor, ingeniero, arquitecto, abogado…) y la matrícula profesional. **Las solicitudes 1 a 11 se enviaron sin esa supresión completa** (la solicitud 10 con filtros `ia-7`).
 - **No se suprimen**, porque son necesarios para identificar el contrato: números de proceso y de contrato, importes, nombre del contratista y de su representante legal, direcciones de edificaciones y datos de contacto de empresas (incluidos teléfonos que no tienen formato de móvil).
 - Las citas que se guardan en la base pasan otra vez por `depurar()`; el texto completo de los documentos no se guarda en las extracciones.
 - Las respuestas del modelo solo se aceptan si su cita consta en la página enviada; la confianza declarada no publica nada.
@@ -27,6 +27,9 @@ Se distinguen dos tipos de dato: **identificaciones** (números de documento de 
 | 5 (04:07) | informe ATC-20 | no (suprimida) | **sí: nombre del inspector** |
 | 6 (04:07) | contrato de servicios | no (suprimida) | **sí: contratista y firmantes** |
 | 7 y 8 (04:32 y 04:34) | cotización | no | sí |
+| 9 (05:35) | análisis del sector (86 págs.) | no (verificación local posterior pendiente de resultado) | no verificado: el texto no se comprobó antes de enviar |
+| 10 (05:35) | resolución de demolición | no | **sí: nombre de un ingeniero y su matrícula profesional** (no cubiertos por el filtro de entonces) |
+| 11 (05:35) | cotización de 16 páginas | no | no se detectaron en la comprobación posterior |
 
 Además se hizo una solicitud directa con un documento ficticio escaneado, sin datos reales (no figura en la tabla de llamadas).
 Ninguna lectura almacenada conserva identificaciones: las de las solicitudes 2 y 3 se purgaron y se regeneraron con el filtro corregido.

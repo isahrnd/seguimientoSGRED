@@ -327,6 +327,16 @@ d('lectura asistida (BD)', () => {
     expect(await prisma.contratacionDocumento.count({ where: { proceso_detectado: { not: null } } })).toBe(0);
   });
 
+  it('una lectura ya completada no se degrada a pendiente por un proceso que la había listado antes', async () => {
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    const { ver } = await documento('a.pdf', [TEXTO(630)]);
+    await servicio(c).procesar(lectura, { versiones: [ver.id] });
+    expect((await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } })).estado).toBe('OK');
+    await (servicio(c) as any).guardarFila(ver.id, { estado: 'PENDIENTE_IA' });
+    await (servicio(c) as any).guardarFila(ver.id, { estado: 'NATIVO' });
+    expect((await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } })).estado).toBe('OK');
+  });
+
   it('no interpreta la matriz de contratación ni las transcripciones', async () => {
     const c = new ClienteFalso(); c.responder = respuestaBuena;
     await documento('matriz.pdf', [TEXTO(630)], { categoria: 'MATRIZ_CONTRATACION' });

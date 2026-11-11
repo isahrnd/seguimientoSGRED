@@ -141,6 +141,12 @@ export class ContratacionIaService {
   }
 
   private async guardarFila(versionId: number, datos: Record<string, any>) {
+    // Una lectura ya completada (OK) nunca se degrada a NATIVO o PENDIENTE_IA: otro proceso (la actualización automática del servidor) pudo listarla
+    // como pendiente antes de que una ejecución manual la terminara.
+    if (datos.estado === 'PENDIENTE_IA' || datos.estado === 'NATIVO') {
+      const actual = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: versionId, extractor: EXTRACTOR_VERSION } }, select: { estado: true } });
+      if (actual?.estado === 'OK') return;
+    }
     await this.prisma.contratacionIaExtraccion.upsert({
       where: { version_id_extractor: { version_id: versionId, extractor: EXTRACTOR_VERSION } },
       create: { version_id: versionId, extractor: EXTRACTOR_VERSION, estado: 'PENDIENTE_IA', ...datos },

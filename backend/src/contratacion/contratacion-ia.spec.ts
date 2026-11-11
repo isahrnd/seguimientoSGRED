@@ -99,6 +99,11 @@ describe('depuración y selección de fragmentos', () => {
     expect(t).not.toMatch(/PEDRO|EJEMPLO|Mateo|Ruiz/);
     expect(t).toContain('alcalde de la ciudad');
   });
+  it('suprime el nombre de un profesional y su matrícula profesional (datos inventados)', () => {
+    const t = depurar('Que el ingeniero Pedro Pablo Ejemplo Prueba, con matrícula profesional No. 11111 - 222222XYZ, practicó la inspección del Conjunto Alfa');
+    expect(t).not.toMatch(/Pedro|Ejemplo|11111/);
+    expect(t).toContain('practicó la inspección del Conjunto Alfa');
+  });
   it('la cita que se guarda también va depurada', () => {
     const pag = [{ pagina: 1, texto: 'CONTRATISTA: JUANA PEREZ , C.C.# [documento de identidad] R/L. EMPRESA SAS' }];
     const r = validarRespuesta({ contratista: { valor: 'EMPRESA SAS', pagina: 1, cita: 'JUANA PEREZ , C.C.# 9.111.222.333 R/L. EMPRESA SAS' } }, pag);
