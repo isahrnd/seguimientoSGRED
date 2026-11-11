@@ -26,7 +26,12 @@ export interface CotizacionExcel {
   campos: Record<string, { valor: string | number; pagina: null; cita: string; fuente: string }>;
   partidas: FilaCotizacion[];
   controles_aritmeticos: ControlAritmetico[];
-  hojas_descartadas: Array<{ hoja: string; motivo: string }>;
+  /** Hojas con la misma plantilla que no son la principal: se conservan aparte, con su procedencia, hasta confirmar su correspondencia. */
+  hojas_adicionales: Array<{
+    hoja: string; proyecto: { nombre: string; celda: string; fecha: string } | null; aplica: boolean; motivo?: string;
+    campos: CotizacionExcel['campos']; partidas: FilaCotizacion[]; controles_aritmeticos: ControlAritmetico[];
+    correspondencia: 'PENDIENTE_DE_CONFIRMAR'; senales_de_revision: string[];
+  }>;
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -34,8 +39,7 @@ const txt = (v: unknown): string => String(v ?? '').replace(/\s+/g, ' ').trim();
 const norm = (v: unknown) => txt(v).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, '').trim();
 
 function leerHojaCotizacion(hoja: HojaTabla | undefined): CotizacionExcel {
-  const vacio = (motivo: string): CotizacionExcel => ({ aplica: false, motivo, campos: {}, partidas: [], controles_aritmeticos: [], hojas_descartadas: [] });
-  const descartadas: CotizacionExcel['hojas_descartadas'] = [];
+  const vacio = (motivo: string): CotizacionExcel => ({ aplica: false, motivo, campos: {}, partidas: [], controles_aritmeticos: [], hojas_adicionales: [] });
   if (!hoja) return { ...vacio('no hay una hoja con la plantilla de cotización') };
   const cel = (f: number, c: string) => {
     const col = c.charCodeAt(0) - 64;
@@ -45,7 +49,7 @@ function leerHojaCotizacion(hoja: HojaTabla | undefined): CotizacionExcel {
   const refer = (f: number, c: string) => `Hoja ${hoja.nombre}, celda ${c}${f}`;
 
   const cabecera = filas.find((f) => norm(cel(f, 'C')) === 'item' && norm(cel(f, 'D')).startsWith('descripcion') && norm(cel(f, 'H')).includes('parcial'));
-  if (!cabecera) return { ...vacio('no se encontró la fila de encabezado ITEM / Descripción / VR. PARCIAL'), hoja: hoja.nombre, hojas_descartadas: descartadas };
+  if (!cabecera) return { ...vacio('no se encontró la fila de encabezado ITEM / Descripción / VR. PARCIAL'), hoja: hoja.nombre, hojas_adicionales: [] };
 
   const campos: CotizacionExcel['campos'] = {};
   const fProyecto = filas.find((f) => norm(cel(f, 'C')).startsWith('nombre del proyecto'));
@@ -66,7 +70,7 @@ function leerHojaCotizacion(hoja: HojaTabla | undefined): CotizacionExcel {
     if (norm(desc) === 'unidad') continue; // repetición del encabezado dentro de la tabla
     lineas.push({ f, item, desc, unidad: txt(cel(f, 'E')) || null, cant: num(cel(f, 'F')), pu: num(cel(f, 'G')), parcial: num(cel(f, 'H')) });
   }
-  if (fSub === null) return { ...vacio('no hay fila SUBTOTAL: la tabla no tiene la estructura esperada'), hoja: hoja.nombre, campos, hojas_descartadas: descartadas };
+  if (fSub === null) return { ...vacio('no hay fila SUBTOTAL: la tabla no tiene la estructura esperada'), hoja: hoja.nombre, campos, hojas_adicionales: [] };
 
   const valoradas = lineas.filter((l) => l.parcial !== null && l.parcial > 0);
   for (const l of lineas) {
@@ -107,7 +111,7 @@ function leerHojaCotizacion(hoja: HojaTabla | undefined): CotizacionExcel {
   ctl('Suma de partidas = subtotal', out.filter((x) => x.nivel === 'PARTIDA').reduce((a, x) => a + (x.importe ?? 0), 0), subtotal);
   ctl('Subtotal = costos directos', subtotal ?? 0, directo);
   if (directo !== null) ctl('Costos directos + AIU + IVA = total proyecto', directo + aiu + impuestos, total);
-  return { aplica: true, hoja: hoja.nombre, campos, partidas: out, controles_aritmeticos: controles, hojas_descartadas: descartadas };
+  return { aplica: true, hoja: hoja.nombre, campos, partidas: out, controles_aritmeticos: controles, hojas_adicionales: [] };
 }
 
 const PALABRAS_GENERICAS = new Set(['proyecto', 'edificio', 'edificacion', 'localizado', 'localizada', 'obra', 'obras', 'civil', 'civiles', 'para', 'demolicion', 'del', 'las', 'los', 'una', 'con', 'calle', 'carrera']);
@@ -121,32 +125,34 @@ const fichas = (h: HojaTabla) => {
 const tokens = (t: string) => new Set(norm(t).split(' ').filter((x) => x.length >= 4 && !PALABRAS_GENERICAS.has(x)));
 
 /**
- * Lee la hoja principal «RESUMEN» y, de las demás hojas con la misma plantilla, descarta SOLO la que tenga evidencia de ser de otro proyecto
- * (su nombre de proyecto no comparte ninguna palabra con el de la principal); la evidencia (nombre, celda y fecha) queda registrada. Si no hay
- * evidencia, la hoja se lee también y se marca para revisión: el nombre de una hoja («RESUMEN (2)») no basta para excluirla.
+ * Lee la hoja principal «RESUMEN». Las demás hojas con la misma plantilla (p. ej. «RESUMEN (2)») NUNCA se descartan ni se mezclan con la principal:
+ * se leen aparte, con su procedencia (hoja y celda del nombre de proyecto y fecha), y quedan «pendientes de confirmar» su correspondencia. Que el
+ * nombre del proyecto no comparta palabras con el de la hoja principal, o que la fecha sea otra, es una SEÑAL para revisión, no evidencia suficiente
+ * de que sea otro proyecto.
  */
 export function leerCotizacionExcel(hojas: HojaTabla[]): CotizacionExcel {
   const principal = hojas.find((h) => /^resumen$/i.test(h.nombre.trim()));
   const base = leerHojaCotizacion(principal);
   if (!principal || !base.aplica) return base.aplica ? base : { ...base, motivo: base.motivo ?? 'no hay una hoja «RESUMEN» con la plantilla de cotización' };
   const fp = fichas(principal);
-  const descartadas: CotizacionExcel['hojas_descartadas'] = [];
+  const adicionales: CotizacionExcel['hojas_adicionales'] = [];
   for (const h of hojas) {
     if (h === principal) continue;
     const f = fichas(h);
     if (!f.tieneEncabezado) continue; // no es una hoja de cotización (p. ej. registro fotográfico)
-    const evidencia = f.proyecto && fp.proyecto && [...tokens(f.proyecto.nombre)].every((t) => !tokens(fp.proyecto!.nombre).has(t))
-      ? `otro proyecto: nombre «${f.proyecto.nombre.slice(0, 70)}» (${h.nombre}, celda ${f.proyecto.celda}${f.proyecto.fecha ? `, fecha ${f.proyecto.fecha}` : ''}) sin relación con «${fp.proyecto.nombre.slice(0, 50)}» (${principal.nombre}, celda ${fp.proyecto.celda})`
-      : null;
-    if (evidencia) { descartadas.push({ hoja: h.nombre, motivo: evidencia }); continue; }
-    const extra = leerHojaCotizacion(h);
-    if (extra.aplica) {
-      base.partidas.push(...extra.partidas.map((p) => ({ ...p, alcance: `[hoja ${h.nombre}] ${p.alcance}` })));
-      base.controles_aritmeticos.push(...extra.controles_aritmeticos.map((c) => ({ ...c, control: `${c.control} (hoja ${h.nombre})` })));
-      descartadas.push({ hoja: h.nombre, motivo: 'SIN evidencia de otro proyecto: se leyó también y queda para revisión' });
-    } else descartadas.push({ hoja: h.nombre, motivo: `sin evidencia de otro proyecto, pero no se pudo leer (${extra.motivo}): sin usar, por revisar` });
+    const senales: string[] = [];
+    if (f.proyecto && fp.proyecto && [...tokens(f.proyecto.nombre)].every((t) => !tokens(fp.proyecto!.nombre).has(t))) {
+      senales.push(`el nombre del proyecto («${f.proyecto.nombre.slice(0, 70)}», celda ${f.proyecto.celda}) no comparte palabras con el de la hoja ${principal.nombre} («${fp.proyecto.nombre.slice(0, 50)}», celda ${fp.proyecto.celda})`);
+    }
+    if (f.proyecto?.fecha && fp.proyecto?.fecha && f.proyecto.fecha !== fp.proyecto.fecha) senales.push(`la fecha (${f.proyecto.fecha}) difiere de la de la hoja ${principal.nombre} (${fp.proyecto.fecha})`);
+    const x = leerHojaCotizacion(h);
+    adicionales.push({
+      hoja: h.nombre, proyecto: f.proyecto, aplica: x.aplica, ...(x.aplica ? {} : { motivo: x.motivo }), campos: x.campos, partidas: x.partidas, controles_aritmeticos: x.controles_aritmeticos,
+      correspondencia: 'PENDIENTE_DE_CONFIRMAR',
+      senales_de_revision: senales.length ? senales : ['sin señales de diferencia, pero su correspondencia con la hoja principal no está confirmada'],
+    });
   }
-  return { ...base, hojas_descartadas: descartadas };
+  return { ...base, hojas_adicionales: adicionales };
 }
 
 export { letraColumna };

@@ -38,22 +38,32 @@ const HOJA_MISMO_PROYECTO = hoja('RESUMEN (2)', { 9: { C: 'NOMBRE DEL PROYECTO',
 
 describe('lectura nativa de una cotización en Excel', () => {
   const r = leerCotizacionExcel([PLANTILLA_OTRO, RESUMEN]);
-  it('lee la hoja RESUMEN y descarta la plantilla de otro proyecto', () => {
+  it('lee la hoja RESUMEN y conserva aparte la hoja adicional, con su procedencia y sin descartarla', () => {
     expect(r.aplica).toBe(true);
     expect(r.hoja).toBe('RESUMEN');
-    expect(r.hojas_descartadas).toHaveLength(1);
-    expect(r.hojas_descartadas[0].hoja).toBe('RESUMEN (2)');
-    expect(r.hojas_descartadas[0].motivo).toMatch(/otro proyecto: nombre «OBRAS CIVILES PARA CALDERA SUCROAL» \(RESUMEN \(2\), celda D9, fecha 2025-01-31\)/);
+    expect(r.hojas_adicionales).toHaveLength(1);
+    const h = r.hojas_adicionales[0];
+    expect(h.hoja).toBe('RESUMEN (2)');
+    expect(h.correspondencia).toBe('PENDIENTE_DE_CONFIRMAR');
+    expect(h.proyecto).toEqual({ nombre: 'OBRAS CIVILES PARA CALDERA SUCROAL', celda: 'D9', fecha: '2025-01-31' });
+    // Otro nombre y otra fecha son señales para revisión, no evidencia de otro proyecto.
+    expect(h.senales_de_revision.join(' ')).toMatch(/no comparte palabras/);
+    expect(h.senales_de_revision.join(' ')).toMatch(/fecha \(2025-01-31\) difiere/);
+    expect(h.senales_de_revision.join(' ')).not.toMatch(/otro proyecto/i);
+    // Sus datos no se mezclan con los de la hoja principal.
+    expect(r.partidas.every((p) => !p.alcance.includes('Acero de refuerzo'))).toBe(true);
   });
-  it('una hoja «RESUMEN (2)» SIN evidencia de otro proyecto no se descarta por su nombre: se lee y se marca para revisión', () => {
-    const x = leerCotizacionExcel([HOJA_MISMO_PROYECTO, RESUMEN].reverse());
-    expect(x.hojas_descartadas[0].motivo).toMatch(/SIN evidencia de otro proyecto/);
-    expect(x.partidas.some((p) => p.alcance === '[hoja RESUMEN (2)] Otra actividad' && p.importe === 10)).toBe(true);
-    expect(x.controles_aritmeticos.some((c) => c.control.includes('(hoja RESUMEN (2))'))).toBe(true);
+  it('una hoja adicional interpretable se lee aparte y no suma ni se mezcla con la principal', () => {
+    const x = leerCotizacionExcel([HOJA_MISMO_PROYECTO, RESUMEN]);
+    const h = x.hojas_adicionales[0];
+    expect(h.aplica).toBe(true);
+    expect(h.partidas.find((p) => p.alcance === 'Otra actividad')).toMatchObject({ importe: 10, fuente: 'Hoja RESUMEN (2), celda H29' });
+    expect(h.senales_de_revision[0]).toMatch(/sin señales de diferencia, pero su correspondencia/);
+    expect(x.partidas.some((p) => p.alcance === 'Otra actividad')).toBe(false);
+    expect(x.controles_aritmeticos.every((c) => !c.control.includes('RESUMEN (2)'))).toBe(true);
   });
-  it('una hoja sin la plantilla de cotización (p. ej. registro fotográfico) se ignora sin descartarla como otro proyecto', () => {
-    const x = leerCotizacionExcel([RESUMEN, hoja('REGISTRO FOTOGRAFICO', {})]);
-    expect(x.hojas_descartadas).toEqual([]);
+  it('una hoja sin la plantilla de cotización (p. ej. registro fotográfico) no es una hoja adicional', () => {
+    expect(leerCotizacionExcel([RESUMEN, hoja('REGISTRO FOTOGRAFICO', {})]).hojas_adicionales).toEqual([]);
   });
   it('extrae edificio, proveedor (solo la empresa, sin nombres de personas), NIT, número y fecha con su celda', () => {
     expect(r.campos.edificio).toMatchObject({ valor: 'Edificio Ejemplo Alfa', fuente: 'Hoja RESUMEN, celda D9' });

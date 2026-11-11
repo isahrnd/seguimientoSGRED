@@ -29,6 +29,11 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
             {ORIGEN[x.origen ?? "ASISTIDA"]}
             {x.trazabilidad?.reutilizado_de ? ` · resultado de ${x.trazabilidad.reutilizado_de}, reutilizado bajo ${x.trazabilidad.extractor_vigente}` : x.trazabilidad?.extractor ? ` · ${x.trazabilidad.extractor}` : ""}
           </div>
+          {x.correspondencia_pendiente && (
+            <p className="texto-secundario" style={{ margin: "4px 0 0", fontSize: 13 }}>
+              Hoja adicional del mismo archivo: su correspondencia con el edificio está pendiente de confirmar{x.correspondencia_pendiente.proyecto ? ` (proyecto citado: «${x.correspondencia_pendiente.proyecto.nombre}», celda ${x.correspondencia_pendiente.proyecto.celda})` : ""}. Señales para revisión: {x.correspondencia_pendiente.senales.join("; ")}. Sus datos se muestran aparte y no se mezclan con los de la hoja principal.
+            </p>
+          )}
           {x.campos.length > 0 && (
             <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
               {x.campos.map((c) => (
@@ -63,7 +68,7 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
                 </tbody>
               </table>
               <p className="texto-secundario" style={{ margin: "6px 0 0", fontSize: 13 }}>
-                {(x.suma_solo_partidas ?? 0) > 0 ? <>Suma solo de partidas: <span className="cifra">{cop(x.suma_solo_partidas ?? 0)}</span>. </> : <>Este documento solo trae totales: no se extrajeron partidas desagregadas. </>}Los subtotales, totales e impuestos resumen a las partidas y no se suman a ellas.
+                {(x.suma_solo_partidas ?? 0) > 0 ? <>Suma solo de partidas: <span className="cifra">{cop(x.suma_solo_partidas ?? 0)}</span>. </> : <>Se identificaron totales; desglose pendiente de verificación. </>}Los subtotales, totales e impuestos resumen a las partidas y no se suman a ellas.
               </p>
               {[...(x.controles_de_suma ?? []).filter((c) => c.estado !== "SIN_TOTAL_DECLARADO"), ...((x.controles_aritmeticos ?? []).map((c) => ({ grupo: c.control, suma_partidas: c.calculado, total_declarado: c.declarado, estado: c.estado, diferencia: c.diferencia })))].map((c, i) => (
                 <p key={i} className="texto-secundario" style={{ margin: "2px 0 0", fontSize: 13 }}>

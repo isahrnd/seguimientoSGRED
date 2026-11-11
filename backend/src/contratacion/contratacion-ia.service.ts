@@ -20,7 +20,7 @@ import {
 
 const MAX_PAGINAS_LECTURA = 150;
 /** Identificador del lector nativo de cotizaciones en Excel (no usa la API); versiona sus resultados aparte de los de la lectura asistida. */
-export const EXTRACTOR_XLSX = 'xlsx-2';
+export const EXTRACTOR_XLSX = 'xlsx-3';
 /** Documentos de nivel edificio: una resolución de demolición o una visita técnica pertenece a un edificio, no a un proceso; no necesitan número de proceso. */
 const NIVEL_EDIFICIO = new Set(['RESOLUCION_DEMOLICION', 'VISITA_SOPORTE_TECNICO']);
 const BLOQUEO_PRESUPUESTO = 7102; // pg_advisory_xact_lock: serializa la reserva de llamadas entre procesos
@@ -171,7 +171,7 @@ export class ContratacionIaService {
         if (!buf) continue;
         const c = leerCotizacionExcel(await leerTablas(buf));
         const no_encontrados = c.aplica ? ['edificio', 'proveedor', 'numero_cotizacion', 'fecha_cotizacion', 'importe'].filter((k) => !c.campos[k]).map((k) => ({ campo: k, motivo: 'no consta en la hoja' })) : [{ campo: 'cotizacion', motivo: c.motivo ?? 'plantilla no reconocida' }];
-        const resultado = { hoja_calculo: true, esquema: ESQUEMA_RESULTADO, trazabilidad: { extractor: EXTRACTOR_XLSX, origen: 'HOJA_DE_CALCULO' }, aplica: c.aplica, hoja: c.hoja ?? null, campos: c.campos, partidas: c.partidas, controles_aritmeticos: c.controles_aritmeticos, hojas_descartadas: c.hojas_descartadas, no_encontrados };
+        const resultado = { hoja_calculo: true, esquema: ESQUEMA_RESULTADO, trazabilidad: { extractor: EXTRACTOR_XLSX, origen: 'HOJA_DE_CALCULO' }, aplica: c.aplica, hoja: c.hoja ?? null, campos: c.campos, partidas: c.partidas, controles_aritmeticos: c.controles_aritmeticos, hojas_adicionales: c.hojas_adicionales, no_encontrados };
         await this.prisma.contratacionIaExtraccion.upsert({
           where: { version_id_extractor: { version_id: v.id, extractor: EXTRACTOR_XLSX } },
           create: { version_id: v.id, extractor: EXTRACTOR_XLSX, estado: c.aplica ? 'OK' : 'NO_APLICA', resultado: resultado as any },

@@ -195,6 +195,7 @@ export interface LecturaAsistida {
   version_id: number;
   documento: string;
   origen?: "ASISTIDA" | "NATIVA" | "HOJA_DE_CALCULO";
+  correspondencia_pendiente?: { proyecto: { nombre: string; celda: string; fecha: string } | null; senales: string[] } | null;
   trazabilidad?: { extractor?: string; modelo?: string; reutilizado_de?: string; extractor_vigente?: string } | null;
   campos: { campo: string; valor: string | number; pagina: number | null; cita: string; fuente?: string | null }[];
   coincidencia_edificio?: CoincidenciaEdificioVista | null;

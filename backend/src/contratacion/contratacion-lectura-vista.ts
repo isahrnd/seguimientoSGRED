@@ -18,7 +18,13 @@ export async function vistaLecturaAsistida(prisma: any, filtroVersion: Record<st
   if (ultima.size === 0) return [];
   const edificios: Array<{ id: number; nombre: string }> = await prisma.contratacionEdificio.findMany({ select: { id: true, nombre: true } });
 
-  return [...ultima.values()].map((x) => {
+  const vistas = [...ultima.values()].flatMap((x) => {
+    const base: any = x.resultado ?? {};
+    // Hojas adicionales de un Excel: cada una se muestra aparte, con su procedencia y su correspondencia pendiente de confirmar.
+    const extra = ((base.hojas_adicionales ?? []) as any[]).map((h) => ({ ...x, __hoja: h, resultado: { hoja_calculo: true, trazabilidad: base.trazabilidad, campos: h.campos, partidas: h.partidas, controles_aritmeticos: h.controles_aritmeticos, no_encontrados: h.aplica ? [] : [{ campo: 'cotizacion', motivo: h.motivo ?? 'estructura no reconocida' }] } }));
+    return [x, ...extra];
+  });
+  return vistas.map((x: any) => {
     const r: any = x.resultado ?? {};
     const vinculados = new Set<number>(x.version.documento.edificios.map((e: any) => e.edificio_id));
     const registrados = edificios.map((e) => ({ id: e.id, nombre: e.nombre, vinculado: vinculados.has(e.id) }));
@@ -31,7 +37,8 @@ export async function vistaLecturaAsistida(prisma: any, filtroVersion: Record<st
     });
     return {
       version_id: x.version_id,
-      documento: x.version.documento.nombre,
+      documento: x.__hoja ? `${x.version.documento.nombre} — hoja ${x.__hoja.hoja}` : x.version.documento.nombre,
+      correspondencia_pendiente: x.__hoja ? { proyecto: x.__hoja.proyecto, senales: x.__hoja.senales_de_revision } : null,
       campos: Object.entries(r.campos ?? {}).map(([campo, c]: [string, any]) => ({ campo, valor: c.valor, pagina: c.pagina, cita: c.cita, fuente: c.fuente ?? null })),
       coincidencia_edificio: r.campos?.edificio?.valor ? compararEdificio(r.campos.edificio.valor, registrados) : null,
       controles_aritmeticos: r.controles_aritmeticos ?? [],
