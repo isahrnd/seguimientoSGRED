@@ -51,7 +51,7 @@ export interface TrabajoIndice {
   error: string | null;
 }
 
-async function textoPrimeraPagina(buf: Buffer, mime: string): Promise<string> {
+export async function textoPrimeraPagina(buf: Buffer, mime: string): Promise<string> {
   if (mime !== 'application/pdf') return '';
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const pdf = require('pdf-parse/lib/pdf-parse.js');
@@ -66,7 +66,7 @@ async function textoPrimeraPagina(buf: Buffer, mime: string): Promise<string> {
   return '';
 }
 
-async function paginasPdf(buf: Buffer, max = 2): Promise<string[]> {
+export async function paginasPdf(buf: Buffer, max = 2): Promise<string[]> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const pdf = require('pdf-parse/lib/pdf-parse.js');
   for (let intento = 0; intento < 3; intento++) {
@@ -115,7 +115,7 @@ export class ContratacionIndiceService {
    * `confirmarVacia` (por defecto true: actualización manual): permite retirar todos los documentos de una fuente que
    * aparece vacía. La sincronización programada lo desactiva y no retira nada ante una carpeta vacía inesperada.
    */
-  async reindexar(opciones: { confirmarVacia?: boolean; origen?: 'MANUAL' | 'AUTOMATICA' } = {}): Promise<{ local: ResumenFuente; drive: ResumenFuente }> {
+  async reindexar(opciones: { confirmarVacia?: boolean; origen?: 'MANUAL' | 'AUTOMATICA'; ia?: { versiones: number[] } } = {}): Promise<{ local: ResumenFuente; drive: ResumenFuente }> {
     if (this.enCurso) throw new Error('Ya hay una actualización del índice en curso');
     this.enCurso = true;
     this.confirmarVacia = opciones.confirmarVacia !== false;
@@ -128,7 +128,7 @@ export class ContratacionIndiceService {
       await this.enriquecer();
       await this.leerContratos();
       await this.leerMatriz();
-      await this.interpretarDocumentos();
+      await this.interpretarDocumentos(opciones.ia?.versiones);
       trabajo.resultado = { local, drive };
       trabajo.estado = 'FINALIZADA';
       return { local, drive };
@@ -491,12 +491,15 @@ export class ContratacionIndiceService {
   }
 
   /** Lectura asistida de lo que la lectura nativa no resolvió (sin clave queda pendiente); un fallo aquí no invalida la actualización. */
-  private async interpretarDocumentos() {
+  private async interpretarDocumentos(versiones?: number[]) {
     try {
-      await this.ia.procesar({
+      await this.ia.procesar(
+        {
         paginas: async (md5, max) => { const cand = this.candidatosVistos.get(md5); return cand && cand.mime === 'application/pdf' ? await paginasPdf(await cand.leerBytes(), max) : null; },
         bytes: async (md5) => { const cand = this.candidatosVistos.get(md5); return cand ? await cand.leerBytes() : null; },
-      });
+        },
+        versiones ? { versiones } : {},
+      );
     } catch (e) {
       this.log.warn(`Sin lectura asistida: ${(e as Error).message}`);
     }

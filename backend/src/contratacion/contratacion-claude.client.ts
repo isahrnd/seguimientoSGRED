@@ -51,7 +51,7 @@ export class ClienteClaudeHttp implements ClienteClaude {
           method: 'POST',
           signal: ctl.signal,
           headers: { 'content-type': 'application/json', 'x-api-key': clave, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: modelo, temperature: 0, ...solicitud }),
+          body: JSON.stringify({ model: modelo, ...solicitud }),
         });
         if (r.status === 429 || r.status === 529 || r.status >= 500) {
           ultimo = new ErrorClaude(r.status === 429 ? 'LIMITE_API' : 'API_NO_DISPONIBLE', r.status);
@@ -64,7 +64,8 @@ export class ClienteClaudeHttp implements ClienteClaude {
         const j: any = await r.json();
         const uso = j?.usage ?? {};
         const bloque = Array.isArray(j?.content) ? j.content.find((b: any) => b?.type === 'tool_use') : null;
-        return { entrada: bloque?.input ?? null, tokens_entrada: Number(uso.input_tokens) || 0, tokens_salida: Number(uso.output_tokens) || 0, http: r.status };
+        if (!bloque) throw new ErrorClaude(j?.stop_reason === 'refusal' ? 'RECHAZO_DEL_MODELO' : 'SIN_HERRAMIENTA', r.status);
+        return { entrada: bloque.input ?? null, tokens_entrada: Number(uso.input_tokens) || 0, tokens_salida: Number(uso.output_tokens) || 0, http: r.status };
       } catch (e: any) {
         if (e instanceof ErrorClaude) throw e;
         ultimo = new ErrorClaude(e?.name === 'AbortError' ? 'TIEMPO_AGOTADO' : 'RED');

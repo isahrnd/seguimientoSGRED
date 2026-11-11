@@ -9,7 +9,7 @@ import { normalizar } from './contratacion-sugerencias';
  * declare el modelo no publica nada.
  * Cambiar el prompt, el esquema o las reglas de validación exige subir EXTRACTOR_VERSION (invalida la caché).
  */
-export const EXTRACTOR_VERSION = 'ia-1';
+export const EXTRACTOR_VERSION = 'ia-3';
 
 export const ETAPAS = ['NECESIDAD', 'COTIZACION', 'ANALISIS_SECTOR', 'CONTRATACION', 'EJECUCION', 'RESOLUCION', 'OTRA'] as const;
 export const INTERVENCIONES = ['DEMOLICION', 'IZAJE_GRUAS', 'MAQUINARIA', 'RCD', 'OTRA'] as const;
@@ -93,18 +93,22 @@ export const SISTEMA = [
   'Registra únicamente lo que el texto dice de forma expresa. Si no consta, usa null. No deduzcas, no sumes, no completes por suposición.',
   'Cada dato lleva la página y una cita textual corta copiada tal cual del fragmento. Los datos personales aparecen suprimidos entre corchetes.',
   'Un área es una superficie declarada («área construida de 320 m²»); no uses cantidades de partidas ni calcules áreas.',
-  'Responde solo llamando a la herramienta registrar_extraccion.',
+  'Responde SIEMPRE y únicamente llamando a la herramienta registrar_extraccion, incluso si no encuentras ningún dato (en ese caso, con todos los campos en null y areas vacío).',
 ].join('\n');
 
+/**
+ * Claude Sonnet 5.5 (documentación oficial): rechaza con 400 `temperature`/`top_p`/`top_k` y el `tool_choice` forzado (`any`/`tool`), y no admite
+ * `thinking: disabled`; el nivel más bajo es `between_tools`. Por eso se usa `auto`, se pide la herramienta en el prompt y se valida que la use.
+ */
 export interface SolicitudClaude {
-  system: string; tools: unknown[]; tool_choice: { type: 'tool'; name: string }; max_tokens: number;
+  system: string; tools: unknown[]; tool_choice: { type: 'auto' }; thinking: { type: 'between_tools' }; max_tokens: number;
   messages: Array<{ role: 'user'; content: string }>;
 }
 
 export function construirSolicitud(fragmentos: Fragmento[], maxTokensSalida: number): SolicitudClaude {
   const cuerpo = fragmentos.map((f) => `<fragmento pagina="${f.pagina}">\n${f.texto}\n</fragmento>`).join('\n');
   return {
-    system: SISTEMA, tools: [HERRAMIENTA], tool_choice: { type: 'tool', name: HERRAMIENTA.name }, max_tokens: maxTokensSalida,
+    system: SISTEMA, tools: [HERRAMIENTA], tool_choice: { type: 'auto' }, thinking: { type: 'between_tools' }, max_tokens: maxTokensSalida,
     messages: [{ role: 'user', content: `Documento (fragmentos con su número de página):\n${cuerpo}` }],
   };
 }

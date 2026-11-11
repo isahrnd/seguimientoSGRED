@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Alert, Button, Table, Tag } from "antd";
 import { CalculatorOutlined, FileTextOutlined, LineChartOutlined } from "@ant-design/icons";
 import { PENDIENTE, UNIDAD_ETQ, cop, fechaCorta, precioConUnidad } from "@/lib/format";
-import { ETAPA_ETQ, desglose, encabezadoM2, historial, type EntradaPrecio, type Partida, type PrecioM2 } from "@/lib/precios-actividad";
+import { ETAPA_ETQ, TIPO_CIFRA_ETQ, desglose, encabezadoM2, historial, soporteDePagina, type EntradaPrecio, type Partida, type PrecioM2 } from "@/lib/precios-actividad";
 import type { DetalleExpediente } from "@/types/contratacion";
 import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "./soporte-link";
@@ -42,7 +42,7 @@ function EncabezadoM2({ d }: { d: DetalleExpediente }) {
     <div>
       <div className="grupo-valores grupo-3">
         <div>
-          <div className="etq-valor">Superficie documentada</div>
+          <div className="etq-valor">Superficie del edificio</div>
           {h.area ? (
             <>
               <div className="importe cifra">{num(h.area.valor)} <span style={{ fontSize: 15, fontWeight: 500 }}>m²</span></div>
@@ -51,8 +51,15 @@ function EncabezadoM2({ d }: { d: DetalleExpediente }) {
             </>
           ) : (
             <>
-              <div style={{ color: PALETA.ambar, fontWeight: 650, fontSize: 18 }}>Pendiente</div>
+              <div style={{ color: PALETA.ambar, fontWeight: 650, fontSize: 18 }}>Superficie pendiente de verificación</div>
               {h.motivo && <div className="texto-secundario" style={{ fontSize: 12.5 }}>{h.motivo}</div>}
+              {(d.area_precio?.candidatas ?? []).length > 0 && (
+                <ul style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 12.5 }}>
+                  {d.area_precio!.candidatas!.map((c, i) => (
+                    <li key={i}>{TIPO_CIFRA_ETQ[c.tipo] ?? c.tipo}: <span className="cifra">{num(c.valor)} m²</span> <SoporteLink soporte={soporteDePagina(c.soporte)} corto /></li>
+                  ))}
+                </ul>
+              )}
             </>
           )}
         </div>

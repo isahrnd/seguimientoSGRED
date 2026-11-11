@@ -91,6 +91,13 @@ export function claudeConfigurado(): boolean {
   return claudeApiKey() !== null && claudeMaxLlamadasDia() > 0;
 }
 
+/**
+ * Procesamiento AUTOMÁTICO con IA (actualización del índice y sincronización periódica). Por defecto PAUSADO: la lectura nativa sigue
+ * funcionando, pero ningún documento se envía a la API hasta activarlo con SEGUIMIENTO_CLAUDE_AUTOMATICO=true. Una ejecución manual
+ * y explícita sobre versiones concretas (CLI `interpretar`) no depende de este interruptor.
+ */
+export const claudeAutomatico = () => process.env.SEGUIMIENTO_CLAUDE_AUTOMATICO === 'true';
+
 /** Tope de tokens de la respuesta, de documentos interpretados por actualización y de páginas por OCR para la interpretación. */
 export const claudeMaxTokensSalida = () => entero('SEGUIMIENTO_CLAUDE_MAX_TOKENS_SALIDA', 1500, 200, 8000);
 export const claudeMaxDocsEjecucion = () => entero('SEGUIMIENTO_CLAUDE_MAX_DOCS_EJECUCION', 10, 0, 200);

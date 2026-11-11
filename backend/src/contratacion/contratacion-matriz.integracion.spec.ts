@@ -27,10 +27,10 @@ async function xlsx(hojas: Record<string, Fila[]>, conEncabezado = true): Promis
 
 const COMPRAS: Fila[] = [
   [1, '9999.001.32.1.515-2026', 'Contratación directa - Convenio de asociación', '9999.001.27.1.5-2026', 'Aunar esfuerzos para soporte logístico', 4050000000, 'Ejecución', 'Fundación X', 'x'],
-  [2, '9999.001.32.1.630-2026', 'Contratación directa - Contrato de obra', '9999.001.26.1.630- 2026', 'Ejecutar actividades de repique, demolición y gestión integral del RCD', 123456789.12, 'Ejecución', 'empresa uno S.A.S.', { text: 'Contrato', hyperlink: 'https://community.secop.gov.co/view?id=1' }],
+  [2, '9999.001.32.1.630-2026', 'Contratación directa - Contrato de obra', '9999.001.26.1.630- 2026', 'Ejecutar actividades de repique, demolición y gestión integral del RCD', 123456789.12, 'Ejecución', 'EMPRESA UNO S.A.S.', { text: 'Contrato', hyperlink: 'https://community.secop.gov.co/view?id=1' }],
   [3, '9999.001.32.1.819 -2026', 'Contratación directa - Alquiler maquinaria amarilla', '9999.001.26.1.819-2026', 'Alquiler y operación de maquinaria', 555555555.5, 'Ejecución', 'O2 S.A.S.', 'Contrato'],
 ];
-const ADICION: Fila[] = [[1, '9999.001.32.1.630-2026', 'Adición', '9999.001.26.1.630-2026', 'Adición al contrato', 1500000.5, 'Ejecución', 'empresa uno S.A.S.', 'Contrato']];
+const ADICION: Fila[] = [[1, '9999.001.32.1.630-2026', 'Adición', '9999.001.26.1.630-2026', 'Adición al contrato', 1500000.5, 'Ejecución', 'EMPRESA UNO S.A.S.', 'Contrato']];
 
 d('matriz de contratación (BD)', () => {
   let prisma: PrismaClient;

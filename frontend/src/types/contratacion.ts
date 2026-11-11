@@ -167,6 +167,8 @@ export interface AreaPrecio {
   cita?: string;
   motivo: string | null;
   soporte?: { version_id: number; documento: string | null; pagina: number } | null;
+  /** Cifras en m² halladas en los documentos que no están declaradas como superficie del edificio (evidencia, no cálculo). */
+  candidatas?: { valor: number; tipo: string; estado: string; cita: string; soporte: { version_id: number; documento: string | null; pagina: number } | null }[];
 }
 
 export interface LecturaAsistida {

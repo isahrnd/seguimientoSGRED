@@ -4,6 +4,8 @@
  * (127.0.0.1/localhost) que tenga aplicada la migración del módulo.
  * Se vacían únicamente las tablas tbl_contratacion_*.
  */
+// Lector de PDF determinista (ver pdf-parse-determinista.ts); la lectura con pdf.js real se prueba en contratacion-pdf-real.spec.ts.
+jest.mock('pdf-parse/lib/pdf-parse.js', () => require('./pdf-parse-determinista'));
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -401,6 +403,47 @@ d('Monitoreo de contratación (integración, datos ficticios)', () => {
       expect((await biblio.listar({ expediente: String(exp.id) })).total).toBe(2);
       expect((await consulta.detalle(exp.id)).soportes.map((s: any) => s.nombre)).toContain('2. EMPRESA UNO.pdf');
       expect((await importacion.aplicar(payload, 1)).aplicada).toBe(false);
+    });
+
+    it('una asociación confirmada se conserva tras dos reindexados con una matriz de contratación presente', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const ExcelJS = require('exceljs');
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('COMPRAS');
+      ws.addRow(['Cantidad', 'Número de proceso', 'Modalidad', 'Número de contrato', 'Objeto', 'Valor total', 'Estado', 'Contratista', 'Link SECOP II']);
+      ws.addRow([1, PROC, 'Contratación directa', '9999.001.26.1.001-2030', 'Demolición', 123456789.12, 'Ejecución', 'EMPRESA UNO', 'x']);
+      subir('Matriz.xlsx', Buffer.from(await wb.xlsx.writeBuffer()));
+      fs.writeFileSync(path.join(dir, 'a.pdf'), analisis('base'));
+      subir('1. EDIF PRUEBA ALFA/COTIZACIONES/2. EMPRESA UNO.pdf', pdf('cotizacion sin proceso otra'));
+      await indice.reindexar();
+      const cot = await prisma.contratacionDocumento.findFirstOrThrow({ where: { nombre: '2. EMPRESA UNO.pdf' }, include: { versiones: true } });
+      const payload = { version: 1, documentos: [{ documento: cot.versiones[0].md5, confirmaciones: [{ tipo: 'EXPEDIENTE', valor: PROC }, { tipo: 'EDIFICACION', valor: 'EDIF PRUEBA ALFA' }] }] };
+      await importacion.aplicar(payload, 1);
+      const foto = async () => ({
+        docs: await prisma.contratacionDocumento.count(),
+        sug: await prisma.contratacionDocSugerencia.count(),
+        confirmadas: await prisma.contratacionDocSugerencia.count({ where: { estado: 'CONFIRMADA' } }),
+        filas: await prisma.contratacionMatrizFila.count(),
+        vinculadas: await prisma.contratacionMatrizFila.count({ where: { expediente_id: { not: null } } }),
+        exps: await prisma.contratacionExpediente.count(),
+        valores: await prisma.contratacionValor.count(),
+        contratos: await prisma.contratacionContrato.count(),
+      });
+      const antes = await foto();
+      expect(antes.filas).toBe(1);
+      expect(antes.vinculadas).toBe(1);
+      expect(antes.confirmadas).toBeGreaterThanOrEqual(2);
+      await indice.reindexar();
+      await indice.reindexar();
+      expect(await foto()).toEqual(antes);
+      const doc = await prisma.contratacionDocumento.findUniqueOrThrow({ where: { id: cot.id } });
+      expect(doc.expediente_id).not.toBeNull();
+      const item = (await biblio.listar({})).items.find((i) => i.nombre === '2. EMPRESA UNO.pdf')!;
+      expect(item.expediente).toMatchObject({ proceso: PROC, confirmado: true });
+      expect(item.edificaciones.find((e) => e.valor === 'EDIF PRUEBA ALFA')!.estado).toBe('CONFIRMADA');
+      // La matriz es fuente común: no se asigna a ningún expediente ni cambia lo confirmado.
+      const m = await prisma.contratacionDocumento.findFirstOrThrow({ where: { nombre: 'Matriz.xlsx' } });
+      expect(m).toMatchObject({ categoria: 'MATRIZ_CONTRATACION', expediente_id: null });
     });
 
     it('vista previa de hoja: celdas como datos, sin fórmulas; solo para hojas de cálculo', async () => {

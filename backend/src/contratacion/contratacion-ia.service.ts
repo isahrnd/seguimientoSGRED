@@ -10,10 +10,10 @@ import {
 import { EjecutorOcr, MIN_TEXTO_NATIVO, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { normalizar } from './contratacion-sugerencias';
 import {
-  claudeApiKey, claudeMaxDocsEjecucion, claudeMaxLlamadasDia, claudeMaxTokensEntrada, claudeMaxTokensSalida, claudeModelo, claudeTarifaUsd, ocrMaxPaginasIa,
+  claudeApiKey, claudeAutomatico, claudeMaxDocsEjecucion, claudeMaxLlamadasDia, claudeMaxTokensEntrada, claudeMaxTokensSalida, claudeModelo, claudeTarifaUsd, ocrMaxPaginasIa,
 } from './contratacion.config';
 
-const MAX_PAGINAS_LECTURA = 40;
+const MAX_PAGINAS_LECTURA = 150;
 const BLOQUEO_PRESUPUESTO = 7102; // pg_advisory_xact_lock: serializa la reserva de llamadas entre procesos
 
 export interface LecturaPdf {
@@ -96,19 +96,21 @@ export class ContratacionIaService {
   }
 
   // ------------------------------------------------------------------ procesamiento
-  async procesar(lectura: LecturaPdf): Promise<ResumenIa> {
+  /** `opciones.versiones`: ejecución MANUAL sobre versiones concretas (no depende del interruptor automático). */
+  async procesar(lectura: LecturaPdf, opciones: { versiones?: number[] } = {}): Promise<ResumenIa> {
     const r: ResumenIa = { revisadas: 0, nativas: 0, desde_cache: 0, llamadas: 0, pendientes: 0, errores: 0, ocr_paginas: 0, tokens_entrada: 0, tokens_salida: 0, limite_alcanzado: false, detenido: null };
     if (this.enCurso) return r; // un solo procesamiento a la vez (actualización manual y sincronización automática no se pisan)
     this.enCurso = true;
     try {
-      const puedeLlamar = this.cliente.disponible() && claudeMaxLlamadasDia() > 0;
+      const manual = Array.isArray(opciones.versiones);
+      const puedeLlamar = this.cliente.disponible() && claudeMaxLlamadasDia() > 0 && (manual || claudeAutomatico());
       const ahora = new Date();
       const vistas = await this.prisma.contratacionIaExtraccion.findMany({ where: { extractor: EXTRACTOR_VERSION }, select: { version_id: true, estado: true, proximo_intento: true } });
-      const hechas = new Set(vistas.filter((v) => v.estado === 'NATIVO' || v.estado === 'OK' || (v.estado === 'PENDIENTE_IA' && !puedeLlamar) || (v.estado === 'ERROR' && v.proximo_intento && v.proximo_intento > ahora)).map((v) => v.version_id));
+      const hechas = new Set(vistas.filter((v) => manual ? v.estado === 'OK' : v.estado === 'NATIVO' || v.estado === 'OK' || (v.estado === 'PENDIENTE_IA' && !puedeLlamar) || (v.estado === 'ERROR' && v.proximo_intento && v.proximo_intento > ahora)).map((v) => v.version_id));
       const versiones = await this.prisma.contratacionDocumentoVersion.findMany({
         where: {
           vigente: true,
-          id: { notIn: [...hechas] },
+          id: manual ? { in: opciones.versiones!.filter((i) => !hechas.has(i)) } : { notIn: [...hechas] },
           origenes: { some: { estado: 'ACTIVO', mime: 'application/pdf' } },
           indice: { isNot: null },
           documento: { categoria: { not: 'MATRIZ_CONTRATACION' } },
@@ -264,7 +266,7 @@ export class ContratacionIaService {
       }
       await this.prisma.contratacionAreaDocumentada.upsert({
         where: { version_id_pagina_tipo_valor: { version_id: v.id, pagina: a.pagina, tipo: a.tipo, valor: a.valor } },
-        create: { version_id: v.id, pagina: a.pagina, valor: a.valor, tipo: a.tipo, edificio_id: edificio, etapa, cita: a.cita, origen, estado: edificio !== null ? 'DOCUMENTADA' : 'EN_REVISION' },
+        create: { version_id: v.id, pagina: a.pagina, valor: a.valor, tipo: a.tipo, edificio_id: edificio, etapa, cita: a.cita, origen, estado: edificio !== null && a.tipo !== 'CANTIDAD' ? 'DOCUMENTADA' : 'EN_REVISION' },
         update: {}, // una superficie ya registrada (o descartada por una persona) no se reescribe
       });
     }

@@ -18,10 +18,10 @@ const url = 'https://community.secop.gov.co/contrato/view?id=1';
 const compras = hoja('COMPRAS', [
   ENC,
   [c(1), c('9999.001.32.1.515-2026'), c('Contratación directa - Convenio de asociación'), c('9999.001.27.1.5-2026'), c('Aunar esfuerzos para soporte logístico'), c(1000), c('Ejecución'), c('Fundación X'), c('x')],
-  [c(2), c('9999.001.32.1.630-2026'), c('Contratación directa - Contrato de obra'), c('9999.001.26.1.630- 2026'), c('Ejecutar actividades de repique, demolición y gestión integral del RCD'), c(123456789.12), c('Ejecución'), c('empresa uno S.A.S.'), c('Contrato', url)],
+  [c(2), c('9999.001.32.1.630-2026'), c('Contratación directa - Contrato de obra'), c('9999.001.26.1.630- 2026'), c('Ejecutar actividades de repique, demolición y gestión integral del RCD'), c(123456789.12), c('Ejecución'), c('EMPRESA UNO S.A.S.'), c('Contrato', url)],
   [c(3), c('9999.001.32.1.819 -2026'), c('Contratación directa - Alquiler maquinaria amarilla'), c('9999.001.26.1.819-2026'), c('Alquiler y operación de maquinaria'), c('$ 555.555.555,50'), c('Ejecución'), c('O2 S.A.S.'), c('Contrato', 'http://otro.com/x')],
 ]);
-const adicion = hoja('ADICION', [ENC, [c(1), c('9999.001.32.1.630-2026'), c('Adición'), c('9999.001.26.1.630-2026'), c('Adición al contrato'), c(1500000.5), c('Ejecución'), c('empresa uno S.A.S.'), c('Contrato', url)]]);
+const adicion = hoja('ADICION', [ENC, [c(1), c('9999.001.32.1.630-2026'), c('Adición'), c('9999.001.26.1.630-2026'), c('Adición al contrato'), c(1500000.5), c('Ejecución'), c('EMPRESA UNO S.A.S.'), c('Contrato', url)]]);
 
 describe('lectura de la matriz de contratación', () => {
   const { filas, hojasLeidas } = leerMatriz([compras, adicion, hoja('OTRA', [[c('nada')]])]);

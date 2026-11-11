@@ -109,6 +109,13 @@ export function desglose(d: DetalleExpediente): GrupoOferta[] {
     });
 }
 
+export const soporteDePagina = (s: { version_id: number; documento: string | null; pagina: number } | null | undefined): SoporteRef | null =>
+  s ? ({ version_id: s.version_id, documento_id: 0, documento: s.documento, numero_version: 1, es_vigente: true, version_vigente_id: null, pagina: s.pagina, hoja: null, celda: null } as SoporteRef) : null;
+
+export const TIPO_CIFRA_ETQ: Record<string, string> = {
+  CANTIDAD: "Cantidad de referencia de la propuesta (no es la superficie del edificio)", LOTE: "Área predial", CONSTRUIDA: "Área construida", INTERVENCION: "Área de intervención", DEMOLICION: "Área de demolición", OTRA: "Otra cifra en m²",
+};
+
 export interface AreaDocumentada {
   valor: number;
   /** Documento y página que declaran la superficie. */

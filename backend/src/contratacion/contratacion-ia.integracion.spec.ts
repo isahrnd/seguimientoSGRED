@@ -14,7 +14,7 @@ const d = habilitado ? describe : describe.skip;
 jest.setTimeout(60000);
 
 const TEXTO = (n: number) =>
-  `CONTRATO No 9999.001.26.1.${String(n).padStart(3, '0')}-2026. Contratista: empresa uno S.A.S. C.C. 1.234.567.890 correo juan@ejemplo.com. El valor del contrato es $123.456.789,12. El área construida es de 1.250,50 m2.`;
+  `CONTRATO No 9999.001.26.1.${String(n).padStart(3, '0')}-2026. Contratista: EMPRESA UNO S.A.S. C.C. 1.234.567.890 correo juan@ejemplo.com. El valor del contrato es $123.456.789,12. El área construida es de 1.250,50 m2.`;
 
 class ClienteFalso implements ClienteClaude {
   llamadas: any[] = [];
@@ -35,7 +35,7 @@ class ClienteFalso implements ClienteClaude {
 class OcrFalso implements EjecutorOcr {
   pedidas: number[][] = [];
   disponible() { return true; }
-  paginas(_pdf: Buffer, paginas: number[]) { this.pedidas.push(paginas); return paginas.map((p) => `ESCANEADO. CONTRATO No 9999.001.26.1.700-2026. Contratista: empresa uno S.A.S. pagina ${p}`); }
+  paginas(_pdf: Buffer, paginas: number[]) { this.pedidas.push(paginas); return paginas.map((p) => `ESCANEADO. CONTRATO No 9999.001.26.1.700-2026. Contratista: EMPRESA UNO S.A.S. pagina ${p}`); }
 }
 
 d('lectura asistida (BD)', () => {
@@ -64,7 +64,7 @@ d('lectura asistida (BD)', () => {
     return {
     entrada: {
       proceso: { valor: `9999.001.26.1.${String(n).padStart(3, '0')}-2026`, pagina: 1, cita: `CONTRATO No 9999.001.26.1.${String(n).padStart(3, '0')}-2026` },
-      contratista: { valor: 'empresa uno S.A.S.', pagina: 1, cita: 'Contratista: empresa uno S.A.S.' },
+      contratista: { valor: 'EMPRESA UNO S.A.S.', pagina: 1, cita: 'Contratista: EMPRESA UNO S.A.S.' },
       importe: { valor: 123456789.12, pagina: 1, cita: 'El valor del contrato es $123.456.789,12' },
       etapa: { valor: 'CONTRATACION', pagina: 1, cita: 'CONTRATO No 9999' },
       areas: [{ valor: 1250.5, tipo: 'CONSTRUIDA', edificio: null, pagina: 1, cita: 'El área construida es de 1.250,50 m2' }],
@@ -79,9 +79,30 @@ d('lectura asistida (BD)', () => {
     n = 0;
     textos.clear();
     for (const k of Object.keys(guardarEnv)) { if (guardarEnv[k] === undefined) delete process.env[k]; else process.env[k] = guardarEnv[k]; delete guardarEnv[k]; }
+    process.env.SEGUIMIENTO_CLAUDE_AUTOMATICO = 'true'; // las pruebas del procesamiento automático lo activan; la pausa tiene sus propias pruebas
     await prisma.$executeRawUnsafe('TRUNCATE tbl_contratacion_ia_extracciones, tbl_contratacion_ia_llamadas, tbl_contratacion_areas, tbl_contratacion_ocr_paginas, tbl_contratacion_doc_sugerencias, tbl_contratacion_doc_indice, tbl_contratacion_documento_edificios, tbl_contratacion_doc_origenes, tbl_contratacion_doc_versiones, tbl_contratacion_documentos, tbl_contratacion_edificios RESTART IDENTITY CASCADE');
   });
   const servicio = (c: ClienteClaude, o: EjecutorOcr = new OcrFalso()) => new ContratacionIaService(prisma as any, c, o);
+
+  it('pausado (por defecto) no llama a la API ni siquiera con clave: queda pendiente; una ejecución manual sobre versiones concretas sí', async () => {
+    delete process.env.SEGUIMIENTO_CLAUDE_AUTOMATICO;
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    const a = await documento('a.pdf', [TEXTO(630)]);
+    await documento('b.pdf', [TEXTO(631)]);
+    const r1 = await servicio(c).procesar(lectura);
+    expect(r1).toMatchObject({ llamadas: 0, pendientes: 2 });
+    expect(c.llamadas).toHaveLength(0);
+    expect(await prisma.contratacionIaLlamada.count()).toBe(0);
+    // Manual sobre una sola versión: solo esa se interpreta; la otra sigue pendiente.
+    const r2 = await servicio(c).procesar(lectura, { versiones: [a.ver.id] });
+    expect(r2).toMatchObject({ llamadas: 1 });
+    expect(c.llamadas).toHaveLength(1);
+    expect((await prisma.contratacionIaExtraccion.findMany({ orderBy: { version_id: 'asc' } })).map((x) => x.estado)).toEqual(['OK', 'PENDIENTE_IA']);
+    // Una actualización automática posterior, aún pausada, no toca la pendiente.
+    const r3 = await servicio(c).procesar(lectura);
+    expect(r3.llamadas).toBe(0);
+    expect(c.llamadas).toHaveLength(1);
+  });
 
   it('sin clave no consume nada: el documento queda pendiente y se interpreta cuando hay clave', async () => {
     const c = new ClienteFalso(); c.activo = false; c.responder = respuestaBuena;
@@ -258,7 +279,7 @@ d('lectura asistida (BD)', () => {
   it('no sobrescribe lo que una persona ya confirmó o descartó', async () => {
     const c = new ClienteFalso(); c.responder = respuestaBuena;
     const { doc, ver } = await documento('a.pdf', [TEXTO(630)]);
-    await prisma.contratacionDocSugerencia.create({ data: { documento_id: doc.id, tipo: 'EMPRESA', valor: 'empresa uno S.A.S.', fuente_tipo: 'PDF_PAGINA', fuente_detalle: 'p. 1 · lectura asistida', estado: 'CONFIRMADA', confirmada_en: new Date() } });
+    await prisma.contratacionDocSugerencia.create({ data: { documento_id: doc.id, tipo: 'EMPRESA', valor: 'EMPRESA UNO S.A.S.', fuente_tipo: 'PDF_PAGINA', fuente_detalle: 'p. 1 · lectura asistida', estado: 'CONFIRMADA', confirmada_en: new Date() } });
     await prisma.contratacionAreaDocumentada.create({ data: { version_id: ver.id, pagina: 1, valor: 1250.5, tipo: 'CONSTRUIDA', cita: 'x', origen: 'NATIVO', estado: 'DESCARTADA' } });
     await servicio(c).procesar(lectura);
     expect((await prisma.contratacionDocSugerencia.findFirstOrThrow({ where: { documento_id: doc.id, tipo: 'EMPRESA' } })).estado).toBe('CONFIRMADA');
