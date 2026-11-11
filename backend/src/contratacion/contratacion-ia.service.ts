@@ -15,6 +15,8 @@ import {
 } from './contratacion.config';
 
 const MAX_PAGINAS_LECTURA = 150;
+/** Documentos de nivel edificio: una resolución de demolición o una visita técnica pertenece a un edificio, no a un proceso; no necesitan número de proceso. */
+const NIVEL_EDIFICIO = new Set(['RESOLUCION_DEMOLICION', 'VISITA_SOPORTE_TECNICO']);
 const BLOQUEO_PRESUPUESTO = 7102; // pg_advisory_xact_lock: serializa la reserva de llamadas entre procesos
 
 export interface LecturaPdf {
@@ -116,7 +118,7 @@ export class ContratacionIaService {
           indice: { isNot: null },
           documento: { categoria: { not: 'MATRIZ_CONTRATACION' } },
         },
-        include: { documento: { include: { edificios: true, sugerencias: { select: { tipo: true, estado: true } } } }, doc_contrato: { select: { estado: true, proceso_citado: true } } },
+        include: { documento: { include: { edificios: true, sugerencias: { select: { tipo: true, estado: true } }, expediente: { select: { edificios: { select: { edificio_id: true } } } } } }, doc_contrato: { select: { estado: true, proceso_citado: true } } },
         orderBy: { id: 'asc' },
         take: 300,
       });
@@ -172,8 +174,8 @@ export class ContratacionIaService {
       return {
         textoUtil: ps.some((p) => p.texto.trim().length >= MIN_TEXTO_NATIVO),
         // Un contrato solo deja resuelto el proceso si cita su número de proceso (.32.) o ya está asociado a un expediente; el número de contrato no basta.
-        procesoResuelto: !!(doc.expediente_id || (doc.proceso_detectado && tipoPorSegmento(doc.proceso_detectado) === 'PROCESO') || v.doc_contrato?.proceso_citado || extraerProceso(texto)),
-        edificioResuelto: edificiosDoc.length > 0 || doc.sugerencias.some((s: any) => s.tipo === 'EDIFICACION' && s.estado !== 'DESCARTADA'),
+        procesoResuelto: !!(NIVEL_EDIFICIO.has(doc.categoria) || doc.expediente_id || (doc.proceso_detectado && tipoPorSegmento(doc.proceso_detectado) === 'PROCESO') || v.doc_contrato?.proceso_citado || extraerProceso(texto)),
+        edificioResuelto: edificiosDoc.length > 0 || (doc.expediente?.edificios?.length ?? 0) > 0 || doc.sugerencias.some((s: any) => s.tipo === 'EDIFICACION' && s.estado !== 'DESCARTADA'),
       };
     };
     let est = evaluar(paginas);

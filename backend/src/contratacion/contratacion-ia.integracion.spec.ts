@@ -337,6 +337,20 @@ d('lectura asistida (BD)', () => {
     expect((await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } })).estado).toBe('OK');
   });
 
+  it('una resolución o visita de un edificio vinculado, y un análisis ya asociado a un expediente con edificios, se resuelven sin API', async () => {
+    const ed = await prisma.contratacionEdificio.create({ data: { nombre: 'Torre Norte', nombre_norm: 'torre norte' } });
+    const exp = await prisma.contratacionExpediente.create({ data: { proceso: '9999.001.32.1.650-2026', intervencion: 'x' } });
+    await prisma.contratacionExpedienteEdificio.create({ data: { expediente_id: exp.id, edificio_id: ed.id } });
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    await documento('resolucion.pdf', ['RESOLUCION por la cual se ordena la demolicion de un inmueble sin numero de proceso en el texto'], { edificio: ed.id, categoria: 'RESOLUCION_DEMOLICION' });
+    await documento('visita.pdf', ['Informe de visita tecnica al predio sin numero de proceso en el texto'], { edificio: ed.id, categoria: 'VISITA_SOPORTE_TECNICO' });
+    const a = await documento('analisis.pdf', ['ESTRUCTURACION DEL ANALISIS DEL SECTOR sin numero de proceso en este fragmento']);
+    await prisma.contratacionDocumento.update({ where: { id: a.doc.id }, data: { expediente_id: exp.id } });
+    const r = await servicio(c).procesar(lectura);
+    expect(r).toMatchObject({ llamadas: 0, nativas: 3 });
+    expect(c.llamadas).toHaveLength(0);
+  });
+
   it('no interpreta la matriz de contratación ni las transcripciones', async () => {
     const c = new ClienteFalso(); c.responder = respuestaBuena;
     await documento('matriz.pdf', [TEXTO(630)], { categoria: 'MATRIZ_CONTRATACION' });
