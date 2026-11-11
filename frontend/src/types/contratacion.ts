@@ -577,6 +577,9 @@ export interface HojaRespuesta {
   hoja: { indice: number; nombre: string; filas: (string | number | boolean | null)[][]; total_filas: number; total_columnas: number; truncado: boolean };
 }
 
+/** Presentación institucional del resultado; el estado interno (`resultado`) no cambia. */
+export interface PresentacionPrecios { etiqueta: string; detalle: string | null; tono: "INFORMATIVO" | "ATENCION" | "FAVORABLE" }
+
 export type ResultadoPrecio =
   | "SIN_CONTRATO_SOPORTADO"
   | "EVIDENCIA_INSUFICIENTE"
@@ -613,6 +616,7 @@ export interface AnalisisPrecios {
   referencias: ReferenciaPrecio[];
   rango: { min: number; max: number; referencias: number } | null;
   resultado: ResultadoPrecio;
+  presentacion?: PresentacionPrecios;
   resumen: string;
   cobertura: { partidas_comparadas: number; partidas_totales: number; aviso: string | null };
   ejecutado_vs_contratado: { ejecutado: number; diferencia_cop: number; nota: string } | null;
@@ -634,6 +638,7 @@ export interface FilaAnalisisPrecios {
   soporte_contrato: SoporteRef | null;
   reportado_contratado: boolean;
   resultado: ResultadoPrecio;
+  presentacion?: PresentacionPrecios;
   resumen: string;
   pendientes: string[];
   rango: { min: number; max: number; referencias: number } | null;

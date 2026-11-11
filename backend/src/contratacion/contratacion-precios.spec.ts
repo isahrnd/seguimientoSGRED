@@ -43,7 +43,9 @@ describe('análisis de precios', () => {
   it('una sola oferta y ninguna referencia: evidencia insuficiente, sin porcentajes', () => {
     const r = analizarPrecios(base({ ofertas: [of('A', 1000)] }));
     expect(r.resultado).toBe('EVIDENCIA_INSUFICIENTE');
-    expect(r.resumen).toMatch(/Evidencia insuficiente para contrastar con el mercado/);
+    expect(r.resumen).toMatch(/Comparación de precios por completar/);
+    expect(r.presentacion).toMatchObject({ etiqueta: 'Comparación de precios por completar', tono: 'INFORMATIVO' });
+    expect(r.resumen).not.toMatch(/sobrecosto|sin sobrecostos/i);
     expect(r.referencias.every((x) => x.diferencia_pct === null)).toBe(true);
   });
 
@@ -117,4 +119,42 @@ describe('tipo de intervención', () => {
     ['Retiro de RCD', 'DEMOLICION'],
     ['Interventoría', 'OTRA'],
   ])('%s => %s', (t, esperado) => expect(tipoIntervencion(t)).toBe(esperado));
+});
+
+import { presentacionPrecios, DETALLE_ESTUDIO_MERCADO } from './contratacion-precios';
+describe('presentación institucional del resultado', () => {
+  it('sin contrato: «Documentación contractual por incorporar», sin mencionar un estudio de mercado que no está identificado', () => {
+    const r = analizarPrecios(base({ contratos: [] }));
+    expect(r.resultado).toBe('SIN_CONTRATO_SOPORTADO'); // el estado interno no cambia
+    expect(r.presentacion).toEqual({ etiqueta: 'Documentación contractual por incorporar', detalle: null, tono: 'INFORMATIVO' });
+    expect(r.resumen).not.toMatch(/estudio de mercado/i);
+  });
+  it('sin contrato y con estudio de mercado identificado: añade el detalle indicado', () => {
+    const r = analizarPrecios(base({ contratos: [], contexto: { estudio_mercado_identificado: true } }));
+    expect(r.presentacion.detalle).toBe(DETALLE_ESTUDIO_MERCADO);
+    expect(r.presentacion.detalle).toBe('Se cuenta con un estudio de mercado. La comparación se completará al incorporar la información contractual correspondiente.');
+  });
+  it('contrato cargado pero sin relacionar: «Documento contractual por vincular»', () => {
+    const r = analizarPrecios(base({ contratos: [], contexto: { contrato_por_vincular: true } }));
+    expect(r.presentacion.etiqueta).toBe('Documento contractual por vincular');
+    expect(r.resumen).toMatch(/falta vincularlo/);
+    expect(r.pendientes).toContain('Vincular al proceso el documento contractual ya cargado');
+  });
+  it('el estudio de mercado solo se menciona cuando falta el contrato (no en otros estados)', () => {
+    expect(presentacionPrecios('EVIDENCIA_INSUFICIENTE', { estudio_mercado_identificado: true }).detalle).toBeNull();
+    expect(presentacionPrecios('POR_ENCIMA_DEL_RANGO', { estudio_mercado_identificado: true }).detalle).toBeNull();
+  });
+  it('solo lo que requiere atención usa el tono de atención; un trámite pendiente es informativo', () => {
+    expect(presentacionPrecios('SIN_CONTRATO_SOPORTADO').tono).toBe('INFORMATIVO');
+    expect(presentacionPrecios('EVIDENCIA_INSUFICIENTE').tono).toBe('INFORMATIVO');
+    expect(presentacionPrecios('ALCANCE_NO_EQUIVALENTE').tono).toBe('ATENCION');
+    expect(presentacionPrecios('POR_ENCIMA_DEL_RANGO').tono).toBe('ATENCION');
+    expect(presentacionPrecios('POR_DEBAJO_DEL_RANGO').tono).toBe('ATENCION');
+  });
+  it('una comparación pendiente no se presenta como completa ni concluye ausencia de sobrecostos', () => {
+    for (const r of ['SIN_CONTRATO_SOPORTADO', 'EVIDENCIA_INSUFICIENTE'] as const) {
+      const p = presentacionPrecios(r, { estudio_mercado_identificado: true });
+      expect(`${p.etiqueta} ${p.detalle ?? ''}`).not.toMatch(/dentro del rango|sin sobrecosto|no hay sobrecosto/i);
+    }
+  });
 });

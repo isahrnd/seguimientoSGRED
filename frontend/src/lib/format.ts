@@ -17,7 +17,7 @@ export const ACTIVIDAD_ETQ: Record<string, string> = {
   DISPOSICION_RCD: "Disposición de RCD", GESTION_INTEGRAL: "Servicio integral (demolición, cargue, transporte y gestión de RCD)", OTRO: "Otro componente",
 };
 export const ESTADO_ETQ: Record<string, string> = {
-  PENDIENTE_SOPORTE: "Pendiente de soporte",
+  PENDIENTE_SOPORTE: "Documentación contractual por incorporar",
   ANALISIS_DEL_SECTOR: "Análisis del sector",
   CONTRATADO: "Contratado",
   EJECUCION_DOCUMENTADA: "Ejecución documentada",
@@ -45,14 +45,14 @@ export function fechaCorta(f: string | Date | null | undefined): string {
 
 export const ESTADO_VALOR_ETQ: Record<string, string> = {
   SOPORTADO: "Soportado",
-  CITADO_SIN_ACTA: "Citado; acta pendiente",
-  PENDIENTE_SOPORTE: "Pendiente de soporte",
+  CITADO_SIN_ACTA: "Citado; acta por incorporar",
+  PENDIENTE_SOPORTE: "Documentación por incorporar",
 };
 
 export const SELECCION_ETQ: Record<string, string> = {
   ADJUDICADA: "Seleccionada y adjudicada con acto de contratación",
-  JUSTIFICADA_SIN_ACTO: "Justificación documentada; falta el acto de contratación",
-  PENDIENTE_SOPORTE: "Pendiente de soporte",
+  JUSTIFICADA_SIN_ACTO: "Justificación documentada; acto de contratación por incorporar",
+  PENDIENTE_SOPORTE: "Documentación contractual por incorporar",
 };
 
 /** "Hoja Datos · celda B2". */

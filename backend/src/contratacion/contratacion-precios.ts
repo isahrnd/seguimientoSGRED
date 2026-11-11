@@ -28,6 +28,33 @@ export interface EntradaPrecios {
   ejecutado: Array<{ importe: number; respaldado: boolean; soporte: SoporteRefP | null }>;
   /** Partidas de las ofertas: cuántas se pudieron comparar entre sí y cuántas hay. */
   partidas: { comparadas: number; total: number };
+  /** Contexto solo para la presentación: no cambia el resultado ni las cifras. */
+  contexto?: { estudio_mercado_identificado?: boolean; contrato_por_vincular?: boolean };
+}
+
+/**
+ * Presentación institucional del resultado. El estado interno (`resultado`) no cambia. El tono «ATENCION» se reserva para lo que requiere atención
+ * (alcance no equivalente, valores fuera del rango); un trámite pendiente se muestra como «INFORMATIVO».
+ */
+export interface PresentacionPrecios { etiqueta: string; detalle: string | null; tono: 'INFORMATIVO' | 'ATENCION' | 'FAVORABLE' }
+
+export const DETALLE_ESTUDIO_MERCADO = 'Se cuenta con un estudio de mercado. La comparación se completará al incorporar la información contractual correspondiente.';
+
+export function presentacionPrecios(resultado: ResultadoPrecio, ctx: { estudio_mercado_identificado?: boolean; contrato_por_vincular?: boolean } = {}): PresentacionPrecios {
+  switch (resultado) {
+    case 'SIN_CONTRATO_SOPORTADO':
+      return {
+        etiqueta: ctx.contrato_por_vincular ? 'Documento contractual por vincular' : 'Documentación contractual por incorporar',
+        // Solo se menciona un estudio de mercado si está identificado como tal.
+        detalle: ctx.estudio_mercado_identificado ? DETALLE_ESTUDIO_MERCADO : null,
+        tono: 'INFORMATIVO',
+      };
+    case 'EVIDENCIA_INSUFICIENTE': return { etiqueta: 'Comparación de precios por completar', detalle: null, tono: 'INFORMATIVO' };
+    case 'ALCANCE_NO_EQUIVALENTE': return { etiqueta: 'Alcance no equivalente: sin comparación', detalle: null, tono: 'ATENCION' };
+    case 'DENTRO_DEL_RANGO': return { etiqueta: 'Dentro del rango de las referencias comparables', detalle: null, tono: 'FAVORABLE' };
+    case 'POR_ENCIMA_DEL_RANGO': return { etiqueta: 'Por encima del rango de las referencias', detalle: null, tono: 'ATENCION' };
+    case 'POR_DEBAJO_DEL_RANGO': return { etiqueta: 'Por debajo del rango de las referencias', detalle: null, tono: 'ATENCION' };
+  }
 }
 
 export type ResultadoPrecio =
@@ -145,13 +172,15 @@ export function analizarPrecios(e: EntradaPrecios) {
   let resumen: string;
   switch (resultado) {
     case 'SIN_CONTRATO_SOPORTADO':
-      resumen = 'No hay contrato, acto de adjudicación ni acta que acredite un valor contratado: no es posible afirmar si el precio se ubica dentro de referencias comparables.';
+      resumen = e.contexto?.contrato_por_vincular
+        ? 'El documento contractual ya está cargado, pero falta vincularlo con este proceso. Hasta completar la comparación no se afirma si el precio se ubica dentro de referencias comparables.'
+        : 'Documentación contractual por incorporar (contrato, acto de adjudicación o acta que acredite el valor contratado). Hasta entonces no se afirma si el precio se ubica dentro de referencias comparables.';
       break;
     case 'ALCANCE_NO_EQUIVALENTE':
       resumen = `Hay ${competidoras} ofertas, pero no cubren el mismo alcance (${e.alcance.diferencias.map((d) => d.concepto.toLowerCase()).join(', ') || 'diferencias por aclarar'}): no se calculan diferencias hasta explicarlo.`;
       break;
     case 'EVIDENCIA_INSUFICIENTE':
-      resumen = `Evidencia insuficiente para contrastar con el mercado: ${validas.length === 0 ? 'ninguna referencia independiente y comparable' : 'una sola referencia independiente y comparable'} frente a lo contratado (${fmt(base!)}).`;
+      resumen = `Comparación de precios por completar: se cuenta con ${validas.length === 0 ? 'ninguna referencia independiente y comparable' : 'una sola referencia independiente y comparable'} frente a lo contratado (${fmt(base!)}). No se concluye sobre el precio mientras no haya al menos dos referencias independientes y comparables.`;
       break;
     case 'DENTRO_DEL_RANGO':
       resumen = `El valor contratado (${fmt(base!)}) se ubica dentro del rango de ${rango!.referencias} referencias independientes y comparables (${fmt(rango!.min)} a ${fmt(rango!.max)}), con alcance verificado como equivalente.`;
@@ -165,7 +194,7 @@ export function analizarPrecios(e: EntradaPrecios) {
   }
 
   const pendientes: string[] = [];
-  if (contratado === null) pendientes.push('Contrato, acta de adjudicación u oferta aceptada firmada del proceso');
+  if (contratado === null) pendientes.push(e.contexto?.contrato_por_vincular ? 'Vincular al proceso el documento contractual ya cargado' : 'Contrato, acta de adjudicación u oferta aceptada firmada del proceso');
   if (competidoras < 2) pendientes.push('Otras cotizaciones independientes para la misma intervención');
   if (competidoras >= 2 && !alcanceOk) pendientes.push('Aclaración de las diferencias de alcance entre las ofertas');
   if (!e.seleccion.justificada && contratado !== null) pendientes.push('Justificación documentada de la selección de la oferta');
@@ -178,6 +207,7 @@ export function analizarPrecios(e: EntradaPrecios) {
     referencias,
     rango,
     resultado,
+    presentacion: presentacionPrecios(resultado, e.contexto),
     resumen,
     cobertura: { partidas_comparadas: e.partidas.comparadas, partidas_totales: e.partidas.total, aviso: e.partidas.total === 0 ? 'No hay partidas con precio unitario: la conclusión aplica solo al valor global.' : e.partidas.comparadas < e.partidas.total ? 'Solo algunas partidas son comparables: la conclusión no se extiende al contrato completo.' : null },
     ejecutado_vs_contratado: contratado !== null && ejecutadoRespaldado > 0 ? { ejecutado: ejecutadoRespaldado, diferencia_cop: redondeo(ejecutadoRespaldado - contratado), nota: 'Puede deberse a cantidades o alcance, no necesariamente al precio unitario.' } : null,

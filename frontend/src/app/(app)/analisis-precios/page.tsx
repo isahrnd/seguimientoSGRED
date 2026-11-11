@@ -20,7 +20,7 @@ export default function AnalisisPreciosPage() {
   if (q.isLoading) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (q.isError || !q.data) return <ErrorCarga texto="No fue posible cargar el análisis de precios." onReintentar={() => q.refetch()} />;
   const d = q.data;
-  const total = (v: number | null) => (v === null ? <span style={{ color: PALETA.ambar, fontSize: 17 }}>Sin contrato soportado</span> : <span className="cifra importe">{cop(v)}</span>);
+  const total = (v: number | null) => (v === null ? <span className="texto-secundario" style={{ fontSize: 16 }}>Documentación contractual por incorporar</span> : <span className="cifra importe">{cop(v)}</span>);
 
   return (
     <div style={{ display: "grid", gap: 24 }}>
@@ -47,19 +47,19 @@ export default function AnalisisPreciosPage() {
             </div>) },
           { title: "Contratado", align: "right", render: (_, f) => (f.valor_contratado?.sustentado
             ? <div><div className="cifra" style={{ fontWeight: 700, fontSize: 17 }}>{cop(f.valor_contratado.valor_actualizado ?? f.valor_contratado.valor_inicial)}</div><SoporteLink soporte={f.soporte_contrato} corto /></div>
-            : <span style={{ color: PALETA.ambar }}>{f.reportado_contratado ? "Reportado; falta el contrato" : PENDIENTE}</span>) },
+            : <span className="texto-secundario">{f.reportado_contratado ? "Reportado; documentación contractual por incorporar" : f.presentacion?.etiqueta ?? "Documentación contractual por incorporar"}</span>) },
           { title: "Referencias", render: (_, f) => <span>{f.ofertas} {f.ofertas === 1 ? "oferta" : "ofertas"} · {f.referencias_independientes} independientes{f.rango && <div className="cifra texto-secundario" style={{ fontSize: 13 }}>{cop(f.rango.min)} a {cop(f.rango.max)}</div>}</span> },
-          { title: "Lectura", render: (_, f) => <div style={{ maxWidth: 320 }}><ResultadoTag r={f.resultado} /></div> },
+          { title: "Lectura", render: (_, f) => <div style={{ maxWidth: 320 }}><ResultadoTag r={f.resultado} presentacion={f.presentacion} /></div> },
           { title: "", width: 130, render: (_, f) => <BotonEnlace href={`/expedientes/${f.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
         ]}
       />
 
       {d.pendientes_de_soporte.length > 0 && (
         <section>
-          <h2 style={{ fontSize: 18, margin: "0 0 10px" }}>Esperan documento contractual</h2>
+          <h2 style={{ fontSize: 18, margin: "0 0 10px" }}>Documentación contractual por incorporar</h2>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {d.pendientes_de_soporte.map((p) => (
-              <li key={p.id} className="largo"><Link href={`/expedientes/${p.id}`}>{p.intervencion}</Link> <Tag color={p.reportado_contratado ? "warning" : "default"}>{p.reportado_contratado ? "reportado contratado" : "sin reporte"}</Tag> — falta: {p.documento_necesario}</li>
+              <li key={p.id} className="largo"><Link href={`/expedientes/${p.id}`}>{p.intervencion}</Link> <Tag color={p.reportado_contratado ? "processing" : "default"}>{p.reportado_contratado ? "reportado contratado" : "sin reporte"}</Tag> — por incorporar: {p.documento_necesario}</li>
             ))}
           </ul>
         </section>

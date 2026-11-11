@@ -9,7 +9,7 @@ const COLS: Array<{ k: keyof FilaResumen; t: string; w: number; moneda?: boolean
   { k: 'valor_ejecutado', t: 'Ejecutado con acta', w: 20, moneda: true }, { k: 'fuente_ejecutado', t: 'Fuente (ejecución)', w: 44 },
   { k: 'presupuesto_oficial', t: 'Presupuesto oficial', w: 20, moneda: true }, { k: 'fuente_presupuesto', t: 'Fuente (presupuesto)', w: 44 },
   { k: 'area_m2', t: 'Área documentada (m²)', w: 16 }, { k: 'precio_m2', t: 'Precio por m²', w: 16, moneda: true }, { k: 'nota_m2', t: 'Nota del precio por m²', w: 40 },
-  { k: 'pendientes', t: 'Pendiente de verificación', w: 44 }, { k: 'observacion', t: 'Observación', w: 50 },
+  { k: 'pendientes', t: 'Pendiente de verificación', w: 44 }, { k: 'observacion', t: 'Observación', w: 50 }, { k: 'comparacion_precios', t: 'Comparación de precios', w: 48 },
 ];
 
 /** Libro con una fila por expediente. Las columnas de matriz, contrato y ejecución no se suman: son fuentes distintas de una misma cifra. */

@@ -248,7 +248,14 @@ export class ContratacionConsultaService {
       const cs = e.valores.filter((v) => v.tipo === 'COTIZADO' && v.oferta_id === o.id);
       return cs.length === 1 ? n(cs[0].importe) : null;
     };
+    // Contexto de presentación (datos reales): un estudio de mercado solo se menciona si hay un documento clasificado como tal y confirmado; un contrato
+    // «por vincular» es un documento de contratación que cita este proceso y aún no está asociado a ningún expediente.
+    const estudioIdentificado = estudios.some((x: any) => x.estado_clasificacion === 'CONFIRMADO');
+    const contratoPorVincular = contratos.length === 0 && (await this.prisma.contratacionDocumento.count({
+      where: { categoria: 'CONTRATACION_ACTAS', expediente_id: null, OR: [{ proceso_detectado: e.proceso }, { sugerencias: { some: { tipo: 'EXPEDIENTE', valor: e.proceso, estado: { not: 'DESCARTADA' } } } }] },
+    })) > 0;
     const analisis_precios = analizarPrecios({
+      contexto: { estudio_mercado_identificado: estudioIdentificado, contrato_por_vincular: contratoPorVincular },
       contratos: contratos.map((c) => ({ valor: c.valor as number, tipo_acto: c.tipo_acto, numero: c.numero, oferta: c.oferta, soporte: c.soporte as any })),
       ofertas: e.ofertas.map((o) => ({ proveedor: o.proveedor, grupo_oferta: o.grupo_oferta, revision: o.revision, valor: valorOferta(o), soporte: S(o) as any })),
       presupuestoOficial: (() => { const p = valores.find((v) => v.tipo === 'PRESUPUESTO_OFICIAL'); return p ? { importe: p.importe as number, soporte: p.soporte as any } : null; })(),
@@ -285,7 +292,7 @@ export class ContratacionConsultaService {
         estado: contratos.some((c) => c.oferta) ? 'ADJUDICADA' : justificaciones.length ? 'JUSTIFICADA_SIN_ACTO' : 'PENDIENTE_SOPORTE',
         oferta: seleccionada,
         justificaciones,
-        texto: contratos.some((c) => c.oferta) ? null : justificaciones.length ? 'Hay una justificación documentada, pero aún no el acto de contratación.' : 'Pendiente de soporte: no hay contrato, acta ni justificación documentada de la selección.',
+        texto: contratos.some((c) => c.oferta) ? null : justificaciones.length ? 'Hay una justificación documentada, pero aún no el acto de contratación.' : 'Documentación contractual por incorporar: aún no hay contrato, acta ni justificación documentada de la selección.',
         contratos: contratos.filter((c) => c.justificacion).map((c) => ({ numero: c.numero, justificacion: c.justificacion, soporte: c.soporte })),
       },
       estudio_mercado: {
@@ -335,7 +342,7 @@ export class ContratacionConsultaService {
       lineas_sin_oferta: lineas.filter((l) => !l.oferta_clave),
       comparaciones_entre_ofertas: comparaciones,
       analisis_sector: { referencias: refsConComparacion },
-      contratacion: { contratos, seleccion_documentada: contratos.length > 0, aviso: contratos.length ? null : 'Pendiente de soporte: un análisis del sector no acredita una firma ni una adjudicación.' },
+      contratacion: { contratos, seleccion_documentada: contratos.length > 0, aviso: contratos.length ? null : 'Documentación contractual por incorporar: un análisis del sector no acredita una firma ni una adjudicación.' },
       ejecucion: { valores: valores.filter((v) => v.tipo === 'EJECUTADO') },
       valores,
       soportes,
@@ -389,7 +396,7 @@ export class ContratacionConsultaService {
         valor_contratado: A.contratado.sustentado ? A.contratado : null,
         soporte_contrato: primerContrato?.soporte ?? null,
         reportado_contratado: D.expediente.reportado_contratado,
-        resultado: A.resultado, resumen: A.resumen, pendientes: A.pendientes, rango: A.rango,
+        resultado: A.resultado, presentacion: A.presentacion, resumen: A.resumen, pendientes: A.pendientes, rango: A.rango,
         referencias_independientes: A.referencias.filter((r: any) => r.independiente && r.comparable && !r.es_la_seleccionada).length,
         ofertas: D.cotizaciones.length,
       };

@@ -19,7 +19,20 @@ describe('resumen por contrato', () => {
     expect(f.valor_matriz).toBe(123456789.12);
     expect(f.fuente_matriz).toContain('celda F6');
     expect(f.valor_contrato).toBeNull();
-    expect(f.observacion).toContain('Contrato pendiente de vincular');
+    expect(f.observacion).toContain('Documentación contractual por incorporar');
+    expect(f.estado).toBe('Documentación contractual por incorporar'); // el estado interno sigue siendo PENDIENTE_SOPORTE
+  });
+  it('la comparación de precios se presenta con la etiqueta institucional y su detalle, en la hoja del libro', async () => {
+    const d = base({ analisis_precios: { presentacion: { etiqueta: 'Documentación contractual por incorporar', detalle: 'Se cuenta con un estudio de mercado. La comparación se completará al incorporar la información contractual correspondiente.', tono: 'INFORMATIVO' } } });
+    const f = filaResumen(d);
+    expect(f.comparacion_precios).toBe('Documentación contractual por incorporar. Se cuenta con un estudio de mercado. La comparación se completará al incorporar la información contractual correspondiente.');
+    expect(filaResumen(base()).comparacion_precios).toBe('');
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load((await construirLibroResumen([f])) as any);
+    const ws = wb.getWorksheet('Resumen por contrato')!;
+    const encabezados: string[] = []; ws.getRow(1).eachCell((c) => encabezados.push(String(c.value)));
+    expect(encabezados).toContain('Comparación de precios');
+    const col = encabezados.indexOf('Comparación de precios') + 1;
+    expect(String(ws.getRow(2).getCell(col).value)).toMatch(/^Documentación contractual por incorporar\./);
   });
   it('misma cifra en matriz y contrato cuenta una vez y se informa', () => {
     const f = filaResumen(base({ contratacion: { contratos: [{ valor: 100, soporte: { documento: 'c.pdf', pagina: 2 } }] }, matriz: { valor_reportado: { importe: 100, coincide_con_contrato: true, soporte: null } } }));

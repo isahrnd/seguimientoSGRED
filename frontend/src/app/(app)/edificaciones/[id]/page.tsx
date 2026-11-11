@@ -60,7 +60,7 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
       )}
 
       {d.sin_proceso_confirmado && (
-        <Alert type="warning" showIcon message="Proceso contractual pendiente" description="Aún no se ha confirmado la relación de esta edificación con un contrato. Sus visitas y cotizaciones confirmadas se pueden consultar abajo." />
+        <Alert type="info" showIcon message="Proceso contractual por vincular" description="Aún no se ha confirmado la relación de esta edificación con un contrato. Sus visitas y cotizaciones confirmadas se pueden consultar abajo." />
       )}
 
       <Caja titulo="Resolución de demolición"><EstadoResolucion r={d.resolucion} /></Caja>

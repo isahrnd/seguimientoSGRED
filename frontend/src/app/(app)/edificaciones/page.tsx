@@ -1,4 +1,5 @@
 "use client";
+import { EtiquetaInformativa } from "@/components/estado-informativo";
 import { BotonEnlace } from "@/components/boton-enlace";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
@@ -27,7 +28,7 @@ function Contenido() {
   if (q.isError && esErrorDeAcceso(q.error)) return <SinAcceso />;
   const filas = q.data?.edificios ?? [];
   const procesos = (e: EdificioFila) => e.procesos.length === 0
-    ? <Tag color="warning">Proceso contractual pendiente</Tag>
+    ? <EtiquetaInformativa>Proceso contractual por vincular</EtiquetaInformativa>
     : e.procesos.map((p) => <div key={p.id}><Link href={`/expedientes/${p.id}`}>{p.proceso}</Link></div>);
 
   return (

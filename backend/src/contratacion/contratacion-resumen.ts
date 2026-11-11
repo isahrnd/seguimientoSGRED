@@ -32,10 +32,12 @@ export interface FilaResumen {
   nota_m2: string;
   pendientes: string;
   observacion: string;
+  /** Etiqueta institucional de la comparación de precios (y su detalle) tal como se muestra en la ficha. */
+  comparacion_precios: string;
 }
 
 const ESTADOS: Record<string, string> = {
-  CONTRATADO: 'Contrato en soporte', EJECUCION_DOCUMENTADA: 'Ejecución documentada', ANALISIS_DEL_SECTOR: 'Análisis del sector', PENDIENTE_SOPORTE: 'Pendiente de soporte',
+  CONTRATADO: 'Contrato en soporte', EJECUCION_DOCUMENTADA: 'Ejecución documentada', ANALISIS_DEL_SECTOR: 'Análisis del sector', PENDIENTE_SOPORTE: 'Documentación contractual por incorporar',
 };
 
 /** `d` es el detalle de un expediente (ContratacionConsultaService.detalle). El importe del contrato y el de la matriz no se suman. */
@@ -59,7 +61,7 @@ export function filaResumen(d: any): FilaResumen {
   else if (area === null) nota = ap?.motivo ?? 'Superficie pendiente de documentar';
   else if (base !== null) { precio = Math.round(base / area); nota = `Calculado: ${valorContrato !== null ? 'valor del contrato' : 'presupuesto oficial'} ÷ superficie documentada (${fuenteTexto(ap.soporte)})`; }
   const obs: string[] = [];
-  if (rep && contratos.length === 0) obs.push('Contrato pendiente de vincular');
+  if (rep && contratos.length === 0) obs.push('Documentación contractual por incorporar');
   if (rep && contratos.length && !rep.coincide_con_contrato) obs.push('El valor de la matriz difiere del contrato');
   if (rep && contratos.length && rep.coincide_con_contrato) obs.push('Misma cifra en matriz y contrato: cuenta una sola vez');
   if (rep && oficial && contratos.length === 0 && Math.abs(rep.importe - oficial.importe) < 0.5) obs.push('El valor de la matriz es igual al presupuesto oficial');
@@ -73,5 +75,6 @@ export function filaResumen(d: any): FilaResumen {
     presupuesto_oficial: oficial?.importe ?? null, fuente_presupuesto: fuenteTexto(oficial?.soporte),
     area_m2: area, precio_m2: precio, nota_m2: nota,
     pendientes: (exp.pendientes ?? []).join('; '), observacion: obs.join('. '),
+    comparacion_precios: d.analisis_precios?.presentacion ? [d.analisis_precios.presentacion.etiqueta, d.analisis_precios.presentacion.detalle].filter(Boolean).join('. ') : '',
   };
 }

@@ -1,4 +1,5 @@
 "use client";
+import { EtiquetaInformativa } from "@/components/estado-informativo";
 import Link from "next/link";
 import { Alert, Table, Tag } from "antd";
 import { ACTIVIDAD_ETQ, BASE_ETQ, PENDIENTE, SELECCION_ETQ, cantidadConUnidad, cop, fechaCorta, precioConUnidad, urlHoja } from "@/lib/format";
@@ -134,7 +135,7 @@ export function ComparacionCotizaciones({ d }: { d: DetalleExpediente }) {
 
       <section aria-labelledby="seleccion">
         <H2 id="seleccion">Selección y justificación</H2>
-        <Tag color={c.seleccion.estado === "ADJUDICADA" ? "success" : "warning"} style={{ whiteSpace: "normal", fontSize: 14 }}>{SELECCION_ETQ[c.seleccion.estado]}</Tag>
+        {c.seleccion.estado === "ADJUDICADA" ? <Tag color="success" style={{ whiteSpace: "normal", fontSize: 14 }}>{SELECCION_ETQ[c.seleccion.estado]}</Tag> : <EtiquetaInformativa>{SELECCION_ETQ[c.seleccion.estado]}</EtiquetaInformativa>}
         {c.seleccion.oferta && <span style={{ marginLeft: 8 }}>Oferta: <strong>{c.seleccion.oferta}</strong></span>}
         {c.seleccion.texto && <p className="texto-secundario">{c.seleccion.texto}</p>}
         {c.seleccion.justificaciones.map((j, i) => <p key={i} className="largo"><strong>Justificación documentada:</strong> {j.texto} <SoporteLink soporte={j.soporte} /></p>)}

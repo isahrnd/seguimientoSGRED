@@ -1,8 +1,9 @@
 "use client";
 import { Table, Tag } from "antd";
-import { CheckCircleOutlined, InfoCircleOutlined, QuestionCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, InfoCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import { EtiquetaInformativa } from "./estado-informativo";
 import { PENDIENTE, cop } from "@/lib/format";
-import type { DetalleExpediente, ReferenciaPrecio, ResultadoPrecio } from "@/types/contratacion";
+import type { DetalleExpediente, PresentacionPrecios, ReferenciaPrecio, ResultadoPrecio } from "@/types/contratacion";
 import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "./soporte-link";
 import { BarrasPrecios } from "./barras-precios";
@@ -10,8 +11,8 @@ import { ConciliacionCifras } from "./conciliacion-cifras";
 import { PreciosPorActividad } from "./precios-por-actividad";
 
 export const RESULTADO_ETQ: Record<ResultadoPrecio, string> = {
-  SIN_CONTRATO_SOPORTADO: "Pendiente de soporte contractual",
-  EVIDENCIA_INSUFICIENTE: "Evidencia insuficiente para contrastar con el mercado",
+  SIN_CONTRATO_SOPORTADO: "Documentación contractual por incorporar",
+  EVIDENCIA_INSUFICIENTE: "Comparación de precios por completar",
   ALCANCE_NO_EQUIVALENTE: "Alcance no equivalente: sin comparación",
   DENTRO_DEL_RANGO: "Dentro del rango de las referencias comparables",
   POR_ENCIMA_DEL_RANGO: "Por encima del rango de las referencias",
@@ -19,11 +20,14 @@ export const RESULTADO_ETQ: Record<ResultadoPrecio, string> = {
 };
 
 /** Un precio por encima del rango se muestra con la misma visibilidad que uno por debajo o dentro. */
-export function ResultadoTag({ r }: { r: ResultadoPrecio }) {
-  const fuera = r === "POR_ENCIMA_DEL_RANGO" || r === "POR_DEBAJO_DEL_RANGO";
-  const Icono = r === "DENTRO_DEL_RANGO" ? CheckCircleOutlined : fuera ? WarningOutlined : QuestionCircleOutlined;
-  const color = r === "DENTRO_DEL_RANGO" ? "success" : fuera ? "error" : "warning";
-  return <Tag color={color} icon={<Icono />} style={{ whiteSpace: "normal", fontSize: 14, padding: "3px 10px" }}>{RESULTADO_ETQ[r]}</Tag>;
+export function ResultadoTag({ r, presentacion }: { r: ResultadoPrecio; presentacion?: PresentacionPrecios }) {
+  const etiqueta = presentacion?.etiqueta ?? RESULTADO_ETQ[r];
+  const tono = presentacion?.tono ?? (r === "DENTRO_DEL_RANGO" ? "FAVORABLE" : r === "POR_ENCIMA_DEL_RANGO" || r === "POR_DEBAJO_DEL_RANGO" || r === "ALCANCE_NO_EQUIVALENTE" ? "ATENCION" : "INFORMATIVO");
+  const detalle = presentacion?.detalle ? <div className="texto-secundario" style={{ fontSize: 13, marginTop: 4, maxWidth: 560 }}>{presentacion.detalle}</div> : null;
+  // Un trámite pendiente es informativo (colores suaves, icono informativo); la advertencia se reserva para lo que requiere atención.
+  if (tono === "INFORMATIVO") return <div><EtiquetaInformativa>{etiqueta}</EtiquetaInformativa>{detalle}</div>;
+  const Icono = tono === "FAVORABLE" ? CheckCircleOutlined : WarningOutlined;
+  return <div><Tag color={tono === "FAVORABLE" ? "success" : "warning"} icon={<Icono />} style={{ whiteSpace: "normal", fontSize: 14, padding: "3px 10px" }}>{etiqueta}</Tag>{detalle}</div>;
 }
 
 const pct = (n: number | null) => (n === null ? "—" : `${n > 0 ? "+" : ""}${n.toLocaleString("es-CO")} %`);
@@ -37,7 +41,7 @@ export function AnalisisPreciosExpediente({ d }: { d: DetalleExpediente }) {
     <div style={{ display: "grid", gap: 28 }}>
       <PreciosPorActividad d={d} />
       <section>
-        <ResultadoTag r={a.resultado} />
+        <ResultadoTag r={a.resultado} presentacion={a.presentacion} />
         <p className="largo" style={{ margin: "10px 0 4px", maxWidth: 900 }}>{a.resumen}</p>
         <p className="texto-secundario" style={{ fontSize: 13.5, margin: 0 }}><InfoCircleOutlined /> Solo se afirma lo que los documentos permiten comprobar. No se aplican umbrales porcentuales para declarar sobrecostos.</p>
       </section>
@@ -59,7 +63,7 @@ export function AnalisisPreciosExpediente({ d }: { d: DetalleExpediente }) {
           </>
         ) : (
           <p style={{ border: `1px dashed ${PALETA.borde}`, borderRadius: 8, padding: 14, margin: 0, background: "#fff" }}>
-            <strong style={{ color: PALETA.ambar }}>{PENDIENTE}.</strong> No hay contrato, acto de adjudicación ni acta que acredite el valor contratado. Un análisis del sector o una cotización no lo reemplazan.
+            <strong>{a.presentacion?.etiqueta ?? "Documentación contractual por incorporar"}.</strong> Aún no se cuenta con contrato, acto de adjudicación o acta que acredite el valor contratado. Un análisis del sector o una cotización no lo reemplazan.
           </p>
         )}
       </section>
@@ -83,7 +87,7 @@ export function AnalisisPreciosExpediente({ d }: { d: DetalleExpediente }) {
                   {r.motivo && <div className="texto-secundario" style={{ fontSize: 13 }}>{r.motivo}</div>}
                 </div>) },
               { title: "Valor", key: "v", align: "right", render: (_, r) => <span className="cifra">{r.valor !== null ? cop(r.valor) : PENDIENTE}</span> },
-              { title: "Diferencia (COP)", key: "d", align: "right", render: (_, r) => <span className="cifra">{r.comparable ? copDif(r.diferencia_cop) : <span className="texto-secundario" style={{ fontSize: 13 }}>{contratadoBase === null ? "Pendiente de soporte contractual" : "—"}</span>}</span> },
+              { title: "Diferencia (COP)", key: "d", align: "right", render: (_, r) => <span className="cifra">{r.comparable ? copDif(r.diferencia_cop) : <span className="texto-secundario" style={{ fontSize: 13 }}>{contratadoBase === null ? "Documentación contractual por incorporar" : "—"}</span>}</span> },
               { title: "Diferencia (%)", key: "p", align: "right", render: (_, r) => <span className="cifra">{r.comparable ? pct(r.diferencia_pct) : "—"}</span> },
               { title: "Base de comparación", key: "b", render: (_, r) => (r.comparable && r.base !== null && contratadoBase !== null ? <span className="cifra">{cop(r.base)}</span> : <span className="texto-secundario">No comparable</span>) },
               { title: "Soporte", key: "s", render: (_, r) => <SoporteLink soporte={r.soporte} corto /> },

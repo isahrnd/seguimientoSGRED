@@ -194,7 +194,7 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
       <LecturaAsistida lectura={d.lectura_asistida} />
 
       <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-        <div><ResultadoTag r={d.analisis_precios.resultado} /></div>
+        <div><ResultadoTag r={d.analisis_precios.resultado} presentacion={d.analisis_precios.presentacion} /></div>
         {documentosParaAvanzar(d).length > 0 && (
           <Alert type="info" showIcon message="Documento que permite avanzar"
             description={<ul style={{ margin: 0, paddingLeft: 18 }}>{documentosParaAvanzar(d).map((x) => <li key={x}>{x}</li>)}</ul>} />

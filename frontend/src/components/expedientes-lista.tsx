@@ -130,7 +130,7 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
             options={[
               { label: "Todos", value: "todos" },
               { label: "Con contrato respaldado", value: "contrato" },
-              { label: "Esperan documento contractual", value: "espera" },
+              { label: "Documentación contractual por incorporar", value: "espera" },
             ]}
           />
         ) : (

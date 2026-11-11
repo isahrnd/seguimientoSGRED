@@ -1,4 +1,5 @@
 "use client";
+import { EtiquetaInformativa } from "@/components/estado-informativo";
 import { Tag } from "antd";
 import { cop, ESTADO_VALOR_ETQ, PENDIENTE } from "@/lib/format";
 import type { DetalleExpediente, ImporteSignificado, ValorSignificado } from "@/types/contratacion";
@@ -19,7 +20,7 @@ const FALTA: Record<ValorSignificado["tipo"], string> = {
   PRESUPUESTO_OFICIAL: "Falta el documento que fija el presupuesto.",
   COTIZACION: "No hay cotización registrada.",
   OFERTA_SELECCIONADA: "Falta el soporte de la selección.",
-  VALOR_CONTRATADO: "Falta el contrato o acto de adjudicación.",
+  VALOR_CONTRATADO: "Contrato o acto de adjudicación por incorporar.",
   VALOR_EJECUTADO: "Faltan actas de ejecución.",
 };
 
@@ -75,7 +76,7 @@ export function SintesisEconomica({ d }: { d: DetalleExpediente }) {
                 {v.tipo === "VALOR_CONTRATADO" && d.contratacion.contratos.slice(0, 3).map((c) => <FirmaContrato key={c.id} c={c} detalle={false} />)}
                 {v.importes.length > 3 && <div className="texto-secundario" style={{ fontSize: 13, marginTop: 8 }}>y {v.importes.length - 3} más en el detalle</div>}
                 {v.tipo === "VALOR_EJECUTADO" && new Set(v.importes.map((i) => i.importe)).size > 1 && <div style={{ fontSize: 13, color: PALETA.ambar, fontWeight: 600, marginTop: 8 }}>Importes distintos, sin conciliar: no se suman</div>}
-                {v.estado !== "SOPORTADO" && <Tag color="warning" style={{ marginTop: 8 }}>{ESTADO_VALOR_ETQ[v.estado]}</Tag>}
+                {v.estado !== "SOPORTADO" && <div style={{ marginTop: 8 }}><EtiquetaInformativa>{ESTADO_VALOR_ETQ[v.estado]}</EtiquetaInformativa></div>}
               </>
             )}
           </div>
