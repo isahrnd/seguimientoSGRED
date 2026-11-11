@@ -27,3 +27,41 @@ export function discrepanciasDireccion(registrada: string | null | undefined, no
   }
   return [...dif];
 }
+
+export interface DiscrepanciaDireccion {
+  documento: string;
+  /** Dirección leída en el contenido del documento (página original). */
+  en_pagina?: { texto: string; pagina: number | null };
+  /** Dirección escrita en el nombre del archivo. */
+  en_nombre?: string;
+}
+
+/**
+ * Direcciones que difieren de la registrada (misma vía, distinta placa), distinguiendo de dónde sale cada una: la que consta en la página del
+ * documento y la que solo está escrita en el nombre del archivo. Un nombre de archivo no es evidencia de la dirección del documento.
+ */
+export function discrepanciasDireccionDocumentos(
+  registrada: string | null | undefined,
+  nombres: string[],
+  lectura: Array<{ documento: string; campos: Array<{ campo: string; valor: string | number; pagina: number | null }> }> = [],
+): DiscrepanciaDireccion[] {
+  const base = extraerDirecciones(registrada);
+  if (base.length === 0) return [];
+  const claves = new Set(base.map((b) => b.clave));
+  const vias = new Set(base.map((b) => b.clave.split("#")[0]));
+  const distinta = (d: DireccionNorm) => !claves.has(d.clave) && vias.has(d.clave.split("#")[0]);
+  const porDoc = new Map<string, DiscrepanciaDireccion>();
+  const fila = (documento: string) => { if (!porDoc.has(documento)) porDoc.set(documento, { documento }); return porDoc.get(documento)!; };
+  for (const nombre of nombres) {
+    const d = extraerDirecciones(nombre).find(distinta);
+    if (d) fila(nombre).en_nombre = d.texto;
+  }
+  for (const l of lectura) {
+    for (const c of l.campos) {
+      if (c.campo !== "direccion") continue;
+      const d = extraerDirecciones(String(c.valor)).find(distinta);
+      if (d) fila(l.documento).en_pagina = { texto: d.texto, pagina: c.pagina };
+    }
+  }
+  return [...porDoc.values()];
+}

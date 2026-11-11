@@ -11,6 +11,13 @@ const ORIGEN: Record<string, string> = { ASISTIDA: "Lectura asistida del PDF", N
 const NIVEL: Record<string, string> = { PARTIDA: "Partida", SUBTOTAL: "Subtotal", TOTAL: "Total", IMPUESTO_O_AIU: "AIU / impuesto", COMPONENTE_SIN_VALOR: "Componente sin valor" };
 const fuente = (p: { fuente?: string | null; pagina?: number | null }) => p.fuente ?? (p.pagina ? `p. ${p.pagina}` : "—");
 
+/** Contenido adicional (otra hoja del archivo, relación sin confirmar): plegado por defecto pero consultable. */
+function Envoltura({ adicional, documento, children }: { adicional: boolean; documento: string; children: React.ReactNode }) {
+  return adicional
+    ? <details style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid #E6EAF0" }}><summary style={{ cursor: "pointer", fontWeight: 600 }}>Contenido adicional pendiente de revisión — {documento}</summary>{children}</details>
+    : <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid #E6EAF0" }}><div style={{ fontWeight: 600 }}>{documento}</div>{children}</div>;
+}
+
 /**
  * Datos extraídos de los documentos, cada uno con su fuente (página o celda). Son pendientes de verificación y no entran en los totales.
  * Se distingue «dato no encontrado por el extractor» de «soporte no disponible»; una oferta nunca se presenta como valor contratado.
@@ -22,16 +29,17 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
     <section aria-label="Datos extraídos pendientes de verificación" style={{ marginTop: 16, background: "#fff", border: "1px solid #D5DBE5", borderRadius: 8, padding: "16px 18px" }}>
       <h2 style={{ margin: 0, fontSize: 18 }}>Datos extraídos pendientes de verificación</h2>
       <p className="texto-secundario" style={{ margin: "4px 0 0", fontSize: 13.5 }}>Fuente: lectura de los documentos. No entran en los totales hasta que se verifiquen y una oferta no es un valor contratado.</p>
-      {l.map((x) => (
-        <div key={x.version_id} style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid #E6EAF0" }}>
-          <div style={{ fontWeight: 600 }}>{x.documento}</div>
+      {l.map((x, idx) => {
+        const adicional = !!x.excluida_de_indicadores;
+        return (
+        <Envoltura key={`${x.version_id}-${idx}`} adicional={adicional} documento={x.documento}>
           <div className="texto-secundario" style={{ fontSize: 12.5 }}>
             {ORIGEN[x.origen ?? "ASISTIDA"]}
             {x.trazabilidad?.reutilizado_de ? ` · resultado de ${x.trazabilidad.reutilizado_de}, reutilizado bajo ${x.trazabilidad.extractor_vigente}` : x.trazabilidad?.extractor ? ` · ${x.trazabilidad.extractor}` : ""}
           </div>
           {x.correspondencia_pendiente && (
             <p className="texto-secundario" style={{ margin: "4px 0 0", fontSize: 13 }}>
-              Hoja adicional del mismo archivo: su correspondencia con el edificio está pendiente de confirmar{x.correspondencia_pendiente.proyecto ? ` (proyecto citado: «${x.correspondencia_pendiente.proyecto.nombre}», celda ${x.correspondencia_pendiente.proyecto.celda})` : ""}. Señales para revisión: {x.correspondencia_pendiente.senales.join("; ")}. Sus datos se muestran aparte y no se mezclan con los de la hoja principal.
+              Excluido de los indicadores del edificio mientras no se confirme su relación. Hoja adicional del mismo archivo: su correspondencia con el edificio está pendiente de confirmar{x.correspondencia_pendiente.proyecto ? ` (proyecto citado: «${x.correspondencia_pendiente.proyecto.nombre}», celda ${x.correspondencia_pendiente.proyecto.celda})` : ""}. Señales para revisión: {x.correspondencia_pendiente.senales.join("; ")}. Sus datos se muestran aparte y no se mezclan con los de la hoja principal.
             </p>
           )}
           {x.campos.length > 0 && (
@@ -67,9 +75,16 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
                   ))}
                 </tbody>
               </table>
-              <p className="texto-secundario" style={{ margin: "6px 0 0", fontSize: 13 }}>
-                {(x.suma_solo_partidas ?? 0) > 0 ? <>Suma solo de partidas: <span className="cifra">{cop(x.suma_solo_partidas ?? 0)}</span>. </> : <>Se identificaron totales; desglose pendiente de verificación. </>}Los subtotales, totales e impuestos resumen a las partidas y no se suman a ellas.
-              </p>
+              {!adicional && (
+                <p className="texto-secundario" style={{ margin: "6px 0 0", fontSize: 13 }}>
+                  {(x.suma_solo_partidas ?? 0) > 0
+                    ? <>Suma solo de partidas: <span className="cifra">{cop(x.suma_solo_partidas ?? 0)}</span>. </>
+                    : x.partidas!.some((p) => p.nivel === "TOTAL" || p.nivel === "SUBTOTAL")
+                      ? <>Se identificaron totales; desglose pendiente de verificación. </>
+                      : <>Contenido adicional pendiente de revisión. </>}
+                  Los subtotales, totales e impuestos resumen a las partidas y no se suman a ellas.
+                </p>
+              )}
               {[...(x.controles_de_suma ?? []).filter((c) => c.estado !== "SIN_TOTAL_DECLARADO"), ...((x.controles_aritmeticos ?? []).map((c) => ({ grupo: c.control, suma_partidas: c.calculado, total_declarado: c.declarado, estado: c.estado, diferencia: c.diferencia })))].map((c, i) => (
                 <p key={i} className="texto-secundario" style={{ margin: "2px 0 0", fontSize: 13 }}>
                   {c.grupo}: calculado {cop(c.suma_partidas)} · declarado {cop(c.total_declarado as number)} — {c.estado === "CUADRA" ? "cuadra" : `no cuadra (diferencia ${cop(c.diferencia as number)})`}
@@ -77,7 +92,7 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
               ))}
             </div>
           )}
-          {(x.edificios_sin_vinculo ?? []).length > 0 && (
+          {!adicional && (x.edificios_sin_vinculo ?? []).length > 0 && (
             <p className="texto-secundario" style={{ margin: "6px 0 0", fontSize: 13 }}>
               La tabla cita {x.edificios_en_tabla} edificios y el documento tiene {x.edificios_vinculados_al_documento} vinculados. Sin vínculo confirmado: {x.edificios_sin_vinculo!.join("; ")}. Las relaciones siguen pendientes de revisión.
             </p>
@@ -87,8 +102,9 @@ export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined })
               Dato no encontrado por el extractor: {x.no_encontrados!.map((n) => `${ETQ[n.campo] ?? n.campo} (${n.motivo})`).join("; ")}. Esto no implica que el soporte no exista.
             </p>
           )}
-        </div>
-      ))}
+        </Envoltura>
+        );
+      })}
     </section>
   );
 }

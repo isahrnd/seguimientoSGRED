@@ -200,7 +200,8 @@ export interface LecturaAsistida {
   campos: { campo: string; valor: string | number; pagina: number | null; cita: string; fuente?: string | null }[];
   coincidencia_edificio?: CoincidenciaEdificioVista | null;
   partidas?: PartidaLeida[];
-  suma_solo_partidas?: number;
+  suma_solo_partidas?: number | null;
+  excluida_de_indicadores?: boolean;
   controles_de_suma?: { grupo: string; suma_partidas: number; total_declarado: number | null; estado: "CUADRA" | "NO_CUADRA" | "SIN_TOTAL_DECLARADO"; diferencia: number | null }[];
   controles_aritmeticos?: { control: string; calculado: number; declarado: number; estado: "CUADRA" | "NO_CUADRA"; diferencia: number }[];
   no_encontrados?: { campo: string; motivo: string }[];

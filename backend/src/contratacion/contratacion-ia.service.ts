@@ -8,6 +8,7 @@ import {
   CATEGORIA_POR_ETAPA, ESQUEMA_RESULTADO, EXTRACTOR_VERSION, depurarResultado, Extraccion, Fragmento, construirSolicitud, estimarTokens, huellaContenido, necesitaInterpretacion,
   seleccionarFragmentos, validarRespuesta,
 } from './contratacion-ia';
+import { fusionarPresupuestoNativo } from './contratacion-presupuesto-nativo';
 import { EjecutorOcr, MIN_TEXTO_NATIVO, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { normalizar } from './contratacion-sugerencias';
 import { extraerNativo } from './contratacion-nativo';
@@ -185,6 +186,27 @@ export class ContratacionIaService {
     return leidos;
   }
 
+  /**
+   * Completa, SIN llamar a la API, el desglose de lecturas ya aceptadas (OK) cuyo presupuesto se puede leer del texto nativo con controles aritméticos.
+   * No toca filas sin lectura previa ni cambia campos, descartes ni valores ya verificados.
+   */
+  async completarDesgloseNativo(lectura: LecturaPdf, versiones: number[]): Promise<Array<{ version_id: number; aplicado: boolean; motivo?: string; partidas?: number }>> {
+    const out: Array<{ version_id: number; aplicado: boolean; motivo?: string; partidas?: number }> = [];
+    for (const id of versiones) {
+      const fila = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: id, extractor: EXTRACTOR_VERSION } }, include: { version: { select: { md5: true } } } });
+      if (!fila || fila.estado !== 'OK' || !fila.resultado) { out.push({ version_id: id, aplicado: false, motivo: 'sin lectura aceptada (OK) del extractor vigente' }); continue; }
+      const nativas = (await lectura.paginas(fila.version.md5, MAX_PAGINAS_LECTURA)) ?? [];
+      const guardadas = await this.prisma.contratacionOcrPagina.findMany({ where: { version_id: id }, select: { pagina: true, texto: true } });
+      const porOcr = new Map(guardadas.map((g) => [g.pagina, g.texto]));
+      const paginas = nativas.map((texto, i) => ({ pagina: i + 1, texto: texto.trim().length < MIN_TEXTO_NATIVO && porOcr.has(i + 1) ? porOcr.get(i + 1)! : texto }));
+      const f = fusionarPresupuestoNativo(fila.resultado as any, paginas);
+      if (!f.aplicado) { out.push({ version_id: id, aplicado: false, motivo: f.motivo }); continue; }
+      await this.prisma.contratacionIaExtraccion.update({ where: { id: fila.id }, data: { resultado: f.resultado as any } });
+      out.push({ version_id: id, aplicado: true, partidas: (f.resultado as any).partidas.length });
+    }
+    return out;
+  }
+
   private async guardarFila(versionId: number, datos: Record<string, any>) {
     // Una lectura ya completada (OK) nunca se degrada a NATIVO o PENDIENTE_IA: otro proceso (la actualización automática del servidor) pudo listarla
     // como pendiente antes de que una ejecución manual la terminara.
@@ -327,7 +349,8 @@ export class ContratacionIaService {
       });
       const previo = await this.prisma.contratacionIaExtraccion.findUnique({ where: { version_id_extractor: { version_id: v.id, extractor: EXTRACTOR_VERSION } } });
       const valida = validarRespuesta(resp.entrada, fragmentos);
-      const resultado = { esquema: ESQUEMA_RESULTADO, trazabilidad: { extractor: EXTRACTOR_VERSION, modelo }, campos: valida.campos, areas: valida.areas, partidas: valida.partidas };
+      // El desglose de la tabla de presupuesto, cuando se puede asociar y cuadra aritméticamente, se toma del texto nativo (sin relajar la evidencia).
+      const resultado = fusionarPresupuestoNativo({ esquema: ESQUEMA_RESULTADO, trazabilidad: { extractor: EXTRACTOR_VERSION, modelo } as any, campos: valida.campos, areas: valida.areas, partidas: valida.partidas as any[] }, paginas).resultado;
       await this.aplicar(v, doc, resultado, edificiosDoc);
       await this.guardarFila(v.id, {
         estado: 'OK', huella, modelo, resultado: resultado as any, descartes: valida.descartes as any, error: null, proximo_intento: null,

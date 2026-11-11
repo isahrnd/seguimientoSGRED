@@ -11,7 +11,8 @@ import * as http from 'http';
 import * as crypto from 'crypto';
 import { NestFactory } from '@nestjs/core';
 import { MonitoreoContratacionModule } from '../src/contratacion/monitoreo-contratacion.module';
-import { ContratacionIndiceService } from '../src/contratacion/contratacion-indice.service';
+import { ContratacionIndiceService, paginasPdf } from '../src/contratacion/contratacion-indice.service';
+import { ContratacionDocumentosService } from '../src/contratacion/contratacion-documentos.service';
 import { tipoPorSegmento } from '../src/contratacion/contratacion-identificadores';
 import { compararEdificio } from '../src/contratacion/contratacion-edificios-match';
 import { edificacionDeCarpeta } from '../src/contratacion/contratacion-sugerencias';
@@ -87,6 +88,23 @@ async function main() {
         console.log(JSON.stringify({ version: f.version_id, documento: f.version.documento.nombre, estado: f.estado, error: f.error, tokens_entrada: f.tokens_entrada, tokens_salida: f.tokens_salida, descartes: f.descartes, ...(args.includes('--detalle') ? { resultado: f.resultado } : { campos: Object.keys((f.resultado as any)?.campos ?? {}) }) }));
       }
       console.log(JSON.stringify(await indice.ia.estado()));
+    } else if (cmd === 'desglose-nativo') {
+      // Completa, SIN llamar a la API, el desglose de lecturas ya aceptadas leyendo la tabla de presupuesto del texto nativo (solo si sus controles aritméticos cuadran).
+      const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      if (!lista.length) throw new Error('Indique --versiones=ID,ID,...');
+      const docs = app.get(ContratacionDocumentosService);
+      const ia = app.get(ContratacionIndiceService).ia;
+      const prisma = (app.get(ContratacionIndiceService) as any).prisma;
+      const lectura = {
+        paginas: async (md5: string, max: number) => {
+          const v = await prisma.contratacionDocumentoVersion.findFirst({ where: { md5 }, select: { id: true } });
+          if (!v) return null;
+          const { buf } = await docs.leerBytes(v.id, 15 * 1024 * 1024);
+          return paginasPdf(buf, max);
+        },
+        bytes: async () => null,
+      };
+      for (const r of await ia.completarDesgloseNativo(lectura as any, lista)) console.log(JSON.stringify(r));
     } else if (cmd === 'proponer-vinculos-carpeta') {
       // Un mismo archivo en varias carpetas de Drive (una por edificio): propone como SUGERIDA la edificación de cada carpeta aún sin vínculo.
       // Solo crea sugerencias (evidencia: la ruta de la carpeta). No confirma vínculos ni toca importes, contratos o expedientes.
@@ -130,7 +148,7 @@ async function main() {
       if (args.includes('--aplicar')) console.log(JSON.stringify(await svc.aplicar(payload, null), null, 2));
       else { const v = await svc.previsualizar(payload); console.log(JSON.stringify({ valida: v.valida, errores: v.errores, advertencias: v.advertencias, resumen: v.resumen }, null, 2)); }
     } else {
-      console.error('Comandos: reindexar | verificar-envio --versiones=ID,ID [--forzar] | proponer-vinculos-carpeta --documento=ID [--aplicar] | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
+      console.error('Comandos: reindexar | desglose-nativo --versiones=ID,ID | verificar-envio --versiones=ID,ID [--forzar] | proponer-vinculos-carpeta --documento=ID [--aplicar] | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
       process.exitCode = 1;
     }
   } finally {

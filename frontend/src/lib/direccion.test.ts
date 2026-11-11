@@ -12,3 +12,19 @@ describe("discrepancia documental de dirección", () => {
     expect(discrepanciasDireccion(null, ["Cra 10 #60-15.pdf"])).toEqual([]);
   });
 });
+
+import { discrepanciasDireccionDocumentos } from "./direccion";
+describe("discrepancia de dirección: página original frente a nombre de archivo", () => {
+  it("distingue la dirección leída en la página de la escrita en el nombre del archivo", () => {
+    const r = discrepanciasDireccionDocumentos(
+      "Carrera 10 # 5-20, comuna 1",
+      ["23 (Hotel Cra 10 #60-15).pdf"],
+      [{ documento: "23 (Hotel Cra 10 #60-15).pdf", campos: [{ campo: "direccion", valor: "Carrera 10 # 60-157", pagina: 2 }] }],
+    );
+    expect(r).toEqual([{ documento: "23 (Hotel Cra 10 #60-15).pdf", en_nombre: "Cra 10 #60-15", en_pagina: { texto: "Carrera 10 # 60-157", pagina: 2 } }]);
+  });
+  it("solo nombre de archivo, o solo página, se informan por separado; lo que coincide no se avisa", () => {
+    expect(discrepanciasDireccionDocumentos("Carrera 10 # 5-20", ["Cra 10 #60-15.pdf"], [])).toEqual([{ documento: "Cra 10 #60-15.pdf", en_nombre: "Cra 10 #60-15" }]);
+    expect(discrepanciasDireccionDocumentos("Carrera 10 # 5-20", ["a.pdf"], [{ documento: "a.pdf", campos: [{ campo: "direccion", valor: "Carrera 10#5 - 20", pagina: 1 }] }])).toEqual([]);
+  });
+});

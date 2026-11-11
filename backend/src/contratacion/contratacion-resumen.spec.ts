@@ -63,13 +63,33 @@ describe('exportación de la lectura de documentos', () => {
     const buf = await construirLibroResumen([], lectura);
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf as any);
     const ws = wb.getWorksheet('Lectura de documentos')!;
-    expect(ws.getRow(2).getCell(5).value).toBe('Partida');
-    expect(ws.getRow(3).getCell(5).value).toBe('Total');
-    expect(ws.getRow(2).getCell(8).value).toBe('p. 5');
+    const col = (n: string) => { let i = 0; ws.getRow(1).eachCell((c, k) => { if (c.value === n) i = k; }); return i; };
+    expect(ws.getRow(2).getCell(col('Nivel')).value).toBe('Partida');
+    expect(ws.getRow(3).getCell(col('Nivel')).value).toBe('Total');
+    expect(ws.getRow(2).getCell(col('Fuente')).value).toBe('p. 5');
+    expect(ws.getRow(2).getCell(col('Unidad')).value).toBe('GLOBAL');
     const control = ws.getRow(4);
-    expect(control.getCell(5).value).toBe('Control');
-    expect(control.getCell(6).value).toBe(100); // solo partidas: 100, no 200
+    expect(control.getCell(col('Nivel')).value).toBe('Control');
+    expect(control.getCell(col('Importe')).value).toBe(100); // solo partidas: 100, no 200
     const datos = wb.getWorksheet('Datos extraídos')!;
     expect(String(datos.getRow(3).getCell(6).value)).toMatch(/Dato no encontrado por el extractor/);
+  });
+
+  it('conserva cantidad, precio unitario, unidad y nivel; el contenido adicional queda rotulado y sin fila de suma', async () => {
+    const lectura = [
+      { documento: 'hoja.xlsx', version_id: 8, origen: 'HOJA_DE_CALCULO', campos: [], no_encontrados: [], partidas: [{ nivel: 'PARTIDA', alcance: 'Excavación', cantidad: 12, precio_unitario: 50, importe: 600, unidad: 'M3', fuente: 'Hoja RESUMEN, celda H30', coincidencia: null }], suma_solo_partidas: 600, controles_de_suma: [], controles_aritmeticos: [] },
+      { documento: 'hoja.xlsx — hoja RESUMEN (2)', version_id: 8, origen: 'HOJA_DE_CALCULO', excluida_de_indicadores: true, campos: [], no_encontrados: [], partidas: [{ nivel: 'PARTIDA', alcance: 'Otra', cantidad: 2, precio_unitario: 5, importe: 10, unidad: 'UND', fuente: 'Hoja RESUMEN (2), celda H9', coincidencia: null }], suma_solo_partidas: null, controles_de_suma: [], controles_aritmeticos: [] },
+    ];
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load((await construirLibroResumen([], lectura)) as any);
+    const ws = wb.getWorksheet('Lectura de documentos')!;
+    const col = (n: string) => { let i = 0; ws.getRow(1).eachCell((c, k) => { if (c.value === n) i = k; }); return i; };
+    expect(ws.getRow(2).getCell(col('Cantidad')).value).toBe(12);
+    expect(ws.getRow(2).getCell(col('Precio unitario')).value).toBe(50);
+    expect(ws.getRow(2).getCell(col('Unidad')).value).toBe('M3');
+    expect(ws.getRow(2).getCell(col('Importe')).value).toBe(600);
+    expect(ws.getRow(4).getCell(col('Estado de revisión')).value).toMatch(/Contenido adicional pendiente de revisión/);
+    // La fila de suma (control) es solo de la hoja principal: tras la principal y la adicional hay 1 fila de control, no 2.
+    const controles: string[] = []; ws.eachRow((r) => { if (r.getCell(col('Nivel')).value === 'Control') controles.push(String(r.getCell(1).value)); });
+    expect(controles).toEqual(['hoja.xlsx (v8)']);
   });
 });

@@ -12,7 +12,7 @@ import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "@/components/soporte-link";
 import { LecturaAsistida } from "@/components/lectura-asistida";
 import { agruparCotizaciones } from "@/lib/oferta";
-import { discrepanciasDireccion } from "@/lib/direccion";
+import { discrepanciasDireccionDocumentos } from "@/lib/direccion";
 
 const Caja = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
   <section style={{ background: "#fff", border: `1px solid ${PALETA.borde}`, borderRadius: 8, padding: 18 }}>
@@ -28,7 +28,7 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
   if (q.isLoading) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (q.isError || !q.data) return <ErrorCarga texto="No fue posible cargar la edificación." onReintentar={() => q.refetch()} />;
   const d = q.data;
-  const discrepancias = discrepanciasDireccion(d.edificio.direccion, [...d.visitas_y_soportes_tecnicos, ...d.grupos.flatMap((g) => g.documentos)].map((x) => x.nombre));
+  const discrepancias = discrepanciasDireccionDocumentos(d.edificio.direccion, [...d.visitas_y_soportes_tecnicos, ...d.grupos.flatMap((g) => g.documentos)].map((x) => x.nombre), d.lectura_asistida ?? []);
   const resto = d.grupos.filter((g) => g.codigo !== "VISITA_SOPORTE_TECNICO");
 
   return (
@@ -43,7 +43,19 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
 
       {discrepancias.length > 0 && (
         <Alert type="warning" showIcon message="Discrepancia documental de dirección por aclarar"
-          description={<>La dirección registrada es <strong>{d.edificio.direccion}</strong>, pero estos documentos mencionan otra: {discrepancias.join("; ")}. No se ha determinado cuál es la correcta.</>} />
+          description={<>
+            La dirección registrada es <strong>{d.edificio.direccion}</strong>. En estos documentos consta otra:
+            <ul style={{ margin: "4px 0", paddingLeft: 18 }}>
+              {discrepancias.map((x) => (
+                <li key={x.documento}>
+                  <em>{x.documento}</em>
+                  {x.en_pagina && <> · en la página original{x.en_pagina.pagina ? ` (p. ${x.en_pagina.pagina})` : ""}: <strong>«{x.en_pagina.texto}»</strong></>}
+                  {x.en_nombre && <> · escrita en el nombre del archivo: <strong>«{x.en_nombre}»</strong></>}
+                </li>
+              ))}
+            </ul>
+            El nombre de un archivo no es evidencia de la dirección del documento. No se ha determinado cuál es la correcta.
+          </>} />
       )}
 
       {d.sin_proceso_confirmado && (
