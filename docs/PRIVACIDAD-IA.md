@@ -27,7 +27,7 @@ Se distinguen dos tipos de dato: **identificaciones** (números de documento de 
 | 5 (04:07) | informe ATC-20 | no (suprimida) | **sí: nombre del inspector** |
 | 6 (04:07) | contrato de servicios | no (suprimida) | **sí: contratista y firmantes** |
 | 7 y 8 (04:32 y 04:34) | cotización | no | sí |
-| 9 (05:35) | análisis del sector (86 págs.) | no (verificación local posterior pendiente de resultado) | no verificado: el texto no se comprobó antes de enviar |
+| 9 (05:35) | análisis del sector (86 págs.) | no verificado (el texto no se comprobó antes de enviar) | no verificado (el texto no se comprobó antes de enviar) |
 | 10 (05:35) | resolución de demolición | no | **sí: nombre de un ingeniero y su matrícula profesional** (no cubiertos por el filtro de entonces) |
 | 11 (05:35) | cotización de 16 páginas | no | no se detectaron en la comprobación posterior |
 
