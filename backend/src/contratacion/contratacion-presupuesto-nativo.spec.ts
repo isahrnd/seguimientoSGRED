@@ -130,3 +130,16 @@ describe('cierre por OCR con marcas de tabla y porcentaje redondeado', () => {
     expect(extraerCierreOcr(OCR2.replace('2.583.162.000,00', '2.583.999.000,00'), 8).ok).toBe(false);
   });
 });
+
+describe('importe «del texto» tras añadir centavos', () => {
+  it('sin un total previo no se afirma que el texto lo exprese sin centavos, ni al repetir; una lectura mal marcada se corrige', () => {
+    const cierre = extraerCierreOcr(OCR2, 8);
+    if (cierre.ok === false) throw new Error('cierre');
+    const una: any = fusionarCierreOcr({ partidas: [], no_encontrados: [] }, cierre, 8);
+    const dos: any = fusionarCierreOcr(una, cierre, 8);
+    expect(dos.partidas.filter((p: any) => p.nivel === 'TOTAL')).toHaveLength(1);
+    expect(dos.partidas.some((p: any) => p.importe_en_el_texto !== undefined)).toBe(false);
+    const mal = { ...dos, partidas: dos.partidas.map((p: any) => (p.nivel === 'TOTAL' ? { ...p, importe_en_el_texto: p.importe } : p)) };
+    expect(fusionarCierreOcr(mal, cierre, 8).partidas.some((p: any) => p.importe_en_el_texto !== undefined)).toBe(false);
+  });
+});

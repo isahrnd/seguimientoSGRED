@@ -200,7 +200,12 @@ export function fusionarCierreOcr<T extends { partidas?: any[]; trazabilidad?: a
   const nuevo = cierre.partidas.find((p) => p.nivel === 'TOTAL')!;
   const i = partidas.findIndex((p) => p.pagina === pagina && p.nivel === 'TOTAL' && Math.abs(p.importe - nuevo.importe) < 1);
   const resto = cierre.partidas.filter((p) => p !== nuevo || i < 0).filter((p) => !partidas.some((q) => q.pagina === pagina && q.origen === 'OCR_LOCAL' && q.alcance === p.alcance));
-  if (i >= 0) partidas[i] = { ...partidas[i], importe: nuevo.importe, importe_en_el_texto: partidas[i].importe_en_el_texto ?? partidas[i].importe, origen: 'OCR_LOCAL', cita: String(partidas[i].cita).includes('centavos según OCR') ? partidas[i].cita : `${partidas[i].cita} · centavos según OCR local p. ${pagina}: ${nuevo.cita}`.slice(0, 240) };
+  if (i >= 0) {
+    // El importe «del texto» es el que había antes de añadir los centavos; nunca el propio valor con centavos ni uno ya leído por OCR.
+    const previoTexto = partidas[i].importe_en_el_texto ?? (partidas[i].origen === 'OCR_LOCAL' ? undefined : partidas[i].importe);
+    const { importe_en_el_texto: _descartado, ...base } = partidas[i];
+    partidas[i] = { ...base, ...(previoTexto !== undefined && previoTexto !== nuevo.importe ? { importe_en_el_texto: previoTexto } : {}), importe: nuevo.importe, origen: 'OCR_LOCAL', cita: String(partidas[i].cita).includes('centavos según OCR') ? partidas[i].cita : `${partidas[i].cita} · centavos según OCR local p. ${pagina}: ${nuevo.cita}`.slice(0, 240) };
+  }
   const motivo = 'los ítems por edificio de la tabla (imagen) no se leen con el OCR local; el desglose por ítem sigue pendiente (valores verificados en imagen: ver cotizaciones del edificio)';
   const no = (resultado.no_encontrados ?? []).filter((n: any) => n.campo !== 'desglose');
   return {
