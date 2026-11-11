@@ -118,7 +118,7 @@ if (!clave) { console.log('El servicio api no ve la clave (revise el Compose y e
 fetch('https://api.anthropic.com/v1/messages', {
   method: 'POST',
   headers: { 'content-type': 'application/json', 'x-api-key': clave, 'anthropic-version': '2023-06-01' },
-  body: JSON.stringify({ model: modelo, max_tokens: 8, messages: [{ role: 'user', content: 'Responde solo: ok' }] }),
+  body: JSON.stringify({ model: modelo, max_tokens: 16, thinking: { type: 'between_tools' }, messages: [{ role: 'user', content: 'Responde solo: ok' }] }),
 }).then(async (r) => {
   const j = await r.json().catch(() => ({}));
   console.log('Modelo configurado:', modelo);
@@ -126,4 +126,17 @@ fetch('https://api.anthropic.com/v1/messages', {
   process.exit(r.ok ? 0 : 42);
 }).catch(() => { console.log('Sin conexion con api.anthropic.com desde el servidor.'); process.exit(43); });
 '@ "$compose exec -T api node -"
-Write-Host "Listo: la clave está cargada y el modelo respondió. La clasificación asistida solo se usa para lo que la lectura nativa no resuelve."
+# 5b) Prueba de la solicitud ESTRUCTURADA real (herramienta + validación contra el texto) con un texto ficticio de una línea.
+Write-Host "5b) Probando la solicitud estructurada con un texto ficticio..."
+Invoke-Remoto "solicitud estructurada" @'
+const { ClienteClaudeHttp } = require('/app/dist/src/contratacion/contratacion-claude.client');
+const { claudeModelo } = require('/app/dist/src/contratacion/contratacion.config');
+const ia = require('/app/dist/src/contratacion/contratacion-ia');
+const frag = [{ pagina: 1, texto: 'CONTRATO No 9999.001.26.1.900-2026. Contratista: EMPRESA FICTICIA S.A.S. El valor del contrato es $1.000.000,00.' }];
+new ClienteClaudeHttp().extraer(claudeModelo(), ia.construirSolicitud(frag, 500)).then((r) => {
+  const v = ia.validarRespuesta(r.entrada, frag);
+  console.log('HTTP', r.http, '| tokens entrada/salida:', r.tokens_entrada + '/' + r.tokens_salida, '| campos validados:', Object.keys(v.campos).join(',') || 'ninguno', '| descartes:', v.descartes.length);
+  process.exit(Object.keys(v.campos).length > 0 ? 0 : 52);
+}).catch((e) => { console.log('Error de la solicitud estructurada:', e && e.codigo ? e.codigo : 'desconocido', e && e.http ? 'HTTP ' + e.http : ''); process.exit(51); });
+'@ "$compose exec -T api node -"
+Write-Host "Listo: la clave está cargada y la solicitud estructurada funcionó. El procesamiento AUTOMÁTICO con IA sigue PAUSADO (SEGUIMIENTO_CLAUDE_AUTOMATICO=false): el piloto se ejecuta aparte."
