@@ -79,7 +79,7 @@ d('ingesta de contratos en PDF (BD)', () => {
   it('una segunda lectura no duplica contratos ni expedientes', async () => {
     await expediente('4163.001.32.1.900-2026', 'Alquiler de grúas para izaje de estructuras colapsadas', 'ACME GRUAS S.A.S.');
     await documento('c.pdf', [pagina1('4163.001.26.1.900 - 2026', 'R/L. ACME GRUAS SAS NIT 9', 'CONTRATAR ALQUILER DE GRÚAS PARA IZAJE DE ESTRUCTURAS COLAPSADAS', '($100.000.000)'), clausula('($100.000.000)'), firmas]);
-    await documento('d.pdf', [pagina1('4163.001.26.1.911 - 2026', 'R/L. BETA INGENIEROS SAS NIT 9', 'CONTRATAR MAQUINARIA PESADA Y APOYO DE OXICORTE', '($555.555.555,50)'), clausula('($555.555.555,50)'), firmas]);
+    await documento('d.pdf', [pagina1('4163.001.26.1.901 - 2026', 'R/L. BETA INGENIEROS SAS NIT 9', 'CONTRATAR MAQUINARIA PESADA Y APOYO DE OXICORTE', '($555.555.555,50)'), clausula('($555.555.555,50)'), firmas]);
     await svc.procesar(leer);
     const antes = await conteos();
     const r2 = await svc.procesar(leer);
@@ -89,12 +89,12 @@ d('ingesta de contratos en PDF (BD)', () => {
 
   it('sin indicios crea una ficha por número de contrato con el proceso pendiente de verificar', async () => {
     await expediente('4163.001.32.1.900-2026', 'Alquiler de grúas', 'ACME GRUAS S.A.S.');
-    await documento('CONTRATO.pdf', [pagina1('4163.001.26.1.911 - 2026', 'MATEO , C.C.# 1 R/L. BETA INGENIEROS SAS NIT 9', 'CONTRATAR EL SERVICIO DE MAQUINARIA PESADA Y APOYO DE OXICORTE', 'SETECIENTOS ($ 555.555.555,50)'), clausula('($ 555.555.555,50)'), firmas]);
+    await documento('CONTRATO.pdf', [pagina1('4163.001.26.1.901 - 2026', 'MATEO , C.C.# 1 R/L. BETA INGENIEROS SAS NIT 9', 'CONTRATAR EL SERVICIO DE MAQUINARIA PESADA Y APOYO DE OXICORTE', 'SETECIENTOS ($ 555.555.555,50)'), clausula('($ 555.555.555,50)'), firmas]);
     const r = await svc.procesar(leer);
     expect(r.fichas).toBe(1);
     const ficha = await prisma.contratacionExpediente.findFirstOrThrow({ where: { proceso_verificado: false } });
-    expect(ficha.numero_contrato).toBe('4163.001.26.1.911-2026');
-    expect(ficha.proceso).toBe('CONTRATO-4163.001.26.1.911-2026');
+    expect(ficha.numero_contrato).toBe('4163.001.26.1.901-2026');
+    expect(ficha.proceso).toBe('CONTRATO-4163.001.26.1.901-2026');
     expect(Number((await prisma.contratacionContrato.findFirstOrThrow({ where: { expediente_id: ficha.id } })).valor)).toBe(555555555.5);
   });
 

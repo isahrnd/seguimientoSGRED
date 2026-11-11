@@ -51,3 +51,6 @@ Thumbs.db
 *.tsbuildinfo
 test-results/
 playwright-report/
+
+# Lista local (NO se versiona) de valores reales que no deben aparecer en el repositorio
+scripts/.valores-privados.local

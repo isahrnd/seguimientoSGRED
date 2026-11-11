@@ -258,7 +258,7 @@ export class ContratacionImportacionService {
         if (c.tipo === 'EXPEDIENTE' && !exp) throw new BadRequestException(`El expediente ${c.valor} no existe; cárguelo antes de confirmar documentos`);
         cambios.push({ proceso: c.tipo === 'EXPEDIENTE' ? c.valor : '-', entidad: 'documento', clave, accion: yaConfirmado ? 'SIN_CAMBIOS' : previas.length ? 'ACTUALIZAR' : 'CREAR' });
         if (!escribir || yaConfirmado) continue;
-        // `evidencia`: aclaración aportada por el equipo (p. ej. «la oferta empresa uno de esta carpeta corresponde al Edificio Ejemplo»).
+        // `evidencia`: aclaración aportada por el equipo (p. ej. «la oferta EMPRESA UNO de esta carpeta corresponde al Edificio Ejemplo»).
         const origen = c.evidencia ? { fuente_tipo: 'ACLARACION', fuente_detalle: String(c.evidencia).trim() } : { fuente_tipo: 'REVISION_PRIVADA', fuente_detalle: 'Confirmado en la importación privada' };
         if (previas.length) await db.contratacionDocSugerencia.updateMany({ where: { documento_id: docId, tipo: c.tipo, valor: c.valor }, data: { estado: 'CONFIRMADA', confirmada_en: new Date(), ...(c.evidencia ? origen : {}) } });
         else await db.contratacionDocSugerencia.create({ data: { documento_id: docId, tipo: c.tipo, valor: c.valor, ...origen, estado: 'CONFIRMADA', confirmada_en: new Date() } });

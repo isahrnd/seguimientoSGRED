@@ -18,10 +18,10 @@ const url = 'https://community.secop.gov.co/contrato/view?id=1';
 const compras = hoja('COMPRAS', [
   ENC,
   [c(1), c('9999.001.32.1.515-2026'), c('Contratación directa - Convenio de asociación'), c('9999.001.27.1.5-2026'), c('Aunar esfuerzos para soporte logístico'), c(1000), c('Ejecución'), c('Fundación X'), c('x')],
-  [c(2), c('9999.001.32.1.630-2026'), c('Contratación directa - Contrato de obra'), c('9999.001.26.1.630- 2026'), c('Ejecutar actividades de repique, demolición y gestión integral del RCD'), c(123456789.12), c('Ejecución'), c('EMPRESA UNO S.A.S.'), c('Contrato', url)],
-  [c(3), c('9999.001.32.1.819 -2026'), c('Contratación directa - Alquiler maquinaria amarilla'), c('9999.001.26.1.819-2026'), c('Alquiler y operación de maquinaria'), c('$ 555.555.555,50'), c('Ejecución'), c('O2 S.A.S.'), c('Contrato', 'http://otro.com/x')],
+  [c(2), c('9999.001.32.1.905-2026'), c('Contratación directa - Contrato de obra'), c('9999.001.26.1.905- 2026'), c('Ejecutar actividades de repique, demolición y gestión integral del RCD'), c(123456789.12), c('Ejecución'), c('EMPRESA UNO S.A.S.'), c('Contrato', url)],
+  [c(3), c('9999.001.32.1.901 -2026'), c('Contratación directa - Alquiler maquinaria amarilla'), c('9999.001.26.1.901-2026'), c('Alquiler y operación de maquinaria'), c('$ 555.555.555,50'), c('Ejecución'), c('O2 S.A.S.'), c('Contrato', 'http://otro.com/x')],
 ]);
-const adicion = hoja('ADICION', [ENC, [c(1), c('9999.001.32.1.630-2026'), c('Adición'), c('9999.001.26.1.630-2026'), c('Adición al contrato'), c(1500000.5), c('Ejecución'), c('EMPRESA UNO S.A.S.'), c('Contrato', url)]]);
+const adicion = hoja('ADICION', [ENC, [c(1), c('9999.001.32.1.905-2026'), c('Adición'), c('9999.001.26.1.905-2026'), c('Adición al contrato'), c(1500000.5), c('Ejecución'), c('EMPRESA UNO S.A.S.'), c('Contrato', url)]]);
 
 describe('lectura de la matriz de contratación', () => {
   const { filas, hojasLeidas } = leerMatriz([compras, adicion, hoja('OTRA', [[c('nada')]])]);
@@ -32,8 +32,8 @@ describe('lectura de la matriz de contratación', () => {
   });
   it('conserva identificadores originales, celdas con su referencia y el valor con centavos', () => {
     const f = filas.find((x) => x.hoja === 'COMPRAS' && x.fila === 3)!;
-    expect(f.proceso_original).toBe('9999.001.32.1.630-2026');
-    expect(f.contrato_original).toBe('9999.001.26.1.630- 2026');
+    expect(f.proceso_original).toBe('9999.001.32.1.905-2026');
+    expect(f.contrato_original).toBe('9999.001.26.1.905- 2026');
     expect(f.valor).toBe(123456789.12);
     expect(f.celdas).toMatchObject({ proceso_original: 'B3', contrato_original: 'D3', valor: 'F3', link: 'I3' });
     expect(f.secop_url).toBe(url);
@@ -47,8 +47,8 @@ describe('lectura de la matriz de contratación', () => {
   it('proceso y contrato son identificadores distintos y se normalizan por separado', () => {
     const f = filas.find((x) => x.hoja === 'COMPRAS' && x.fila === 3)!;
     expect(f.proceso_norm).not.toBe(f.contrato_norm);
-    expect(f.contrato_norm).toBe('9999.001.26.1.630-2026'.toUpperCase());
-    expect(normalizarId('9999.001.32.1.819 –  2026')).toBe('9999.001.32.1.819-2026');
+    expect(f.contrato_norm).toBe('9999.001.26.1.905-2026'.toUpperCase());
+    expect(normalizarId('9999.001.32.1.901 –  2026')).toBe('9999.001.32.1.901-2026');
   });
 });
 
@@ -66,9 +66,9 @@ describe('alcance de cada fila', () => {
 
 describe('vínculo con el expediente', () => {
   const exps = [
-    { id: 1, proceso: '9999.001.32.1.630-2026', numero_contrato: null },
-    { id: 2, proceso: 'CONTRATO-9999.001.26.1.819-2026', numero_contrato: '9999.001.26.1.819-2026' },
-    { id: 3, proceso: '9999.001.32.1.629-2026', numero_contrato: '9999.001.26.1.629-2026' },
+    { id: 1, proceso: '9999.001.32.1.905-2026', numero_contrato: null },
+    { id: 2, proceso: 'CONTRATO-9999.001.26.1.901-2026', numero_contrato: '9999.001.26.1.901-2026' },
+    { id: 3, proceso: '9999.001.32.1.903-2026', numero_contrato: '9999.001.26.1.903-2026' },
   ];
   const { filas } = leerMatriz([compras, adicion]);
   it('vincula por proceso aunque el contrato venga con espacios', () => {
@@ -82,7 +82,7 @@ describe('vínculo con el expediente', () => {
   });
   it('no vincula convenios sin expediente ni ante coincidencias múltiples', () => {
     expect(vincularFila(filas.find((x) => x.fila === 2 && x.tipo_hoja === 'COMPRAS')!, exps)).toBeNull();
-    expect(vincularFila({ proceso_norm: normalizarId('9999.001.32.1.630-2026'), contrato_norm: null }, [exps[0], { ...exps[0], id: 9 }])).toBeNull();
+    expect(vincularFila({ proceso_norm: normalizarId('9999.001.32.1.905-2026'), contrato_norm: null }, [exps[0], { ...exps[0], id: 9 }])).toBeNull();
   });
 });
 
