@@ -380,6 +380,18 @@ d('Monitoreo de contratación (integración, datos ficticios)', () => {
       expect((await consulta.listar({})).totales.contratado).toBeNull();
     });
 
+    it('el mismo archivo en las carpetas de dos edificios sugiere ambos edificios, sin confirmar nada', async () => {
+      const b = pdf('cotizacion compartida por dos edificios');
+      subir('1. EDIF PRUEBA ALFA/COTIZACIONES/2. EMPRESA UNO.pdf', b);
+      subir('2. EDIF PRUEBA BETA/COTIZACIONES/1. EMPRESA UNO.pdf', b);
+      await indice.reindexar();
+      const doc = await prisma.contratacionDocumento.findFirstOrThrow({ include: { sugerencias: true, edificios: true } });
+      expect(doc.sugerencias.filter((s) => s.tipo === 'EDIFICACION' && s.fuente_tipo === 'CARPETA').map((s) => s.valor).sort()).toEqual(['EDIF PRUEBA ALFA', 'EDIF PRUEBA BETA']);
+      expect(doc.sugerencias.every((s) => s.estado === 'SUGERIDA')).toBe(true);
+      expect(doc.edificios).toHaveLength(0);
+      expect(await prisma.contratacionValor.count()).toBe(0);
+    });
+
     it('confirmar una asociación sobrevive a reindexar, no duplica y el documento sigue en Todos', async () => {
       fs.writeFileSync(path.join(dir, 'a.pdf'), analisis('base'));
       subir('1. EDIF PRUEBA ALFA/COTIZACIONES/2. EMPRESA UNO.pdf', pdf('cotizacion sin proceso otra'));

@@ -88,6 +88,17 @@ describe('depuración y selección de fragmentos', () => {
     expect(t).toContain('EMPRESA SAS');
     expect(t).toContain('050');
   });
+  it('suprime el nombre antes de «identificada con» y el del firmante junto a su cargo (nombres inventados)', () => {
+    const t = depurar('entre la Secretaría y MARIA LUISA GOMEZ DIAZ, identificada con C.C. No. 9.111.222.333 expedida en Cali. Nombre: MARIA LUISA GOMEZ DIAZ Cargo: Representante Legal Dirección: Carrera 1');
+    expect(t).not.toMatch(/MARIA|GOMEZ|9\.111/);
+    expect(t).toContain('Cargo: Representante Legal');
+    expect(t).toContain('Secretaría');
+  });
+  it('suprime el nombre tras un tratamiento («doctor …») y conserva el cargo (nombres inventados)', () => {
+    const t = depurar('Doctor PEDRO PABLO EJEMPLO PRUEBA alcalde de la ciudad. Respetado señor Mateo Ruiz Prueba, atentamente');
+    expect(t).not.toMatch(/PEDRO|EJEMPLO|Mateo|Ruiz/);
+    expect(t).toContain('alcalde de la ciudad');
+  });
   it('la cita que se guarda también va depurada', () => {
     const pag = [{ pagina: 1, texto: 'CONTRATISTA: JUANA PEREZ , C.C.# [documento de identidad] R/L. EMPRESA SAS' }];
     const r = validarRespuesta({ contratista: { valor: 'EMPRESA SAS', pagina: 1, cita: 'JUANA PEREZ , C.C.# 9.111.222.333 R/L. EMPRESA SAS' } }, pag);

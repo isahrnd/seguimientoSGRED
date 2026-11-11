@@ -449,7 +449,14 @@ export class ContratacionIndiceService {
           [v.documento.nombre, ruta ?? '', paginas.map((x) => x.texto).join(' ').slice(0, 6000), celdas.map((c) => c.texto).join(' ').slice(0, 6000), (hojas ?? []).map((h: any) => h.nombre).join(' ')].join(' '),
         );
         await p.contratacionDocIndice.upsert({ where: { version_id: v.id }, create: { version_id: v.id, texto, hojas }, update: { texto, hojas, extraido_en: new Date() } });
+        // Un mismo archivo puede estar en varias carpetas de Drive (una por edificio): cada carpeta aporta su propia sugerencia de edificación.
         const sugs = sugerir({ ruta, nombre: cand.nombre, paginas, celdas, edificacionesConocidas: conocidas });
+        for (const o of v.origenes) {
+          if (!o.ruta || o.ruta === ruta) continue;
+          for (const s of sugerir({ ruta: o.ruta, nombre: cand.nombre, edificacionesConocidas: conocidas })) {
+            if (s.tipo === 'EDIFICACION' && s.fuente_tipo === 'CARPETA' && !sugs.some((x) => x.tipo === s.tipo && x.valor === s.valor && x.fuente_detalle === s.fuente_detalle)) sugs.push(s);
+          }
+        }
         for (const s of sugs) {
           await p.contratacionDocSugerencia.upsert({
             where: { documento_id_tipo_valor_fuente_tipo_fuente_detalle: { documento_id: v.documento_id, tipo: s.tipo, valor: s.valor, fuente_tipo: s.fuente_tipo, fuente_detalle: s.fuente_detalle } },

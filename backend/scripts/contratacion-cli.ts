@@ -13,6 +13,8 @@ import { NestFactory } from '@nestjs/core';
 import { MonitoreoContratacionModule } from '../src/contratacion/monitoreo-contratacion.module';
 import { ContratacionIndiceService } from '../src/contratacion/contratacion-indice.service';
 import { tipoPorSegmento } from '../src/contratacion/contratacion-identificadores';
+import { compararEdificio } from '../src/contratacion/contratacion-edificios-match';
+import { edificacionDeCarpeta } from '../src/contratacion/contratacion-sugerencias';
 import { ContratacionImportacionService } from '../src/contratacion/contratacion-importacion.service';
 import { driveRootId, driveTokenFile, ENV_CONTRATACION } from '../src/contratacion/contratacion.config';
 
@@ -76,6 +78,30 @@ async function main() {
         console.log(JSON.stringify({ version: f.version_id, documento: f.version.documento.nombre, estado: f.estado, error: f.error, tokens_entrada: f.tokens_entrada, tokens_salida: f.tokens_salida, descartes: f.descartes, ...(args.includes('--detalle') ? { resultado: f.resultado } : { campos: Object.keys((f.resultado as any)?.campos ?? {}) }) }));
       }
       console.log(JSON.stringify(await indice.ia.estado()));
+    } else if (cmd === 'proponer-vinculos-carpeta') {
+      // Un mismo archivo en varias carpetas de Drive (una por edificio): propone como SUGERIDA la edificación de cada carpeta aún sin vínculo.
+      // Solo crea sugerencias (evidencia: la ruta de la carpeta). No confirma vínculos ni toca importes, contratos o expedientes.
+      const id = Number((args.find((a) => a.startsWith('--documento=')) ?? '').slice(12));
+      if (!Number.isInteger(id) || id <= 0) throw new Error('Indique --documento=ID');
+      const prisma = (app.get(ContratacionIndiceService) as any).prisma;
+      const doc = await prisma.contratacionDocumento.findUnique({ where: { id }, include: { edificios: true, versiones: { where: { vigente: true }, include: { origenes: { where: { estado: 'ACTIVO' } } } } } });
+      if (!doc) throw new Error('Documento inexistente');
+      const registrados = (await prisma.contratacionEdificio.findMany({ select: { id: true, nombre: true } })).map((e: any) => ({ ...e, vinculado: doc.edificios.some((x: any) => x.edificio_id === e.id) }));
+      const md5 = doc.versiones[0]?.md5 ?? null;
+      for (const o of doc.versiones.flatMap((v: any) => v.origenes)) {
+        const carpeta = edificacionDeCarpeta(o.ruta);
+        const cmp = carpeta ? compararEdificio(carpeta, registrados) : null;
+        const propuesta = cmp && cmp.estado === 'COINCIDE' && cmp.vinculado_al_documento === false ? cmp : null;
+        console.log(JSON.stringify({ origen: o.ruta, carpeta, edificio: cmp?.edificio ?? null, coincidencia: cmp?.estado ?? null, ya_vinculado: cmp?.vinculado_al_documento ?? null, propuesta: !!propuesta }));
+        if (propuesta && args.includes('--aplicar')) {
+          await prisma.contratacionDocSugerencia.upsert({
+            where: { documento_id_tipo_valor_fuente_tipo_fuente_detalle: { documento_id: id, tipo: 'EDIFICACION', valor: carpeta, fuente_tipo: 'CARPETA', fuente_detalle: carpeta } },
+            create: { documento_id: id, tipo: 'EDIFICACION', valor: carpeta, fuente_tipo: 'CARPETA', fuente_detalle: carpeta },
+            update: {},
+          });
+          console.log(JSON.stringify({ sugerencia_registrada: { documento: id, valor: carpeta, estado: 'SUGERIDA' }, para_confirmar: { version: 1, documentos: [{ documento: md5, confirmaciones: [{ tipo: 'EDIFICACION', valor: propuesta.edificio }] }] } }));
+        }
+      }
     } else if (cmd === 'corregir-identificadores') {
       // Documentos cuyo «proceso detectado» no es un número de proceso (p. ej. guarda un número de contrato). Por defecto solo informa;
       // con --aplicar vacía ÚNICAMENTE ese campo derivado. No toca expediente, estado de clasificación ni asociaciones.
@@ -95,7 +121,7 @@ async function main() {
       if (args.includes('--aplicar')) console.log(JSON.stringify(await svc.aplicar(payload, null), null, 2));
       else { const v = await svc.previsualizar(payload); console.log(JSON.stringify({ valida: v.valida, errores: v.errores, advertencias: v.advertencias, resumen: v.resumen }, null, 2)); }
     } else {
-      console.error('Comandos: reindexar | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
+      console.error('Comandos: reindexar | proponer-vinculos-carpeta --documento=ID [--aplicar] | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
       process.exitCode = 1;
     }
   } finally {
