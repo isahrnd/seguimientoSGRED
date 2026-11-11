@@ -3,6 +3,7 @@ import { PrismaService } from 'libs/core/services/prisma.service';
 import { CATEGORIAS } from './contratacion-clasificador';
 import { ETIQUETA_REQUISITO, RequisitoResolucion, requisitoResolucion } from './contratacion-comparacion';
 import { driveAbrirDirecto } from './contratacion.config';
+import { vistaLecturaAsistida } from './contratacion-lectura-vista';
 import { normalizar } from './contratacion-sugerencias';
 import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
 
@@ -160,6 +161,7 @@ export class ContratacionEdificiosService {
         valor_contratado: x.expediente.contratos.length ? x.expediente.contratos.reduce((s, c) => s + Number(c.valor), 0) : null,
         nota_valor: x.expediente.edificios.length > 1 ? 'El valor contratado es del proceso completo y no se divide entre edificios.' : null,
       })),
+      lectura_asistida: await vistaLecturaAsistida(this.prisma, { documento: { edificios: { some: { edificio_id: id } } } }),
       sin_proceso_confirmado: e.expedientes.length === 0,
       resolucion,
       grupos,

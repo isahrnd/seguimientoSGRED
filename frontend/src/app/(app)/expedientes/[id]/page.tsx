@@ -191,7 +191,7 @@ export default function DetalleExpedientePage({ params }: { params: Promise<{ id
 
       <div style={{ marginTop: 20 }}><SintesisEconomica d={d} /></div>
       <MatrizContrato d={d} />
-      <LecturaAsistida d={d} />
+      <LecturaAsistida lectura={d.lectura_asistida} />
 
       <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
         <div><ResultadoTag r={d.analisis_precios.resultado} /></div>

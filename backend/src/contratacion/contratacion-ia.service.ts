@@ -3,6 +3,7 @@ import { PrismaService } from 'libs/core/services/prisma.service';
 import { extraerAreasNativas, AreaNativa } from './contratacion-areas';
 import { ClienteClaude, ClienteClaudeHttp, ErrorClaude } from './contratacion-claude.client';
 import { extraerProceso } from './contratacion-clasificador';
+import { tipoPorSegmento } from './contratacion-identificadores';
 import {
   CATEGORIA_POR_ETAPA, EXTRACTOR_VERSION, Extraccion, Fragmento, construirSolicitud, estimarTokens, huellaContenido, necesitaInterpretacion,
   seleccionarFragmentos, validarRespuesta,
@@ -115,7 +116,7 @@ export class ContratacionIaService {
           indice: { isNot: null },
           documento: { categoria: { not: 'MATRIZ_CONTRATACION' } },
         },
-        include: { documento: { include: { edificios: true, sugerencias: { select: { tipo: true, estado: true } } } }, doc_contrato: { select: { estado: true } } },
+        include: { documento: { include: { edificios: true, sugerencias: { select: { tipo: true, estado: true } } } }, doc_contrato: { select: { estado: true, proceso_citado: true } } },
         orderBy: { id: 'asc' },
         take: 300,
       });
@@ -164,7 +165,8 @@ export class ContratacionIaService {
       const texto = ps.map((p) => p.texto).join(' ');
       return {
         textoUtil: ps.some((p) => p.texto.trim().length >= MIN_TEXTO_NATIVO),
-        procesoResuelto: !!(doc.proceso_detectado || doc.expediente_id || v.doc_contrato || extraerProceso(texto)),
+        // Un contrato solo deja resuelto el proceso si cita su número de proceso (.32.) o ya está asociado a un expediente; el número de contrato no basta.
+        procesoResuelto: !!(doc.expediente_id || (doc.proceso_detectado && tipoPorSegmento(doc.proceso_detectado) === 'PROCESO') || v.doc_contrato?.proceso_citado || extraerProceso(texto)),
         edificioResuelto: edificiosDoc.length > 0 || doc.sugerencias.some((s: any) => s.tipo === 'EDIFICACION' && s.estado !== 'DESCARTADA'),
       };
     };

@@ -171,11 +171,16 @@ export interface AreaPrecio {
   candidatas?: { valor: number; tipo: string; estado: string; cita: string; soporte: { version_id: number; documento: string | null; pagina: number } | null }[];
 }
 
+export interface CoincidenciaEdificioVista { estado: 'COINCIDE' | 'POSIBLE' | 'SIN_COINCIDENCIA'; edificio_id: number | null; edificio: string | null; vinculado_al_documento: boolean | null; similitud: number }
+
 export interface LecturaAsistida {
   version_id: number;
   documento: string;
   campos: { campo: string; valor: string | number; pagina: number; cita: string }[];
-  partidas?: { edificio: string | null; alcance: string; alcance_literal?: boolean; importe: number; unidad: string; pagina: number; cita: string; relacion: 'EXPLICITA' | 'PENDIENTE_REVISION' }[];
+  partidas?: { edificio: string | null; alcance: string; alcance_literal?: boolean; importe: number; unidad: string; pagina: number; cita: string; relacion: 'EXPLICITA' | 'PENDIENTE_REVISION'; coincidencia?: CoincidenciaEdificioVista | null }[];
+  edificios_en_tabla?: number;
+  edificios_vinculados_al_documento?: number;
+  edificios_sin_vinculo?: string[];
   descartados: number;
 }
 
@@ -389,6 +394,7 @@ export interface CotizacionEdificio {
 }
 
 export interface DetalleEdificio {
+  lectura_asistida?: LecturaAsistida[];
   cotizaciones: CotizacionEdificio[];
   edificio: { id: number; nombre: string; direccion: string | null };
   procesos: {

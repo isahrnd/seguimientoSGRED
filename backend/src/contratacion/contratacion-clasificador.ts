@@ -1,3 +1,4 @@
+import { procesoUnico } from './contratacion-identificadores';
 export type CategoriaDoc =
   | 'NECESIDAD_ALCANCE'
   | 'COTIZACIONES'
@@ -23,7 +24,6 @@ export const CATEGORIAS: Record<CategoriaDoc, string> = {
   MATRIZ_CONTRATACION: 'Matriz de contratación',
 };
 
-const RE_PROCESO = /\b(\d{4}\.\d{3}\.\d{2}\.\d\.\d{3})\s*-\s*(\d{4})\b/;
 
 export interface Clasificacion {
   categoria: CategoriaDoc | null;
@@ -37,9 +37,12 @@ export function esTranscripcion(nombre: string): boolean {
   return /transcrip/i.test(nombre);
 }
 
+/**
+ * Número de proceso (segmento .32.). Un número de contrato (.26.), de resolución (.21.) o de convenio (.27.) NO es un proceso, un número cuya etiqueta
+ * contradice su segmento o con lectura dudosa queda sin resolver, y si el texto cita varios procesos distintos no se elige ninguno.
+ */
 export function extraerProceso(texto: string): string | null {
-  const m = RE_PROCESO.exec(texto || '');
-  return m ? `${m[1]}-${m[2]}` : null;
+  return procesoUnico(texto || '');
 }
 
 export function extraerFecha(texto: string): string | null {

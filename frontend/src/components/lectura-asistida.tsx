@@ -1,5 +1,5 @@
 "use client";
-import type { DetalleExpediente } from "@/types/contratacion";
+import type { LecturaAsistida as Lectura } from "@/types/contratacion";
 import { cop } from "@/lib/format";
 
 const ETQ: Record<string, string> = {
@@ -7,8 +7,8 @@ const ETQ: Record<string, string> = {
 };
 
 /** Datos extraídos por la lectura asistida: cada uno con su página y su cita. Son pendientes de verificación y no entran en los totales. */
-export function LecturaAsistida({ d }: { d: DetalleExpediente }) {
-  const l = d.lectura_asistida ?? [];
+export function LecturaAsistida({ lectura }: { lectura: Lectura[] | undefined }) {
+  const l = lectura ?? [];
   if (l.length === 0) return null;
   return (
     <section aria-label="Datos extraídos pendientes de verificación" style={{ marginTop: 16, background: "#fff", border: "1px solid #D5DBE5", borderRadius: 8, padding: "16px 18px" }}>
@@ -28,16 +28,23 @@ export function LecturaAsistida({ d }: { d: DetalleExpediente }) {
           {(x.partidas ?? []).length > 0 && (
             <table style={{ marginTop: 8, borderCollapse: 'collapse', fontSize: 13.5, width: '100%' }}>
               <caption style={{ textAlign: 'left', fontWeight: 600 }}>Importes por edificio o alcance (por verificar)</caption>
-              <thead><tr><th style={{ textAlign: 'left' }}>Edificio</th><th style={{ textAlign: 'left' }}>Alcance</th><th style={{ textAlign: 'right' }}>Importe</th><th style={{ textAlign: 'left' }}>Fuente</th><th style={{ textAlign: 'left' }}>Relación</th></tr></thead>
+              <thead><tr><th style={{ textAlign: 'left' }}>Edificio</th><th style={{ textAlign: 'left' }}>Alcance</th><th style={{ textAlign: 'right' }}>Importe</th><th style={{ textAlign: 'left' }}>Fuente</th><th style={{ textAlign: 'left' }}>Edificio registrado</th><th style={{ textAlign: 'left' }}>Relación</th></tr></thead>
               <tbody>
                 {x.partidas!.map((p, i) => (
                   <tr key={i} style={{ borderTop: '1px solid #E6EAF0' }}>
                     <td>{p.edificio ?? 'Sin edificio inequívoco'}</td><td>{p.alcance}</td><td style={{ textAlign: 'right' }} className="cifra">{cop(p.importe)}{p.unidad !== 'GLOBAL' ? ` / ${p.unidad}` : ''}</td>
-                    <td>p. {p.pagina}</td><td>{p.relacion === 'EXPLICITA' ? 'Explícita en la cita' : 'Pendiente de revisión'}</td>
+                    <td>p. {p.pagina}</td>
+                    <td>{!p.coincidencia ? '—' : p.coincidencia.estado === 'SIN_COINCIDENCIA' ? 'Sin edificio registrado con ese nombre' : `${p.coincidencia.estado === 'COINCIDE' ? 'Igual a' : 'Parecido a'} ${p.coincidencia.edificio}${p.coincidencia.vinculado_al_documento ? ' (vinculado al documento)' : ' (no vinculado al documento)'}`}</td>
+                    <td>{p.relacion === 'EXPLICITA' ? 'Explícita en la cita' : 'Pendiente de revisión'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          )}
+          {(x.edificios_sin_vinculo ?? []).length > 0 && (
+            <p className="texto-secundario" style={{ margin: '6px 0 0', fontSize: 13 }}>
+              La tabla cita {x.edificios_en_tabla} edificios y el documento tiene {x.edificios_vinculados_al_documento} vinculados. Sin vínculo confirmado: {x.edificios_sin_vinculo!.join('; ')}. Las relaciones siguen pendientes de revisión.
+            </p>
           )}
         </div>
       ))}

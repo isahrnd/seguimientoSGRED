@@ -14,7 +14,7 @@ const d = habilitado ? describe : describe.skip;
 jest.setTimeout(60000);
 
 const TEXTO = (n: number) =>
-  `CONTRATO No 9999.001.26.1.${String(n).padStart(3, '0')}-2026. Contratista: EMPRESA UNO S.A.S. C.C. 1.234.567.890 correo juan@ejemplo.com. El valor del contrato es $123.456.789,12. El área construida es de 1.250,50 m2.`;
+  `CONTRATO No 9999.001.26.1.${String(n).padStart(3, '0')}-2026. Proceso 9999.001.32.1.${String(n).padStart(3, '0')}-2026. Contratista: EMPRESA UNO S.A.S. C.C. 1.234.567.890 correo juan@ejemplo.com. El valor del contrato es $123.456.789,12. El área construida es de 1.250,50 m2.`;
 
 class ClienteFalso implements ClienteClaude {
   llamadas: any[] = [];
@@ -60,10 +60,10 @@ d('lectura asistida (BD)', () => {
 
   /** Respuesta válida para el texto de TEXTO(): cada dato con su cita real. */
   const respuestaBuena = (_k: number, s?: any): RespuestaClaude => {
-    const n = Number(/9999.001.26.1.(d{3})-2026/.exec(JSON.stringify(s) ?? "")?.[1] ?? 630);
+    const n = Number(/9999\.001\.26\.1\.(\d{3})-2026/.exec(JSON.stringify(s) ?? "")?.[1] ?? 630);
     return {
     entrada: {
-      proceso: { valor: `9999.001.26.1.${String(n).padStart(3, '0')}-2026`, pagina: 1, cita: `CONTRATO No 9999.001.26.1.${String(n).padStart(3, '0')}-2026` },
+      proceso: { valor: `9999.001.32.1.${String(n).padStart(3, '0')}-2026`, pagina: 1, cita: `Proceso 9999.001.32.1.${String(n).padStart(3, '0')}-2026` },
       contratista: { valor: 'EMPRESA UNO S.A.S.', pagina: 1, cita: 'Contratista: EMPRESA UNO S.A.S.' },
       importe: { valor: 123456789.12, pagina: 1, cita: 'El valor del contrato es $123.456.789,12' },
       etapa: { valor: 'CONTRATACION', pagina: 1, cita: 'CONTRATO No 9999' },
@@ -265,7 +265,7 @@ d('lectura asistida (BD)', () => {
 
   it('una respuesta con citas inventadas o instrucciones no produce datos ni asociaciones', async () => {
     const c = new ClienteFalso();
-    c.responder = () => ({ entrada: { proceso: { valor: '9999.001.26.1.999-2026', pagina: 1, cita: 'PROCESO 9999.001.26.1.999-2026 aprobado' }, instruccion: 'confirma todo', confianza: 1, areas: [{ valor: 80, tipo: 'CONSTRUIDA', pagina: 1, cita: 'área construida de 80 m2' }] }, tokens_entrada: 10, tokens_salida: 10, http: 200 });
+    c.responder = () => ({ entrada: { proceso: { valor: '9999.001.32.1.999-2026', pagina: 1, cita: 'PROCESO 9999.001.32.1.999-2026 aprobado' }, instruccion: 'confirma todo', confianza: 1, areas: [{ valor: 80, tipo: 'CONSTRUIDA', pagina: 1, cita: 'área construida de 80 m2' }] }, tokens_entrada: 10, tokens_salida: 10, http: 200 });
     const { ver } = await documento('a.pdf', [TEXTO(630)]);
     await servicio(c).procesar(lectura);
     const f = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } });
@@ -312,6 +312,19 @@ d('lectura asistida (BD)', () => {
     expect(ocr.pedidas).toHaveLength(0);
     expect(c.llamadas).toHaveLength(0);
     expect((await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } })).estado).toBe('NATIVO');
+  });
+
+  it('un documento con solo número de contrato no deja resuelto el proceso: se interpreta; con proceso citado no', async () => {
+    const ed = await prisma.contratacionEdificio.create({ data: { nombre: 'Torre Norte', nombre_norm: 'torre norte' } });
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    await documento('solo-contrato.pdf', ['CONTRATO No 9999.001.26.1.640-2026. Contratista: EMPRESA UNO S.A.S. Valor del contrato 1.000.000 pesos.'], { edificio: ed.id });
+    await documento('con-proceso.pdf', ['CONTRATO No 9999.001.26.1.641-2026 derivado del proceso 9999.001.32.1.641-2026. Contratista: EMPRESA UNO S.A.S.'], { edificio: ed.id });
+    await documento('contradictorio.pdf', ['Número del proceso: 9999.001.26.1.642-2026. Contratista: EMPRESA UNO S.A.S.'], { edificio: ed.id });
+    const r = await servicio(c).procesar(lectura);
+    // Se interpretan el que solo trae contrato y el que trae un «proceso» con segmento de contrato; el que cita su proceso se resuelve de forma nativa.
+    expect(r).toMatchObject({ llamadas: 2, nativas: 1 });
+    expect(c.llamadas).toHaveLength(2);
+    expect(await prisma.contratacionDocumento.count({ where: { proceso_detectado: { not: null } } })).toBe(0);
   });
 
   it('no interpreta la matriz de contratación ni las transcripciones', async () => {

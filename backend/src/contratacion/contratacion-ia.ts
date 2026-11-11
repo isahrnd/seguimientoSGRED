@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { parseNumero } from './contratacion-areas';
+import { tipoPorSegmento } from './contratacion-identificadores';
 import { normalizar } from './contratacion-sugerencias';
 
 /**
@@ -9,7 +10,7 @@ import { normalizar } from './contratacion-sugerencias';
  * declare el modelo no publica nada.
  * Cambiar el prompt, el esquema o las reglas de validación exige subir EXTRACTOR_VERSION (invalida la caché).
  */
-export const EXTRACTOR_VERSION = 'ia-5';
+export const EXTRACTOR_VERSION = 'ia-6';
 
 export const ETAPAS = ['NECESIDAD', 'COTIZACION', 'ANALISIS_SECTOR', 'CONTRATACION', 'EJECUCION', 'RESOLUCION', 'OTRA'] as const;
 export const INTERVENCIONES = ['DEMOLICION', 'IZAJE_GRUAS', 'MAQUINARIA', 'RCD', 'OTRA'] as const;
@@ -174,13 +175,14 @@ export function validarRespuesta(entrada: unknown, fragmentos: Fragmento[]): Ext
     if (v === null) { salida.descartes.push({ campo: nombre, motivo: 'el valor no coincide con la cita' }); return; }
     salida.campos[nombre] = { valor: v, pagina: c.pagina, cita: depurar(String(c.cita).trim()).slice(0, 240) };
   };
-  const identificador = (v: any, cita: string) => {
+  // El proceso es un número de segmento .32. y el contrato uno de segmento .26.: ninguno se acepta en el campo del otro.
+  const identificador = (tipo: 'PROCESO' | 'CONTRATO') => (v: any, cita: string) => {
     const m = typeof v === 'string' ? v.match(RE_ID) : null;
-    return m && compacto(cita).includes(compacto(m[0])) ? m[0] : null;
+    return m && tipoPorSegmento(m[0]) === tipo && compacto(cita).includes(compacto(m[0])) ? m[0] : null;
   };
   const textoEnCita = (v: any, cita: string) => (typeof v === 'string' && compacto(v).length >= 4 && v.length <= 160 && compacto(cita).includes(compacto(v)) ? v.trim() : null);
-  campo('proceso', identificador);
-  campo('contrato', identificador);
+  campo('proceso', identificador('PROCESO'));
+  campo('contrato', identificador('CONTRATO'));
   campo('contratista', textoEnCita);
   campo('edificio', textoEnCita);
   campo('importe', (v, cita) => (typeof v === 'number' && v > 0 && contieneNumero(cita, v) ? Math.round(v * 100) / 100 : null));

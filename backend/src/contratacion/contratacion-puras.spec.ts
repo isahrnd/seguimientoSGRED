@@ -13,9 +13,9 @@ const F = { documento: MD5, pagina: 3 };
 
 describe('clasificador', () => {
   it('detecta proceso, fecha y categoría sin casos particulares', () => {
-    const t = 'ESTRUCTURACION DEL ANALISIS DEL SECTOR\nFecha: 05/03/2030\nNúmero del proceso: 1111.002.33.1.444 - 2030';
+    const t = 'ESTRUCTURACION DEL ANALISIS DEL SECTOR\nFecha: 05/03/2030\nNúmero del proceso: 1111.002.32.1.444 - 2030';
     const c = clasificar('cualquier nombre.pdf', t);
-    expect(c).toMatchObject({ categoria: 'ANALISIS_SECTOR', proceso: '1111.002.33.1.444-2030', fecha: '2030-03-05' });
+    expect(c).toMatchObject({ categoria: 'ANALISIS_SECTOR', proceso: '1111.002.32.1.444-2030', fecha: '2030-03-05' });
   });
   it('fecha imposible no se acepta', () => expect(extraerFecha('Fecha: 31/02/2030')).toBeNull());
   it('sin número de proceso queda sin proceso', () => expect(extraerProceso('nada')).toBeNull());
@@ -54,7 +54,7 @@ describe('comparador de precios', () => {
 describe('validación de importación', () => {
   const ok = () => ({
     version: 1,
-    expedientes: [{ proceso: '1111.002.33.1.444-2030', intervencion: 'X', ofertas: [{ clave: 'o', proveedor: 'P', grupo_oferta: 'g', fuente: F }], valores: [{ clave: 'v', tipo: 'COTIZADO', concepto: 'c', importe: 10, fuente: F }] }],
+    expedientes: [{ proceso: '1111.002.32.1.444-2030', intervencion: 'X', ofertas: [{ clave: 'o', proveedor: 'P', grupo_oferta: 'g', fuente: F }], valores: [{ clave: 'v', tipo: 'COTIZADO', concepto: 'c', importe: 10, fuente: F }] }],
   });
   it('acepta una carga válida', () => expect(validarImportacion(ok()).errores).toEqual([]));
   it('rechaza una cotización registrada como valor contratado', () => {

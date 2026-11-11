@@ -10,6 +10,7 @@ import { Volver } from "@/components/volver";
 import { EstadoResolucion, ListaDocumentosEdificio } from "@/components/edificios-soportes";
 import { PALETA } from "@/theme/theme";
 import { SoporteLink } from "@/components/soporte-link";
+import { LecturaAsistida } from "@/components/lectura-asistida";
 import { agruparCotizaciones } from "@/lib/oferta";
 import { discrepanciasDireccion } from "@/lib/direccion";
 
@@ -37,6 +38,8 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
         <h1 className="largo" style={{ margin: "6px 0 0", fontSize: 30 }}>{d.edificio.nombre}</h1>
         {d.edificio.direccion && <p className="texto-secundario largo" style={{ margin: "4px 0 0" }}>{d.edificio.direccion}</p>}
       </div>
+
+      <LecturaAsistida lectura={d.lectura_asistida} />
 
       {discrepancias.length > 0 && (
         <Alert type="warning" showIcon message="Discrepancia documental de dirección por aclarar"

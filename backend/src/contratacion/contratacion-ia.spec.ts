@@ -1,7 +1,7 @@
 import { AreaRegistrada, areaParaPrecio, extraerAreasNativas, parseNumero } from './contratacion-areas';
 import { EXTRACTOR_VERSION, construirSolicitud, depurar, huellaContenido, necesitaInterpretacion, seleccionarFragmentos, validarRespuesta } from './contratacion-ia';
 
-const P1 = 'CONTRATO No 9999.001.26.1.905-2026. Contratista: EMPRESA UNO S.A.S. Objeto: demolición del Edificio Torre Norte. El valor del contrato es $123.456.789,12. El área construida es de 1.250,50 m2.';
+const P1 = 'CONTRATO No 9999.001.26.1.905-2026. Proceso 9999.001.32.1.905-2026. Contratista: EMPRESA UNO S.A.S. Objeto: demolición del Edificio Torre Norte. El valor del contrato es $123.456.789,12. El área construida es de 1.250,50 m2.';
 const frag = [{ pagina: 1, texto: P1 }, { pagina: 2, texto: 'Cláusula segunda. El área del lote es de 3.000 m².' }];
 const cita = (c: string) => ({ valor: null as any, pagina: 1, cita: c });
 
@@ -121,13 +121,13 @@ describe('huella de caché', () => {
 describe('validación de la respuesta contra el texto enviado', () => {
   it('acepta campos con cita presente y valor coherente', () => {
     const r = validarRespuesta({
-      proceso: { valor: '9999.001.26.1.905-2026', pagina: 1, cita: 'CONTRATO No 9999.001.26.1.905-2026' },
+      proceso: { valor: '9999.001.32.1.905-2026', pagina: 1, cita: 'Proceso 9999.001.32.1.905-2026' },
       contratista: { valor: 'EMPRESA UNO S.A.S.', pagina: 1, cita: 'Contratista: EMPRESA UNO S.A.S.' },
       importe: { valor: 123456789.12, pagina: 1, cita: 'El valor del contrato es $123.456.789,12' },
       etapa: { valor: 'CONTRATACION', pagina: 1, cita: 'CONTRATO No 9999' },
       areas: [{ valor: 1250.5, tipo: 'CONSTRUIDA', edificio: null, pagina: 1, cita: 'El área construida es de 1.250,50 m2' }],
     }, frag);
-    expect(r.campos.proceso?.valor).toBe('9999.001.26.1.905-2026');
+    expect(r.campos.proceso?.valor).toBe('9999.001.32.1.905-2026');
     expect(r.campos.importe?.valor).toBe(123456789.12);
     expect(r.areas).toHaveLength(1);
     expect(r.descartes).toEqual([]);
@@ -135,7 +135,7 @@ describe('validación de la respuesta contra el texto enviado', () => {
   it('descarta lo que no consta: cita inventada, página no enviada, importe que no está en la cita', () => {
     const r = validarRespuesta({
       contratista: { valor: 'OTRA EMPRESA', pagina: 1, cita: 'Contratista: OTRA EMPRESA S.A.' },
-      proceso: { valor: '9999.001.26.1.905-2026', pagina: 9, cita: 'CONTRATO No 9999.001.26.1.905-2026' },
+      proceso: { valor: '9999.001.32.1.905-2026', pagina: 9, cita: 'Proceso 9999.001.32.1.905-2026' },
       importe: { valor: 999, pagina: 1, cita: 'El valor del contrato es $123.456.789,12' },
       contrato: { valor: '9999.001.26.1.904-2026', pagina: 1, cita: 'CONTRATO No 9999.001.26.1.905-2026' },
       areas: [{ valor: 80, tipo: 'CONSTRUIDA', pagina: 1, cita: 'El área construida es de 1.250,50 m2' }],

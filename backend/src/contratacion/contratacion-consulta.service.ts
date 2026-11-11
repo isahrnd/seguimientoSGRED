@@ -11,6 +11,7 @@ import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaci
 import { vistaMatriz } from './contratacion-matriz-vista';
 import { filaResumen } from './contratacion-resumen';
 import { areaParaPrecio, AreaRegistrada } from './contratacion-areas';
+import { vistaLecturaAsistida } from './contratacion-lectura-vista';
 import { construirLibroResumen } from './contratacion-resumen-excel';
 
 const n = (v: any): number | null => (v === null || v === undefined ? null : typeof v.toNumber === 'function' ? v.toNumber() : Number(v));
@@ -270,14 +271,7 @@ export class ContratacionConsultaService {
     }));
     const area_precio = areaParaPrecio(areas, ids);
     // Datos que la lectura asistida extrajo de los documentos del proceso: aceptados con su página y cita; no entran en los totales.
-    const lecturas = await this.prisma.contratacionIaExtraccion.findMany({
-      where: { estado: 'OK', version: { vigente: true, documento: { expediente_id: id } } },
-      include: { version: { include: { documento: true } } }, orderBy: { id: 'asc' },
-    });
-    const lectura_asistida = lecturas.map((x) => {
-      const r: any = x.resultado ?? {};
-      return { version_id: x.version_id, documento: x.version.documento.nombre, campos: Object.entries(r.campos ?? {}).map(([campo, c]: [string, any]) => ({ campo, valor: c.valor, pagina: c.pagina, cita: c.cita })), partidas: r.partidas ?? [], descartados: ((x.descartes as any[]) ?? []).length };
-    }).filter((x) => x.campos.length > 0 || x.partidas.length > 0);
+    const lectura_asistida = await vistaLecturaAsistida(this.prisma, { documento: { OR: [{ expediente_id: id }, ...(ids.length ? [{ edificios: { some: { edificio_id: { in: ids } } } }] : [])] } });
     const edificiosProceso = e.edificios.map((x) => ({ id: x.edificio.id, nombre: x.edificio.nombre, direccion: x.edificio.direccion, estado_asociacion: x.estado, resolucion: req.get(x.edificio_id) ?? null }));
     const comparacion = {
       valores: significados,

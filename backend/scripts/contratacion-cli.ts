@@ -12,6 +12,7 @@ import * as crypto from 'crypto';
 import { NestFactory } from '@nestjs/core';
 import { MonitoreoContratacionModule } from '../src/contratacion/monitoreo-contratacion.module';
 import { ContratacionIndiceService } from '../src/contratacion/contratacion-indice.service';
+import { tipoPorSegmento } from '../src/contratacion/contratacion-identificadores';
 import { ContratacionImportacionService } from '../src/contratacion/contratacion-importacion.service';
 import { driveRootId, driveTokenFile, ENV_CONTRATACION } from '../src/contratacion/contratacion.config';
 
@@ -75,6 +76,17 @@ async function main() {
         console.log(JSON.stringify({ version: f.version_id, documento: f.version.documento.nombre, estado: f.estado, error: f.error, tokens_entrada: f.tokens_entrada, tokens_salida: f.tokens_salida, descartes: f.descartes, ...(args.includes('--detalle') ? { resultado: f.resultado } : { campos: Object.keys((f.resultado as any)?.campos ?? {}) }) }));
       }
       console.log(JSON.stringify(await indice.ia.estado()));
+    } else if (cmd === 'corregir-identificadores') {
+      // Documentos cuyo «proceso detectado» no es un número de proceso (p. ej. guarda un número de contrato). Por defecto solo informa;
+      // con --aplicar vacía ÚNICAMENTE ese campo derivado. No toca expediente, estado de clasificación ni asociaciones.
+      const prisma = (app.get(ContratacionIndiceService) as any).prisma;
+      const docs = await prisma.contratacionDocumento.findMany({ where: { proceso_detectado: { not: null } }, include: { expediente: { select: { proceso: true } } }, orderBy: { id: 'asc' } });
+      const afectados = docs.filter((d: any) => tipoPorSegmento(d.proceso_detectado) !== 'PROCESO');
+      for (const d of afectados) console.log(JSON.stringify({ documento: d.id, nombre: d.nombre, proceso_detectado: d.proceso_detectado, tipo_real: tipoPorSegmento(d.proceso_detectado), expediente_asociado: d.expediente?.proceso ?? null }));
+      if (args.includes('--aplicar') && afectados.length) {
+        const r = await prisma.contratacionDocumento.updateMany({ where: { id: { in: afectados.map((d: any) => d.id) } }, data: { proceso_detectado: null } });
+        console.log(JSON.stringify({ corregidos: r.count, nota: 'solo proceso_detectado; asociaciones intactas' }));
+      } else console.log(JSON.stringify({ afectados: afectados.length, aplicado: false }));
     } else if (cmd === 'importar') {
       const archivo = args.find((a) => !a.startsWith('--'));
       if (!archivo) throw new Error('Indique el archivo JSON de importación');
@@ -83,7 +95,7 @@ async function main() {
       if (args.includes('--aplicar')) console.log(JSON.stringify(await svc.aplicar(payload, null), null, 2));
       else { const v = await svc.previsualizar(payload); console.log(JSON.stringify({ valida: v.valida, errores: v.errores, advertencias: v.advertencias, resumen: v.resumen }, null, 2)); }
     } else {
-      console.error('Comandos: reindexar | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
+      console.error('Comandos: reindexar | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
       process.exitCode = 1;
     }
   } finally {
