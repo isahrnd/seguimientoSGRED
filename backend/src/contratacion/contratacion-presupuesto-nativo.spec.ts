@@ -110,3 +110,23 @@ describe('cierre de una oferta leído por OCR local', () => {
     expect(fusionarCierreOcr(f, cierre, 8).partidas).toHaveLength(5);
   });
 });
+
+// Otro cierre SINTÉTICO, con marcas de tabla del OCR, porcentaje de administración redondeado a dos decimales (21,16 %) e imprevistos.
+// Utilidad 100.000.000,00 (5 %) → costo directo implícito 2.000.000.000; imprevistos 60.000.000,00; IVA 19.000.000,00.
+const OCR2 = [
+  '| e Pumacincamicaardoastayomercnicatarses [o | wo | emo |', '[ADMINISTRACION 21,16% 423.162.000,00', 'IMPREVISTOS 3,00% 60.000.000,00|', 'UTILIDAD 5,00% 100.000.000,00',
+  'TOTAL ANTES DE IVA. 2.583.162.000,00', 'IVA SOBRE UTILIDAD 19% 19.000.000,00', 'TOTAL 2.602.162.000,00',
+].join('\n');
+
+describe('cierre por OCR con marcas de tabla y porcentaje redondeado', () => {
+  it('lo acepta, incluye imprevistos y comprueba el costo directo implícito', () => {
+    const r = extraerCierreOcr(OCR2, 8);
+    expect(r.ok).toBe(true);
+    if (r.ok === false) return;
+    expect(r.partidas.map((p) => p.importe)).toEqual([423162000, 60000000, 100000000, 2583162000, 19000000, 2602162000]);
+    expect(r.controles.some((c) => /Costo directo implícito/.test(c.control) && c.estado === 'CUADRA')).toBe(true);
+  });
+  it('si el total antes de IVA no corresponde a sus componentes, lo rechaza', () => {
+    expect(extraerCierreOcr(OCR2.replace('2.583.162.000,00', '2.583.999.000,00'), 8).ok).toBe(false);
+  });
+});
