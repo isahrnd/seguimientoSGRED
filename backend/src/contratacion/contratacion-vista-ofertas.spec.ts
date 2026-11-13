@@ -52,6 +52,21 @@ describe('ofertas de un edificio desde la lectura de los documentos', () => {
     expect(o.empresa).toBe('EMPRESA DOS');
   });
 
+  it('el número de edificios de una oferta conjunta sale de las filas de su tabla, no solo de los edificios ya registrados', () => {
+    const e = {
+      version_id: 21, documento: '4. EMPRESA TRES.pdf', origen: 'ASISTIDA', edificios_vinculados_al_documento: 1, campos: [],
+      partidas: [
+        p({ edificio: 'EDIFICIO ALFA', alcance: 'Demolición total', importe: 500, coincidencia: coin('COINCIDE', 5) }),
+        p({ edificio: 'Edificio Alfa', alcance: 'Demolición total (repetida)', importe: 500, coincidencia: coin('COINCIDE', 5) }),
+        p({ edificio: 'EDIFICIO BETA', alcance: 'Demolición total', importe: 700, coincidencia: null }),
+        p({ edificio: 'EDIFICIO GAMMA', alcance: 'Demolición total', importe: 900, coincidencia: null }),
+      ],
+      controles_aritmeticos: [],
+    };
+    const [o] = ofertasDeLectura([e], B);
+    expect(o.oferta_conjunta?.edificios).toBe(3);
+  });
+
   it('un nombre solo parecido, sin documento vinculado al edificio, no relaciona la fila', () => {
     const e = { version_id: 30, documento: 'x.pdf', origen: 'ASISTIDA', edificios_vinculados_al_documento: 2, campos: [], partidas: [p({ edificio: 'Ed. Alfa', importe: 10, coincidencia: coin('POSIBLE', 5, false) })] };
     expect(ofertasDeLectura([e], B)).toEqual([]);

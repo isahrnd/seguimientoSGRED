@@ -47,8 +47,10 @@ export function ofertasDeLectura(
   const salida: OfertaEdificio[] = [];
   for (const e of lectura) {
     if (e.excluida_de_indicadores || !(e.partidas ?? []).length || e.origen === 'NATIVA') continue;
-    const vinculados: number = e.edificios_vinculados_al_documento ?? 0;
     const partidas: any[] = e.partidas;
+    // Edificios que cubre la oferta: los de las filas de su tabla (por nombre) o, si son más, los vinculados al documento.
+    const enTabla = new Set(partidas.filter((p) => p.edificio).map((p) => String(p.edificio).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/s+/g, ' ').trim())).size;
+    const vinculados: number = Math.max(e.edificios_vinculados_al_documento ?? 0, enTabla);
     const etiquetado = partidas.some((p) => p.edificio);
     const pertenece = (p: any): boolean => {
       if (!p.edificio) return !etiquetado && vinculados === 1;
