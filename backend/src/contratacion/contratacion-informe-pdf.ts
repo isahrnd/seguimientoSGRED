@@ -360,7 +360,7 @@ export async function informeEdificio(d: DatosInformeEdificio): Promise<Buffer> 
     if (!ev.length) inf.texto('No hay fragmentos de evidencia registrados para los documentos de este edificio.', { color: COLOR.gris });
     for (const x of ev) { inf.titulo2(x.nombre); for (const e of x.evidencias) inf.texto(`${ETQ_FUENTE[e.fuente_tipo] ?? e.fuente_tipo}: ${e.detalle}`, { size: 8.5, gap: 3 }); }
     for (const o of f.ofertas.filter((x) => x.controles.length)) {
-      inf.titulo2(`Controles aritméticos — ${o.empresa}`);
+      inf.titulo2(`Controles aritméticos — ${o.empresa}${o.referencia ? ` · ${o.referencia}` : ''}${o.fecha ? ` (${fechaCorteTexto(o.fecha)})` : ''}`);
       for (const c of o.controles) inf.texto(`${c.control}: ${c.estado === 'CUADRA' ? 'cuadra' : Math.abs(c.diferencia) < 1 ? `diferencia aritmética de ${cop(Math.abs(c.diferencia))} entre las cifras documentadas` : `no cuadra (${cop(c.diferencia)})`}`, { size: 8.5, gap: 3 });
     }
   }
@@ -372,7 +372,7 @@ function desgloseOferta(inf: Informe, o: OfertaEdificio) {
   inf.texto(`${o.nota_version ? `${o.nota_version} ` : ''}${o.relacion}.${o.alcance ? ` ${o.alcance}.` : ''}${o.oferta_conjunta ? ` Oferta conjunta de ${o.oferta_conjunta.edificios} edificios${o.oferta_conjunta.total ? `: total de la oferta ${cop(o.oferta_conjunta.total)} (no es el valor de este edificio)` : ''}.` : ''}`, { size: 8.5, color: COLOR.gris, gap: 4 });
   if (o.items.length) {
     inf.tabla(
-      [{ t: 'Actividad', w: 44 }, { t: 'Unidad', w: 9 }, { t: 'Cantidad', w: 10, a: 'right' }, { t: 'Precio unitario', w: 15, a: 'right' }, { t: 'Subtotal', w: 17, a: 'right' }, { t: 'Fuente', w: 15 }],
+      [{ t: 'Actividad', w: 38 }, { t: 'Unidad', w: 9 }, { t: 'Cantidad', w: 9, a: 'right' }, { t: 'Precio unitario', w: 19, a: 'right' }, { t: 'Subtotal', w: 17, a: 'right' }, { t: 'Fuente', w: 15 }],
       o.items.map((i) => [i.actividad, i.unidad ?? '', i.cantidad !== null ? i.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '', i.precio_unitario !== null ? cop(i.precio_unitario) : '', i.subtotal !== null ? cop(i.subtotal) : '', i.fuente?.hoja && i.fuente.celda ? `${i.fuente.hoja}!${i.fuente.celda}` : i.fuente?.pagina ? `p. ${i.fuente.pagina}` : '']),
       { size: 8 },
     );

@@ -25,8 +25,9 @@ const empresaDe = (entrada: any): string => {
 /** Lo que la propia oferta dice sobre otras versiones («reemplaza expresamente toda cotización anterior»), tal como consta en su registro verificado. */
 const notaDeVersion = (vs: CotizacionVerificada[]): string | null => {
   for (const v of vs) {
-    const m = /reemplaza[^.;]*(?:cotizaci[oó]n|oferta)[^.;]*/i.exec(`${v.nota ?? ''}. ${v.alcance_oferta ?? ''}`);
-    if (m) return m[0].trim().replace(/^./, (c) => c.toUpperCase());
+    // La frase llega hasta el punto final de la oración; los puntos de abreviaturas («pág. 5») no la cortan.
+    const m = /[Rr]eemplaza[\s\S]*?(?=(?<!\b(?:p|pág|págs|pp|núm|no))\.\s+[A-ZÁÉÍÓÚÑ]|;|$)/.exec(`${v.nota ?? ''}. ${v.alcance_oferta ?? ''}`);
+    if (m && /cotizaci[oó]n|oferta/i.test(m[0])) return m[0].trim().replace(/\.$/, '').replace(/^./, (c) => c.toUpperCase());
   }
   return null;
 };
@@ -49,7 +50,7 @@ export function ofertasDeLectura(
     if (e.excluida_de_indicadores || !(e.partidas ?? []).length || e.origen === 'NATIVA') continue;
     const partidas: any[] = e.partidas;
     // Edificios que cubre la oferta: los de las filas de su tabla (por nombre) o, si son más, los vinculados al documento.
-    const enTabla = new Set(partidas.filter((p) => p.edificio).map((p) => String(p.edificio).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/s+/g, ' ').trim())).size;
+    const enTabla = new Set(partidas.filter((p) => p.edificio).map((p) => String(p.edificio).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim())).size;
     const vinculados: number = Math.max(e.edificios_vinculados_al_documento ?? 0, enTabla);
     const etiquetado = partidas.some((p) => p.edificio);
     const pertenece = (p: any): boolean => {

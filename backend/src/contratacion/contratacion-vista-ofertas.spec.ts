@@ -67,6 +67,15 @@ describe('ofertas de un edificio desde la lectura de los documentos', () => {
     expect(o.oferta_conjunta?.edificios).toBe(3);
   });
 
+  it('la nota de reemplazo conserva la oración completa aunque lleve abreviaturas con punto (pág. 5)', () => {
+    const e = { version_id: 22, documento: '4. EMPRESA CUATRO.pdf', origen: 'ASISTIDA', edificios_vinculados_al_documento: 1, campos: [], partidas: [p({ edificio: 'EDIFICIO ALFA', importe: 10, coincidencia: coin('COINCIDE', 5) })] };
+    const ver = [{ version_id: 22, proveedor: 'EMPRESA CUATRO', importe: 10, base: 'COSTO_DIRECTO', total_oferta: null, fecha_oferta: '2026-09-19', edificio_id: 5, referencia_oferta: 'Cotización 2', nota: 'Reemplaza expresamente toda cotización anterior (pág. 5) del mismo proveedor. Otro dato.', alcance_oferta: null }];
+    const [o] = ofertasDeLectura([e], B, ver as any);
+    expect(o.nota_version).toBe('Reemplaza expresamente toda cotización anterior (pág. 5) del mismo proveedor');
+    expect(o.fecha).toBe('2026-09-19');
+    expect(o.referencia).toBe('Cotización 2');
+  });
+
   it('un nombre solo parecido, sin documento vinculado al edificio, no relaciona la fila', () => {
     const e = { version_id: 30, documento: 'x.pdf', origen: 'ASISTIDA', edificios_vinculados_al_documento: 2, campos: [], partidas: [p({ edificio: 'Ed. Alfa', importe: 10, coincidencia: coin('POSIBLE', 5, false) })] };
     expect(ofertasDeLectura([e], B)).toEqual([]);
