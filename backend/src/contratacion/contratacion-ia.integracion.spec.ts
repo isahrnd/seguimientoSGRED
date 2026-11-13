@@ -106,6 +106,27 @@ d('lectura asistida (BD)', () => {
     expect(c.llamadas).toHaveLength(1);
   });
 
+  it('una tabla de presupuesto legible de forma nativa se guarda sin llamar a la API, con página, controles y edificio', async () => {
+    const c = new ClienteFalso(); c.responder = respuestaBuena;
+    const pagina = 'Cotización # 000001 Página 9 3. PRESUPUESTO El valor total de la presente propuesta para el edificio Torre Ejemplo asciende a la suma de: 1. DESMONTAJE ÍTEM DESCRIPCIÓN UND CANT. VR. TOTAL DESMONTAJE Y DEMOLICIÓN MECÁNICA 1 EDIFICIO TORRE EJEMPLO GL 1,00 TOTAL COSTO DIRECTO ADMINISTRACIÓN 15,00% IMPREVISTOS 3,00% UTILIDAD 5,00% TOTAL ANTES DE IVA IVA SOBRE UTILIDAD 19% TOTAL PROPUEST A GARANTÍAS ($ 1.239.500.000,00) $ 1.000.000.000,00 $ 1.000.000.000,00 150.000.000,00 30.000.000,00 50.000.000,00 1.230.000.000,00 9.500.000,00 1.239.500.000,00';
+    const { ver } = await documento('3. EMPRESA UNO', [TEXTO(630), pagina]);
+    const r = await servicio(c).procesar(lectura, { versiones: [ver.id] });
+    expect(r.llamadas).toBe(0);
+    expect(c.llamadas).toHaveLength(0);
+    const fila = await prisma.contratacionIaExtraccion.findFirstOrThrow({ where: { version_id: ver.id } });
+    expect(fila.estado).toBe('NATIVO');
+    const res: any = fila.resultado;
+    expect(res.partidas).toHaveLength(8);
+    expect(res.partidas.map((p: any) => p.nivel)).toEqual(['PARTIDA', 'SUBTOTAL', 'IMPUESTO_O_AIU', 'IMPUESTO_O_AIU', 'IMPUESTO_O_AIU', 'SUBTOTAL', 'IMPUESTO_O_AIU', 'TOTAL']);
+    expect(res.partidas[7]).toMatchObject({ importe: 1239500000, origen: 'NATIVO_POR_ORDEN' });
+    expect(res.campos.edificio.valor).toBe('EDIFICIO TORRE EJEMPLO');
+    expect(res.controles_aritmeticos.every((x: any) => x.estado === 'CUADRA')).toBe(true);
+    // repetir no repite nada ni llama a la API
+    const r2 = await servicio(c).procesar(lectura, { versiones: [ver.id] });
+    expect(c.llamadas).toHaveLength(0);
+    expect(r2.llamadas).toBe(0);
+  });
+
   it('sin clave no consume nada: el documento queda pendiente y se interpreta cuando hay clave', async () => {
     const c = new ClienteFalso(); c.activo = false; c.responder = respuestaBuena;
     const { ver } = await documento('a.pdf', [TEXTO(630)]);

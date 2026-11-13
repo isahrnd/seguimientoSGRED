@@ -25,6 +25,8 @@ export interface ControlPresupuesto { control: string; calculado: number; declar
 export interface PresupuestoNativo {
   pagina: number;
   edificio: string | null;
+  /** Texto literal de la fila del ítem donde consta el edificio. */
+  cita_edificio: string | null;
   partidas: PartidaPresupuesto[];
   controles_aritmeticos: ControlPresupuesto[];
 }
@@ -101,7 +103,7 @@ export function extraerPresupuestoNativo(paginas: Array<{ pagina: number; texto:
     mk('IMPUESTO_O_AIU', `IVA ${pIva}% sobre la utilidad`, iva),
     mk('TOTAL', 'Total de la oferta (total propuesta)', total),
   ];
-  return { ok: true, presupuesto: { pagina, edificio, partidas, controles_aritmeticos: controles } };
+  return { ok: true, presupuesto: { pagina, edificio, cita_edificio: fila ? fila[0].replace(/\s+/g, ' ').trim().slice(0, 200) : null, partidas, controles_aritmeticos: controles } };
 }
 
 /**

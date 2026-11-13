@@ -9,6 +9,7 @@ import { ContratacionEdificiosService } from './contratacion-edificios.service';
 import { ContratacionDocumentosService } from './contratacion-documentos.service';
 import { ContratacionCotizacionesEdificioService } from './contratacion-cotizaciones-edificio.service';
 import { ContratacionImportacionService } from './contratacion-importacion.service';
+import { ContratacionPreciosEdificioService } from './contratacion-precios-edificio.service';
 import { ContratacionIndiceService } from './contratacion-indice.service';
 import { ContratacionSincronizacionService } from './contratacion-sincronizacion.service';
 import { MonitoreoContratacionController } from './monitoreo-contratacion.controller';
@@ -29,7 +30,8 @@ import { MonitoreoContratacionController } from './monitoreo-contratacion.contro
     ContratacionCotizacionesEdificioService,
     ContratacionIndiceService,
     ContratacionSincronizacionService,
+    ContratacionPreciosEdificioService,
   ],
-  exports: [ContratacionIndiceService, ContratacionImportacionService, ContratacionCotizacionesEdificioService],
+  exports: [ContratacionIndiceService, ContratacionImportacionService, ContratacionCotizacionesEdificioService, ContratacionPreciosEdificioService],
 })
 export class MonitoreoContratacionModule {}

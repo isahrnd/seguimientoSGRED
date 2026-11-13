@@ -252,7 +252,7 @@ export class ContratacionConsultaService {
     // «por vincular» es un documento de contratación que cita este proceso y aún no está asociado a ningún expediente.
     const estudioIdentificado = estudios.some((x: any) => x.estado_clasificacion === 'CONFIRMADO');
     const contratoPorVincular = contratos.length === 0 && (await this.prisma.contratacionDocumento.count({
-      where: { categoria: 'CONTRATACION_ACTAS', expediente_id: null, OR: [{ proceso_detectado: e.proceso }, { sugerencias: { some: { tipo: 'EXPEDIENTE', valor: e.proceso, estado: { not: 'DESCARTADA' } } } }] },
+      where: { categoria: 'CONTRATACION_ACTAS', expediente_id: null, NOT: { nombre: { contains: 'resoluci', mode: 'insensitive' } }, OR: [{ proceso_detectado: e.proceso }, { sugerencias: { some: { tipo: 'EXPEDIENTE', valor: e.proceso, estado: { not: 'DESCARTADA' } } } }] },
     })) > 0;
     const analisis_precios = analizarPrecios({
       contexto: { estudio_mercado_identificado: estudioIdentificado, contrato_por_vincular: contratoPorVincular },

@@ -17,7 +17,7 @@ import { tipoPorSegmento } from '../src/contratacion/contratacion-identificadore
 import { compararEdificio } from '../src/contratacion/contratacion-edificios-match';
 import { edificacionDeCarpeta } from '../src/contratacion/contratacion-sugerencias';
 import { ContratacionImportacionService } from '../src/contratacion/contratacion-importacion.service';
-import { driveRootId, driveTokenFile, ENV_CONTRATACION } from '../src/contratacion/contratacion.config';
+import { claudeMaxTokensSalida, claudeTarifaUsd, driveRootId, driveTokenFile, ENV_CONTRATACION } from '../src/contratacion/contratacion.config';
 
 async function vincularDrive() {
   const id = process.env[ENV_CONTRATACION.DRIVE_CLIENT_ID];
@@ -74,7 +74,14 @@ async function main() {
       const indice = app.get(ContratacionIndiceService);
       await indice.reindexar({ ia: { versiones: lista, forzar: args.includes('--forzar'), simular: true } });
       for (const s of indice.ultimoResumenIa?.simulacion ?? []) console.log(JSON.stringify(s));
-      console.log(JSON.stringify({ simulacion: true, versiones: lista.length, bloquearian: (indice.ultimoResumenIa?.simulacion ?? []).filter((s: any) => s.hallazgos.length).length }));
+      // Antes de un lote: cantidad de documentos y estimación de costo (entrada estimada + salida máxima por llamada). Solo es una cota; no consume nada.
+      const sim: any[] = indice.ultimoResumenIa?.simulacion ?? [];
+      const llamarian = sim.filter((s) => s.accion === 'LLAMARIA_API');
+      const tarifa = claudeTarifaUsd() ?? { entrada: 2, salida: 10 }; // USD por millón de tokens (Sonnet 5.5) si no se configuró otra tarifa
+      const tokEntrada = llamarian.reduce((a, s) => a + s.tokens_estimados, 0);
+      const tokSalida = llamarian.length * claudeMaxTokensSalida();
+      const costo = (tokEntrada * tarifa.entrada + tokSalida * tarifa.salida) / 1_000_000;
+      console.log(JSON.stringify({ simulacion: true, versiones: lista.length, llamarian: llamarian.length, reutilizarian_o_nativos: sim.filter((s) => s.accion === 'REUTILIZARIA' || s.accion === 'NATIVO').length, bloquearian: sim.filter((s) => s.hallazgos.length).length, tokens_entrada_estimados: tokEntrada, tokens_salida_maximos: tokSalida, costo_usd_maximo_estimado: Math.round(costo * 1000) / 1000, tarifa_usd_por_mtok: tarifa }));
     } else if (cmd === 'interpretar') {
       // Ejecución MANUAL de la lectura asistida sobre versiones concretas: --versiones=12,15,20 [--detalle]
       const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);

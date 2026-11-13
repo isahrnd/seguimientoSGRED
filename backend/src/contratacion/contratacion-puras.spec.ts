@@ -17,6 +17,12 @@ describe('clasificador', () => {
     const c = clasificar('cualquier nombre.pdf', t);
     expect(c).toMatchObject({ categoria: 'ANALISIS_SECTOR', proceso: '1111.002.32.1.444-2030', fecha: '2030-03-05' });
   });
+  it('una resolución que ordena la demolición se clasifica así aunque el nombre no lo diga (el contenido manda)', () => {
+    const t = 'RESOLUCIÓN No. 9999.001.21.1.001 DE 2030\n"POR LA CUAL SE ORDENA LA DEMOLICIÓN DE UN INMUEBLE AFECTADO POR EL EVENTO SÍSMICO"';
+    expect(clasificar('RESOLUCIÓN No. 9999.001.21.1.001 DE 2030_EDIFICIO_EJEMPLO.pdf', t).categoria).toBe('RESOLUCION_DEMOLICION');
+    // un contrato que solo cita una resolución sigue siendo contratación
+    expect(clasificar('CONTRATO resolución.pdf', 'Contrato de prestación de servicios').categoria).toBe('CONTRATACION_ACTAS');
+  });
   it('fecha imposible no se acepta', () => expect(extraerFecha('Fecha: 31/02/2030')).toBeNull());
   it('sin número de proceso queda sin proceso', () => expect(extraerProceso('nada')).toBeNull());
   it('excluye transcripciones', () => expect(esTranscripcion('Transcripción reunión.docx')).toBe(true));

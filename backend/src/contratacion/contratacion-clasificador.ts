@@ -9,7 +9,8 @@ export type CategoriaDoc =
   | 'VISITA_SOPORTE_TECNICO'
   | 'COMPARATIVO_GENERAL'
   | 'ESTUDIO_MERCADO'
-  | 'MATRIZ_CONTRATACION';
+  | 'MATRIZ_CONTRATACION'
+  | 'CONSOLIDADO_SEGUIMIENTO';
 
 export const CATEGORIAS: Record<CategoriaDoc, string> = {
   NECESIDAD_ALCANCE: 'Necesidad y alcance',
@@ -22,6 +23,7 @@ export const CATEGORIAS: Record<CategoriaDoc, string> = {
   COMPARATIVO_GENERAL: 'Comparativos generales',
   ESTUDIO_MERCADO: 'Estudio de mercado',
   MATRIZ_CONTRATACION: 'Matriz de contratación',
+  CONSOLIDADO_SEGUIMIENTO: 'Consolidado de seguimiento',
 };
 
 
@@ -66,6 +68,8 @@ export function clasificar(nombre: string, textoPrimeraPagina: string): Clasific
   else if (/cuadro\s+comparativ|comparativ[oa]s?(?![a-z])/i.test(nombre)) categoria = 'COMPARATIVO_GENERAL';
   else if (/resoluci[oó]n.{0,60}demolici|demolici.{0,60}resoluci[oó]n/i.test(nombre)) categoria = 'RESOLUCION_DEMOLICION';
   else if (/evaluaci[oó]n\s+(?:de\s+)?(?:da[ñn]os\s+)?atc|(?<![a-z])atc(?![a-z])|informe\s+de\s+visita|visita\s+t[eé]cnica|soporte.{0,3}t[eé]cnico/i.test(nombre)) categoria = 'VISITA_SOPORTE_TECNICO';
+  // Una resolución cuyo contenido ordena la demolición es una resolución de demolición aunque el nombre no lo diga (el contenido manda sobre el nombre).
+  else if (/resoluci[oó]n/i.test(nombre) && /ordena\s+la\s+demolici[oó]n/i.test(textoPrimeraPagina.replace(/\s+/g, ' '))) categoria = 'RESOLUCION_DEMOLICION';
   else if (/an[aá]lisis\s+del\s+sector/i.test(t)) categoria = 'ANALISIS_SECTOR';
   else if (/cotizaci[oó]n|propuesta\s+econ[oó]mica|oferta/i.test(nombre)) categoria = 'COTIZACIONES';
   else if (/contrato|resoluci[oó]n|adjudicaci|orden\s+de\s+proveedur|minuta|\bacta\b/i.test(nombre)) categoria = 'CONTRATACION_ACTAS';

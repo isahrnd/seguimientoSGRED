@@ -9,12 +9,14 @@ import type {
   DetalleExpediente,
   EdificioFila,
   EstadoSincronizacion,
+  FichaPrecios,
   FiltrosBiblioteca,
   FiltrosContratacion,
   FuenteEstado,
   HojaRespuesta,
   ListadoContratacion,
   RespuestaAnalisisPrecios,
+  VistaPrecios,
   TrabajoIndice,
 } from "@/types/contratacion";
 
@@ -60,6 +62,12 @@ export const useDetalleEdificio = (id: number) =>
     enabled: Number.isInteger(id),
     queryFn: () => api.get<DetalleEdificio>(`/edificios/${id}`),
   });
+
+export const usePreciosPorEdificio = () =>
+  useQuery({ ...base, queryKey: [K, "precios-por-edificio"], queryFn: () => api.get<VistaPrecios>("/precios-por-edificio") });
+
+export const useFichaPrecios = (clave: string) =>
+  useQuery({ ...base, queryKey: [K, "precios-por-edificio", clave], enabled: !!clave, queryFn: () => api.get<FichaPrecios>(`/precios-por-edificio/${clave}`) });
 
 export const useAnalisisPrecios = () =>
   useQuery({ ...base, queryKey: [K, "analisis-precios"], queryFn: () => api.get<RespuestaAnalisisPrecios>("/analisis-precios") });

@@ -13,6 +13,7 @@ import { normalizar, sugerir } from './contratacion-sugerencias';
 import { completarConOcr, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { ContratacionContratosService } from './contratacion-contratos.service';
 import { ContratacionMatrizService } from './contratacion-matriz.service';
+import { ContratacionConsolidadoService } from './contratacion-consolidado.service';
 import { ContratacionIaService } from './contratacion-ia.service';
 
 interface Candidato {
@@ -106,6 +107,7 @@ export class ContratacionIndiceService {
   /** Resumen de la última lectura asistida de esta instancia (lo usa el CLI para informar). */
   ultimoResumenIa: any = null;
   private readonly matriz = new ContratacionMatrizService(this.prisma);
+  private readonly consolidado = new ContratacionConsolidadoService(this.prisma);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -135,6 +137,7 @@ export class ContratacionIndiceService {
       trabajo.fase = 'Leyendo contratos y matriz de contratación';
       await this.leerContratos();
       await this.leerMatriz();
+      await this.leerConsolidado();
       trabajo.fase = 'Extrayendo datos de los documentos (solo los nuevos o cambiados)';
       await this.interpretarDocumentos(opciones.ia);
       const ri = this.ultimoResumenIa;
@@ -495,6 +498,19 @@ export class ContratacionIndiceService {
     }
   }
 
+  /** Lee el consolidado de seguimiento en Excel (hoja, celda y fórmula) sin OCR ni API; un fallo aquí no invalida la actualización. */
+  private async leerConsolidado() {
+    try {
+      const r = await this.consolidado.procesar(async (md5) => {
+        const cand = this.candidatosVistos.get(md5);
+        return cand ? await cand.leerBytes() : null;
+      });
+      if (r.versiones) this.log.log(`Consolidado de seguimiento leído: ${r.versiones} archivo(s), ${r.filas} fila(s); vinculadas ${r.vinculadas}`);
+    } catch (e) {
+      this.log.warn(`Sin lectura del consolidado de seguimiento: ${(e as Error).message}`);
+    }
+  }
+
   /** Lee la matriz de contratación en Excel (celda a celda) y la vincula con los expedientes; un fallo aquí no invalida la actualización. */
   private async leerMatriz() {
     try {
@@ -552,6 +568,19 @@ export class ContratacionIndiceService {
   }
 
   private async reasociarPendientes() {
+    // El contenido manda sobre el nombre: un documento aún PENDIENTE de clasificación (nadie lo ha confirmado ni se asoció a un expediente) se vuelve a
+    // clasificar con las reglas vigentes. Nunca toca una categoría confirmada ni un documento ya asociado.
+    const pendientes = await this.prisma.contratacionDocumento.findMany({ where: { estado_clasificacion: 'PENDIENTE_CLASIFICACION', expediente_id: null }, include: { versiones: { where: { vigente: true } } } });
+    for (const d of pendientes) {
+      const cand = d.versiones[0] ? this.candidatosVistos.get(d.versiones[0].md5) : undefined;
+      if (!cand || cand.mime !== 'application/pdf') continue;
+      try {
+        const cl = clasificar(cand.nombre, await textoPrimeraPagina(await cand.leerBytes(), cand.mime));
+        if (cl.categoria && cl.categoria !== d.categoria) await this.prisma.contratacionDocumento.update({ where: { id: d.id }, data: { categoria: cl.categoria } });
+      } catch {
+        /* queda como estaba */
+      }
+    }
     // Reclasifica los documentos cuyo texto no pudo leerse antes (sin proceso detectado).
     const sinProceso = await this.prisma.contratacionDocumento.findMany({
       where: { expediente_id: null, proceso_detectado: null },

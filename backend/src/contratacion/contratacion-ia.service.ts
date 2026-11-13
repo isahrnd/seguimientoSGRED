@@ -8,7 +8,7 @@ import {
   CATEGORIA_POR_ETAPA, ESQUEMA_RESULTADO, EXTRACTOR_VERSION, depurarResultado, Extraccion, Fragmento, construirSolicitud, estimarTokens, huellaContenido, necesitaInterpretacion,
   seleccionarFragmentos, validarRespuesta,
 } from './contratacion-ia';
-import { extraerCierreOcr, fusionarCierreOcr, fusionarLecturaVisual, fusionarPresupuestoNativo, LecturaVisual } from './contratacion-presupuesto-nativo';
+import { extraerCierreOcr, extraerPresupuestoNativo, fusionarCierreOcr, fusionarLecturaVisual, fusionarPresupuestoNativo, LecturaVisual } from './contratacion-presupuesto-nativo';
 import { EjecutorOcr, MIN_TEXTO_NATIVO, MOTOR_OCR, OcrLocal } from './contratacion-ocr';
 import { normalizar } from './contratacion-sugerencias';
 import { extraerNativo } from './contratacion-nativo';
@@ -315,6 +315,26 @@ export class ContratacionIaService {
       this.anotar(v.id, 'NATIVO', [], 0, []);
       r.nativas++;
       return;
+    }
+
+    // Tabla de presupuesto (costo directo, AIU, IVA y total) legible del texto nativo, con controles aritméticos que cuadran: se guarda sin llamar a la API.
+    // Una lectura aceptada previa (OK) nunca se degrada (guardarFila).
+    if (!forzar) {
+      const pres = extraerPresupuestoNativo(paginas);
+      if (pres.ok === true) {
+        const pr = pres.presupuesto;
+        const resultado = depurarResultado({
+          nativo: true, esquema: ESQUEMA_RESULTADO,
+          trazabilidad: { extractor: EXTRACTOR_VERSION, origen: 'NATIVO', desglose: `NATIVO_POR_ORDEN (p. ${pr.pagina}; asociación aceptada porque los ${pr.controles_aritmeticos.length} controles aritméticos cuadran)` },
+          campos: pr.edificio ? { edificio: { valor: pr.edificio, pagina: pr.pagina, cita: pr.cita_edificio ?? pr.edificio } } : {},
+          areas: [], partidas: pr.partidas, controles_aritmeticos: pr.controles_aritmeticos,
+          no_encontrados: [{ campo: 'contratista', motivo: 'no se leyó de forma nativa' }],
+        });
+        await this.guardarFila(v.id, { estado: 'NATIVO', paginas_ocr: 0, resultado: resultado as any });
+        this.anotar(v.id, 'NATIVO', [], 0, []);
+        r.nativas++;
+        return;
+      }
     }
 
     // Un resultado ya verificado de otra versión del extractor, con el esquema vigente, se reutiliza: cambiar los filtros no obliga a repetir la llamada.

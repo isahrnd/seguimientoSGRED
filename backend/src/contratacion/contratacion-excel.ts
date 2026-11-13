@@ -95,7 +95,7 @@ export async function leerCeldas(buf: Buffer, refs: Array<{ hoja: string; celda:
   });
 }
 
-export interface CeldaTabla { valor: CeldaVista; enlace: string | null }
+export interface CeldaTabla { valor: CeldaVista; enlace: string | null; /** Fórmula almacenada (solo como dato; nunca se evalúa). Una fórmula compartida se indica con la celda maestra. */ formula?: string | null }
 export interface HojaTabla { nombre: string; filas: Map<number, Map<number, CeldaTabla>> }
 
 /**
@@ -113,7 +113,8 @@ export async function leerTablas(buf: Buffer, limites = { maxHojas: 8, maxFilas:
         if (c > limites.maxColumnas) return;
         const v = cell.value;
         const enlace = v && typeof v === 'object' && typeof v.hyperlink === 'string' ? v.hyperlink.slice(0, 2000) : null;
-        cols.set(c, { valor: valorComoDato(v), enlace });
+        const formula = v && typeof v === 'object' ? (typeof v.formula === 'string' ? v.formula.slice(0, 200) : typeof v.sharedFormula === 'string' ? `fórmula compartida de ${v.sharedFormula}` : null) : null;
+        cols.set(c, { valor: valorComoDato(v), enlace, formula });
       });
       filas.set(r, cols);
     });

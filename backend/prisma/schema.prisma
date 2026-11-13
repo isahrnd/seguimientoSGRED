@@ -90,6 +90,8 @@ model ContratacionDocumentoVersion {
   cotizaciones_edificio ContratacionCotizacionEdificio[]
   matriz_filas          ContratacionMatrizFila[]
   matriz_lectura        ContratacionMatrizLectura?
+  consolidado_filas     ContratacionConsolidadoFila[]
+  consolidado_lectura   ContratacionConsolidadoLectura?
   ia_extracciones       ContratacionIaExtraccion[]
   areas                 ContratacionAreaDocumentada[]
 
@@ -363,6 +365,7 @@ model ContratacionEdificio {
   resoluciones ContratacionResolucionEdificio[]
   cotizaciones ContratacionCotizacionEdificio[]
   areas        ContratacionAreaDocumentada[]
+  consolidado  ContratacionConsolidadoFila[]
 
   @@map("tbl_contratacion_edificios")
 }
@@ -679,4 +682,47 @@ model ContratacionAreaDocumentada {
 
   @@unique([version_id, pagina, tipo, valor], map: "uq_contratacion_area")
   @@map("tbl_contratacion_areas")
+}
+
+/// Consolidado de seguimiento (Excel de presentación): una fila por edificación, tal como la reporta el consolidado, con su hoja y celdas.
+/// Es una fuente reportada: no verifica contratos, actas ni áreas; se muestra con la etiqueta «Según consolidado del <fecha de corte>».
+model ContratacionConsolidadoFila {
+  id             Int      @id @default(autoincrement())
+  version_id     Int
+  hoja           String
+  fila           Int
+  nombre         String
+  direccion      String?
+  estado         String?
+  avance         String?
+  valor          Decimal? @db.Decimal(20, 2)
+  area_m2        Decimal? @db.Decimal(14, 2)
+  valor_m2       Decimal? @db.Decimal(16, 2)
+  responsable    String?
+  /// Fórmula de la celda de valor cuando la hoja lo calcula (p. ej. área × valor por m²); el valor es el resultado almacenado en el archivo.
+  formula_valor  String?
+  celdas         Json
+  fecha_corte    DateTime? @db.Date
+  edificio_id    Int?
+  /// Cómo se vinculó con el edificio registrado: NOMBRE_EXACTO o NOMBRE_Y_DIRECCION; vacío si no hay vínculo inequívoco.
+  vinculo        String?
+  creado_en      DateTime @default(now())
+
+  version  ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+  edificio ContratacionEdificio?        @relation(fields: [edificio_id], references: [id], onDelete: SetNull)
+
+  @@unique([version_id, hoja, fila], map: "uq_contratacion_consolidado_fila")
+  @@index([edificio_id], map: "idx_contratacion_consolidado_edif")
+  @@map("tbl_contratacion_consolidado_filas")
+}
+
+model ContratacionConsolidadoLectura {
+  version_id Int      @id
+  estado     String
+  filas      Int      @default(0)
+  leida_en   DateTime @default(now())
+
+  version ContratacionDocumentoVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@map("tbl_contratacion_consolidado_lecturas")
 }

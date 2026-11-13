@@ -652,3 +652,44 @@ export interface RespuestaAnalisisPrecios {
   pendientes_de_soporte: Array<{ id: number; proceso: string; intervencion: string; reportado_contratado: boolean; documento_necesario: string }>;
   aviso: string;
 }
+
+// ---------------------------------------------------------------- vista de precios por edificio (misma fuente de datos que el Excel y el PDF)
+export type ProcedenciaValor = "CONTRATO" | "CONSOLIDADO" | "MATRIZ" | "PRESUPUESTO" | "COTIZACION";
+export interface FuenteDato { version_id: number | null; documento: string | null; pagina: number | null; hoja: string | null; celda: string | null }
+export interface DatoValor { valor: number; procedencia: ProcedenciaValor; etiqueta: string; fuente: FuenteDato | null; nota: string | null }
+export type NivelOferta = "COSTO_DIRECTO" | "TOTAL" | "NO_ESPECIFICADO";
+export interface ItemOferta { actividad: string; unidad: string | null; cantidad: number | null; precio_unitario: number | null; subtotal: number | null; nivel: string; fuente: FuenteDato | null }
+export interface OfertaEdificio {
+  empresa: string; documento: string; version_id: number | null; etapa: "COTIZACION"; fecha: string | null; referencia: string | null; nivel: NivelOferta; items: ItemOferta[];
+  componentes: { costo_directo: number | null; administracion: number | null; imprevistos: number | null; utilidad: number | null; iva: number | null; total: number | null };
+  fuentes_componentes: Record<string, FuenteDato | null>; alcance: string | null; oferta_conjunta: { edificios: number; total: number | null } | null; relacion: string;
+  controles: { control: string; estado: string; diferencia: number }[];
+}
+export interface ComparacionOfertas {
+  disponible: boolean; nota: string;
+  niveles: { nivel: NivelOferta; etiqueta: string; ofertas: { empresa: string; valor: number; fecha: string | null; fuente: FuenteDato | null }[]; minimo: number; maximo: number; diferencia: number }[];
+}
+export interface EtapaValor { etapa: string; fecha: string | null; valor: number; procedencia: ProcedenciaValor; fuente: FuenteDato | null; nivel: string | null }
+export interface FilaPrecios {
+  clave: string; edificio_id: number | null; nombre: string; direccion: string | null;
+  responsable: { nombre: string; procedencia: ProcedenciaValor; etiqueta: string; fuente: FuenteDato | null } | null;
+  valor: DatoValor | null; valores_alternos: DatoValor[];
+  contrato_conjunto: { proceso: string; contrato: string | null; valor: number; edificios: number; soporte: FuenteDato | null; nota: string } | null;
+  area: { valor: number; clase: "DOCUMENTADA" | "REPORTADA"; etiqueta: string; fuente: FuenteDato | null } | null;
+  valor_m2: { valor: number; clase: "CONTRATADO" | "REPORTADO"; etiqueta: string; fuente: FuenteDato | null; nota: string | null } | null;
+  estado: { etiqueta: string; consolidado: string | null; avance: string | null };
+  documento_contractual: "RESPALDADO" | "CONJUNTO" | "POR_INCORPORAR" | "POR_VINCULAR" | "NO_APLICA";
+  mensajes: string[]; diferencias: string[]; ofertas: OfertaEdificio[]; comparacion: ComparacionOfertas; etapas: EtapaValor[]; etapas_comparables: boolean;
+  procesos: { id: number; proceso: string; numero_contrato: string | null }[]; consolidado_id: number | null;
+}
+export interface VistaPrecios {
+  fecha_corte: string | null; generado_en: string; filas: FilaPrecios[];
+  resumen: { edificios: number; con_valor: number; con_contrato_respaldado: number; con_contrato_conjunto: number; solo_consolidado: number };
+  revision: { tipo: string; edificio: string; detalle: string; fuente: FuenteDato | null }[];
+  fuentes: { rotulo: string; version_id: number; documento: string }[];
+}
+export interface FichaPrecios {
+  fila: FilaPrecios; fecha_corte: string | null;
+  documentos: { grupo: string; documento_id: number | null; version_id: number | null; nombre: string; formato: string; disponible: boolean; evidencias: { fuente_tipo: string; detalle: string }[] }[];
+  detalle_tecnico: unknown;
+}

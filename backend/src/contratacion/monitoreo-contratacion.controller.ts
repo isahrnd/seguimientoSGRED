@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, ParseIntPipe, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import {
   ContratacionAccesoGuard, ContratacionAccesoService, ContratacionSoloOperacionGuard, aplicarCabecerasPrivadas,
 } from './contratacion-acceso.guard';
@@ -8,6 +8,7 @@ import { ContratacionEdificiosService } from './contratacion-edificios.service';
 import { ContratacionDocumentosService } from './contratacion-documentos.service';
 import { ContratacionImportacionService } from './contratacion-importacion.service';
 import { ContratacionIndiceService } from './contratacion-indice.service';
+import { ContratacionPreciosEdificioService } from './contratacion-precios-edificio.service';
 import { ContratacionSincronizacionService } from './contratacion-sincronizacion.service';
 
 /**
@@ -26,6 +27,7 @@ export class MonitoreoContratacionController {
     private readonly indice: ContratacionIndiceService,
     private readonly sincronizacion: ContratacionSincronizacionService,
     private readonly importacion: ContratacionImportacionService,
+    private readonly preciosEdificio: ContratacionPreciosEdificioService,
   ) {}
 
   /** Para el menú: no revela datos; solo si la sesión actual es la cuenta autorizada. */
@@ -45,6 +47,23 @@ export class MonitoreoContratacionController {
   @Get('edificios')
   listarEdificios(@Query('q') q?: string) {
     return this.edificios.listar(q);
+  }
+
+  /** Vista de precios por edificio (la misma que usan el Excel y el PDF). */
+  @UseGuards(ContratacionAccesoGuard)
+  @Get('precios-por-edificio')
+  async preciosPorEdificio(@Res({ passthrough: true }) res: any) {
+    aplicarCabecerasPrivadas(res);
+    return this.preciosEdificio.vistaGeneral();
+  }
+
+  @UseGuards(ContratacionAccesoGuard)
+  @Get('precios-por-edificio/:clave')
+  async fichaPrecios(@Param('clave') clave: string, @Res({ passthrough: true }) res: any) {
+    aplicarCabecerasPrivadas(res);
+    const f = await this.preciosEdificio.ficha(clave);
+    if (!f) throw new NotFoundException('Edificio no encontrado');
+    return f;
   }
 
   @UseGuards(ContratacionAccesoGuard)
@@ -107,6 +126,41 @@ export class MonitoreoContratacionController {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="resumen-por-contrato.xlsx"');
     res.end(libro);
+  }
+
+  /** Informe PDF: resumen de los edificios (filtrados por `claves`) o de uno solo; descarga autenticada y privada. */
+  @UseGuards(ContratacionAccesoGuard)
+  @Get('exportar/pdf/analisis-precios')
+  async exportarPdfGeneral(@Query('claves') claves: string | undefined, @Res() res: any) {
+    const lista = (claves ?? '').split(',').map((x) => x.trim()).filter((x) => /^[ec]\d{1,6}$/.test(x));
+    const pdf = await this.preciosEdificio.pdfGeneral(lista.length ? lista : undefined);
+    aplicarCabecerasPrivadas(res);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="analisis-de-precios.pdf"');
+    res.end(pdf);
+  }
+
+  @UseGuards(ContratacionAccesoGuard)
+  @Get('exportar/precios-por-edificio')
+  async exportarPreciosExcel(@Query('claves') claves: string | undefined, @Res() res: any) {
+    const lista = (claves ?? '').split(',').map((x) => x.trim()).filter((x) => /^[ec]\d{1,6}$/.test(x));
+    const libro = await this.preciosEdificio.excelGeneral(lista.length ? lista : undefined);
+    aplicarCabecerasPrivadas(res);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="precios-por-edificio.xlsx"');
+    res.end(libro);
+  }
+
+  @UseGuards(ContratacionAccesoGuard)
+  @Get('exportar/pdf/edificio/:clave')
+  async exportarPdfEdificio(@Param('clave') clave: string, @Query('anexo') anexo: string | undefined, @Res() res: any) {
+    if (!/^[ec]\d{1,6}$/.test(clave)) throw new NotFoundException('Edificio no encontrado');
+    const pdf = await this.preciosEdificio.pdfEdificio(clave, anexo === '1' || anexo === 'true');
+    if (!pdf) throw new NotFoundException('Edificio no encontrado');
+    aplicarCabecerasPrivadas(res);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="informe-${clave}.pdf"`);
+    res.end(pdf);
   }
 
   @UseGuards(ContratacionAccesoGuard)
