@@ -13,6 +13,7 @@ import { SinAcceso, ErrorCarga } from "@/components/estados";
 import type { DocumentoBiblioteca, Faceta } from "@/types/contratacion";
 import { ListaExpedientes } from "@/components/expedientes-lista";
 import { ListaEdificaciones } from "@/components/edificaciones-lista";
+import { IndiceControl } from "@/components/indice-control";
 import { PALETA } from "@/theme/theme";
 
 const SECCIONES = ["seccion"] as const;
@@ -128,6 +129,7 @@ function Contenido() {
   const seccion = (["expedientes", "edificaciones"].includes(valores.seccion) ? valores.seccion : "documentos") as Seccion;
   return (
     <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}><IndiceControl /></div>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 16px" }}>
         <Typography.Title level={1} style={{ margin: 0, fontSize: 30 }}>Documentos</Typography.Title>
         <Segmented<Seccion>

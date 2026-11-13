@@ -44,13 +44,22 @@ export function valorDeOferta(o: OfertaEdificio): { valor: number; base: string;
   return null;
 }
 
-const corto = (t: string, n = 110) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
+/** Recorta en el límite de una palabra (nunca a mitad de ella) y marca el corte con «…». */
+const corto = (t: string, n = 96) => {
+  if (t.length <= n) return t;
+  const corte = t.slice(0, n - 1);
+  const ultimo = corte.lastIndexOf(' ');
+  return `${(ultimo > n * 0.6 ? corte.slice(0, ultimo) : corte).trimEnd().replace(/[ ,;:·-]+$/, '')}…`;
+};
 const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export function alcanceResumido(o: OfertaEdificio): string {
   const base = o.alcance ? o.alcance : o.items.length === 1 ? o.items[0].actividad : o.items.length > 1 ? `${o.items.length} actividades` : '';
-  const conj = o.oferta_conjunta ? `Oferta conjunta de ${o.oferta_conjunta.edificios} edificios; cifra de este edificio` : '';
-  return corto([base, conj].filter(Boolean).join(' · ') || 'Alcance no detallado en la oferta');
+  const conj = o.oferta_conjunta ? `Oferta conjunta de ${o.oferta_conjunta.edificios} edificios` : '';
+  // La parte conjunta se conserva completa: se recorta la descripción de la actividad, no la advertencia.
+  const sep = base && conj ? ' · ' : '';
+  const margen = 96 - sep.length - conj.length;
+  return (base ? corto(base, Math.max(24, margen)) : '') + sep + conj || 'Alcance no detallado en la oferta';
 }
 
 /** Palabras corrientes de razón social: no identifican a una empresa. */

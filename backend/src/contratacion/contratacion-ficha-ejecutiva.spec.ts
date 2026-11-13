@@ -41,7 +41,7 @@ describe('capa ejecutiva de la ficha', () => {
 
   it('una oferta conjunta se resume con su alcance y sin atribuir el total al edificio', () => {
     const o = oferta('A', { oferta_conjunta: { edificios: 9, total: 9_000_000 } });
-    expect(alcanceResumido(o)).toBe('Demolición total · Oferta conjunta de 9 edificios; cifra de este edificio');
+    expect(alcanceResumido(o)).toBe('Demolición total · Oferta conjunta de 9 edificios');
     expect(JSON.stringify(construirFila(entrada({ ofertas: [o] })).ejecutivo)).not.toContain('9000000');
   });
 

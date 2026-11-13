@@ -6,7 +6,6 @@ import { Button, Dropdown, Grid, Layout } from "antd";
 import { ApartmentOutlined, FileSearchOutlined, LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { IndiceControl } from "./indice-control";
 
 /** Dos entradas: Demoliciones (inicio) y Documentos (gestión documental y trazabilidad). */
 const ITEMS = [
@@ -58,7 +57,6 @@ export function Shell({ nombre, children }: { nombre: string; children: React.Re
         </div>
       </Layout.Header>
       <Layout.Content id="contenido" className="contenedor">
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}><IndiceControl /></div>
         {children}
       </Layout.Content>
     </Layout>

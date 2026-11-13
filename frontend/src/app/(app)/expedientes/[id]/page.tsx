@@ -43,7 +43,7 @@ export default function ResumenContratoPage({ params }: { params: Promise<{ id: 
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
         <Dato etiqueta="Valor del contrato" valor={contrato ? cop(contrato.valor) : "Por incorporar"} detalle={contrato ? (contrato.expresion_valor ?? "Valor contratado") : "El contrato aún no está incorporado"} />
-        <Dato etiqueta="Contratista" valor={<span style={{ fontSize: 22 }}>{contrato?.contratista ?? e.empresa_seleccionada ?? "Por identificar"}</span>} detalle={contrato?.fecha_acto ? `Suscrito el ${fechaCorta(contrato.fecha_acto)}` : "Fecha por documentar"} />
+        <Dato etiqueta="Contratista" valor={<span style={{ fontSize: 22 }}>{contrato?.contratista ?? e.empresa_seleccionada ?? "Por identificar"}</span>} detalle={(contrato?.fecha_acto ?? contrato?.firma_fecha) ? `Suscrito el ${fechaCorta(contrato.fecha_acto ?? contrato.firma_fecha)}` : "Fecha por documentar"} />
         <Dato etiqueta="Edificios" valor={String(d.edificios.length)} detalle={d.edificios.length > 1 ? "El valor corresponde a todos; no se reparte" : "Sin edificios registrados aún"} />
       </div>
 

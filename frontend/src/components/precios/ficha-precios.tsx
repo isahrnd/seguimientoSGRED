@@ -70,7 +70,7 @@ function Desglose({ ficha }: { ficha: FichaPrecios }) {
   return (
     <div style={{ display: "grid", gap: 10 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>{etiquetaOferta(o, (iso) => fechaCorta(iso))}</div>
+        {conDesglose.length <= 1 && <div style={{ fontSize: 16, fontWeight: 600 }}>{etiquetaOferta(o, (iso) => fechaCorta(iso))}</div>}
         {conDesglose.length > 1 && (
           <Select
             style={{ minWidth: 280, maxWidth: "100%" }} aria-label="Oferta cuyo desglose se muestra" value={indice ?? undefined} onChange={setElegida}
