@@ -3,7 +3,7 @@ import { BotonEnlace } from "@/components/boton-enlace";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Empty, Grid, Input, Pagination, Segmented, Select, Skeleton, Table, Tag, Typography } from "antd";
-import { FileExcelOutlined, FilePdfOutlined, FileOutlined, SearchOutlined } from "@ant-design/icons";
+import { DownloadOutlined, FileExcelOutlined, FilePdfOutlined, FileOutlined, SearchOutlined } from "@ant-design/icons";
 import { useBiblioteca } from "@/hooks/queries";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useScrollRestore } from "@/hooks/use-scroll-restore";
@@ -11,8 +11,11 @@ import { esErrorDeAcceso } from "@/lib/api";
 import { urlAbrirOriginal } from "@/lib/format";
 import { SinAcceso, ErrorCarga } from "@/components/estados";
 import type { DocumentoBiblioteca, Faceta } from "@/types/contratacion";
+import { ListaExpedientes } from "@/components/expedientes-lista";
+import { ListaEdificaciones } from "@/components/edificaciones-lista";
 import { PALETA } from "@/theme/theme";
 
+const SECCIONES = ["seccion"] as const;
 const CLAVES = ["vista", "q", "categoria", "formato", "edificacion", "origen", "expediente", "pagina"] as const;
 const opciones = (f?: Faceta[]) => (f ?? []).map((x) => ({ value: x.valor, label: `${x.nombre} (${x.n})` }));
 
@@ -23,14 +26,14 @@ function IconoFormato({ f }: { f: DocumentoBiblioteca["formato"] }) {
 
 function Vinculos({ d }: { d: DocumentoBiblioteca }) {
   const partes: React.ReactNode[] = [];
-  if (d.expediente) partes.push(<Link key="e" href={`/expedientes/${d.expediente.id}`}>{d.expediente.proceso}{d.expediente.confirmado ? "" : " (sugerido)"}</Link>);
+  if (d.expediente) partes.push(<Link key="e" href={`/documentos/trazabilidad/expediente/${d.expediente.id}`}>{d.expediente.proceso}{d.expediente.confirmado ? "" : " (sugerido)"}</Link>);
   if (d.edificios_confirmados.length) partes.push(<span key="b">{d.edificios_confirmados.map((x) => x.nombre).join(", ")}</span>);
   else if (d.es_general) partes.push(<span key="g">Comparativo general</span>);
   if (d.empresas.length) partes.push(<span key="m">{d.empresas.filter((e) => e.estado !== "DESCARTADA").map((e) => e.valor).join(", ")}</span>);
   return <>{partes.filter(Boolean).map((p, i) => <span key={i}>{i > 0 && " · "}{p}</span>)}</>;
 }
 
-function Contenido() {
+function Biblioteca() {
   const { valores, cambiar } = useUrlState(CLAVES);
   const [texto, setTexto] = useState(valores.q);
   const movil = !Grid.useBreakpoint().md;
@@ -58,7 +61,6 @@ function Contenido() {
 
   return (
     <>
-      <Typography.Title level={1} style={{ margin: "0 0 16px", fontSize: 30 }}>Documentos</Typography.Title>
       <Input size="large" allowClear prefix={<SearchOutlined />} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Buscar por nombre, edificación, empresa o proceso" aria-label="Buscar documentos" style={{ maxWidth: 760, height: 52 }} />
       <div style={{ marginTop: 16 }}>
         <Segmented
@@ -114,6 +116,35 @@ function Contenido() {
       {d && d.total > d.tam && (
         <Pagination style={{ marginTop: 16, textAlign: "right" }} current={d.pagina} pageSize={d.tam} total={d.total} showSizeChanger={false} onChange={(p) => { cambiar({ pagina: p > 1 ? String(p) : "" }); window.scrollTo(0, 0); }} />
       )}
+    </>
+  );
+}
+
+type Seccion = "documentos" | "expedientes" | "edificaciones";
+
+/** Gestión documental: la biblioteca y, con los mismos permisos, las listas técnicas de expedientes y edificaciones (trazabilidad, vínculos y estados internos). */
+function Contenido() {
+  const { valores, cambiar } = useUrlState(SECCIONES);
+  const seccion = (["expedientes", "edificaciones"].includes(valores.seccion) ? valores.seccion : "documentos") as Seccion;
+  return (
+    <>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 16px" }}>
+        <Typography.Title level={1} style={{ margin: 0, fontSize: 30 }}>Documentos</Typography.Title>
+        <Segmented<Seccion>
+          value={seccion} onChange={(v) => cambiar({ seccion: v === "documentos" ? "" : v })}
+          options={[{ label: "Biblioteca", value: "documentos" }, { label: "Expedientes", value: "expedientes" }, { label: "Edificaciones", value: "edificaciones" }]}
+        />
+      </div>
+      {seccion === "expedientes" && (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", margin: "0 0 12px" }}>
+            <Button href="/api/monitoreo-contratacion/exportar/resumen-contratos" icon={<DownloadOutlined />} aria-label="Exportar resumen por contrato (Excel)">Exportar resumen por contrato</Button>
+          </div>
+          <ListaExpedientes completo />
+        </>
+      )}
+      {seccion === "edificaciones" && <ListaEdificaciones />}
+      {seccion === "documentos" && <Biblioteca />}
     </>
   );
 }

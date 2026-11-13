@@ -26,6 +26,8 @@ export const fechaCorteTexto = (iso: string | null | undefined) => {
 };
 export const etiquetaConsolidado = (corte: string | null | undefined) => (corte ? `Según consolidado del ${fechaCorteTexto(corte)}` : 'Según consolidado');
 
+import { construirEjecutiva, type FilaEjecutiva } from './contratacion-ficha-ejecutiva';
+
 export interface DatoValor { valor: number; procedencia: Procedencia; etiqueta: string; fuente: FuenteDato | null; nota: string | null }
 
 export interface ContratoEntrada { valor: number; tipo_acto: string; numero: string | null; contratista: string | null; soporte: FuenteDato | null }
@@ -109,6 +111,8 @@ export interface FilaEdificio {
   procesos: Array<{ id: number; proceso: string; numero_contrato: string | null }>;
   /** Orden de la fila en el consolidado (para presentar los edificios en el orden del reporte); null si no figura en él. */
   consolidado_id: number | null;
+  /** Capa ejecutiva (la misma para pantalla y PDF): oferta mostrada, comparación resumida, nota única, enlace al contrato y diferencias. */
+  ejecutivo: FilaEjecutiva;
 }
 
 export interface Comparacion {
@@ -168,6 +172,8 @@ export function construirFila(e0: EntradaFila): FilaEdificio {
   const conjuntos = conContrato.filter((p) => p.edificios_del_proceso > 1);
   const valores: DatoValor[] = [];
   const diferencias: string[] = [];
+  const difs: Array<{ texto: string; corto: string; magnitud: number }> = [];
+  const anotar = (texto: string, corto: string, magnitud: number) => { diferencias.push(texto); difs.push({ texto, corto, magnitud }); };
   const mensajes: string[] = [];
 
   // --- valores disponibles, cada uno con su procedencia
@@ -189,7 +195,7 @@ export function construirFila(e0: EntradaFila): FilaEdificio {
   for (const a of alternos) {
     if (!principal) break;
     const dif = r2(principal.valor - a.valor);
-    if (Math.abs(dif) >= 0.005) diferencias.push(`${principal.etiqueta}: ${cop(principal.valor)} y ${a.etiqueta.toLowerCase()}: ${cop(a.valor)}; diferencia de ${cop(Math.abs(dif))}. No consta la causa de la diferencia en los documentos.`);
+    if (Math.abs(dif) >= 0.005) anotar(`${principal.etiqueta}: ${cop(principal.valor)} y ${a.etiqueta.toLowerCase()}: ${cop(a.valor)}; diferencia de ${cop(Math.abs(dif))}. No consta la causa de la diferencia en los documentos.`, `Valor distinto según la fuente: ${principal.etiqueta.toLowerCase()} ${cop(principal.valor)} y ${a.etiqueta.toLowerCase()} ${cop(a.valor)}.`, Math.abs(dif));
   }
 
   // --- contrato que cubre varios edificios: se muestra como tal
@@ -204,7 +210,7 @@ export function construirFila(e0: EntradaFila): FilaEdificio {
   if (e.area_documentada) area = { valor: e.area_documentada.valor, clase: 'DOCUMENTADA', etiqueta: 'Área documentada', fuente: e.area_documentada.fuente };
   else if (c?.area_m2 != null) area = { valor: c.area_m2, clase: 'REPORTADA', etiqueta: etiquetaConsolidado(c.fecha_corte), fuente: c.fuentes.area_m2 };
   if (e.area_documentada && c?.area_m2 != null && Math.abs(e.area_documentada.valor - c.area_m2) >= 0.005) {
-    diferencias.push(`Área documentada ${m2fmt(e.area_documentada.valor)} m² y área del consolidado ${m2fmt(c.area_m2)} m²; no consta cuál corresponde al alcance contratado.`);
+    anotar(`Área documentada ${m2fmt(e.area_documentada.valor)} m² y área del consolidado ${m2fmt(c.area_m2)} m²; no consta cuál corresponde al alcance contratado.`, `Área distinta según la fuente: documentada ${m2fmt(e.area_documentada.valor)} m² y consolidado ${m2fmt(c.area_m2)} m².`, 1e6);
   }
 
   // --- valor por m²
@@ -215,7 +221,7 @@ export function construirFila(e0: EntradaFila): FilaEdificio {
     const calculado = r2(c.valor / c.area_m2);
     const reportado = c.valor_m2 ?? calculado;
     m2 = { valor: r2(reportado), clase: 'REPORTADO', etiqueta: `Valor por m² reportado (${etiquetaConsolidado(c.fecha_corte).toLowerCase()})`, fuente: c.fuentes.valor_m2 ?? c.fuentes.valor, nota: Math.abs(calculado - reportado) > 0.5 ? `El cociente valor ÷ área es ${cop(calculado)}; el consolidado reporta ${cop(reportado)}.` : 'Indicador reportado; no verifica que el área corresponda al alcance contratado.' };
-    if (Math.abs(calculado - reportado) > 0.5) diferencias.push(`Valor por m² del consolidado (${cop(reportado)}) distinto del cociente valor ÷ área (${cop(calculado)}).`);
+    if (Math.abs(calculado - reportado) > 0.5) anotar(`Valor por m² del consolidado (${cop(reportado)}) distinto del cociente valor ÷ área (${cop(calculado)}).`, `El valor por m² del consolidado (${cop(reportado)}) difiere del cociente valor ÷ área (${cop(calculado)}).`, Math.abs(calculado - reportado));
   }
 
   // --- responsable
@@ -255,11 +261,18 @@ export function construirFila(e0: EntradaFila): FilaEdificio {
   const niveles = new Set(etapas.map((x) => x.nivel));
   const etapas_comparables = etapas.length >= 2 && niveles.size === 1 && !niveles.has(null);
 
+  const propio = unico ? { p: unico, conjunto: false } : conjuntos[0] ? { p: conjuntos[0], conjunto: true } : null;
+  const ejecutivo = construirEjecutiva({
+    fila: { valor: principal, area, valor_m2: m2, responsable, documento_contractual, contrato_conjunto: conjunto, ofertas: e.ofertas },
+    contrato: propio ? { fuente: propio.p.contratos[0].soporte, conjunto: propio.conjunto, proceso: propio.p.proceso, proceso_id: propio.p.id } : null,
+    diferencias: difs,
+  });
+
   return {
     clave: e.edificio.id != null ? `e${e.edificio.id}` : `c${c?.id ?? e.edificio.nombre}`,
     edificio_id: e.edificio.id, nombre: e.edificio.nombre, direccion: e.edificio.direccion ?? c?.direccion ?? null,
     responsable, valor: principal, valores_alternos: alternos, contrato_conjunto: conjunto, area, valor_m2: m2, estado, documento_contractual, mensajes, diferencias,
     ofertas: e.ofertas, comparacion, etapas, etapas_comparables, procesos: e.procesos.map((p) => ({ id: p.id, proceso: p.proceso, numero_contrato: p.numero_contrato })),
-    consolidado_id: c?.id ?? null,
+    consolidado_id: c?.id ?? null, ejecutivo,
   };
 }

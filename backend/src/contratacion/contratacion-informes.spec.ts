@@ -71,17 +71,27 @@ describe('pantalla, Excel y PDF muestran las mismas cifras (misma fila de la vis
     expect(t).toContain('no se asigna a cada edificio');
   });
 
-  it('PDF de un edificio: cuatro datos clave, desglose por actividad, comparación por nivel y referencias documentales', async () => {
+  it('PDF ejecutivo de un edificio: valor, área, valor/m², desglose, comparación y referencias breves; sin anexo técnico ni controles aritméticos', async () => {
+    const f = filas()[0];
+    const t = await textoPdf(await informeEdificio({
+      fila: f, fecha_corte: '2026-11-11', generado_en: new Date().toISOString(), anexo: false,
+      documentos: [{ grupo: 'Cotizaciones', nombre: 'EMPRESA UNO.pdf', version_id: 2, formato: 'PDF', evidencias: [{ fuente_tipo: 'PDF_PAGINA', detalle: 'pág. 2' }] }],
+    }));
+    for (const x of ['Edificio Alfa', 'Responsable: EMPRESA A', 'VALOR REPORTADO', cop(123_456_789), '400,5 m²', cop(308_272.26), 'A. Desglose del precio', 'Demolición total', 'B. Comparación de ofertas', 'EMPRESA DOS', 'EMPRESA UNO', 'Referencias', 'hoja Hoja1, celda E2']) expect(t).toContain(x);
+    expect(t).not.toContain('Anexo técnico');
+    expect(t).not.toContain('Controles aritméticos');
+    expect(t).not.toContain('diferencia aritmética');
+    expect(t).not.toMatch(/\d+,\d % /); // nunca una diferencia porcentual entre ofertas
+    expect(t).toMatch(/Página 1 de [12]/);
+  });
+
+  it('el anexo técnico es opcional: conserva controles aritméticos, centavos, etapas y documentos', async () => {
     const f = filas()[0];
     const t = await textoPdf(await informeEdificio({
       fila: f, fecha_corte: '2026-11-11', generado_en: new Date().toISOString(), anexo: true,
       documentos: [{ grupo: 'Cotizaciones', nombre: 'EMPRESA UNO.pdf', version_id: 2, formato: 'PDF', evidencias: [{ fuente_tipo: 'PDF_PAGINA', detalle: 'pág. 2' }] }],
     }));
-    for (const x of ['Edificio Alfa', 'VALOR REPORTADO', cop(123_456_789), '400,5 m²', cop(308_272.26), 'EMPRESA A', 'A. Desglose de precios', 'Demolición total', cop(1000), 'B. Comparación', 'EMPRESA DOS', cop(1200), 'C. Documentos de respaldo', 'hoja Hoja1, celda E2', 'Anexo documental', 'Contenido del documento']) expect(t).toContain(x);
-    expect(t).toContain('diferencia aritmética de $0,40 entre las cifras documentadas');
-    expect(t).toMatch(/Página 1 de \d/);
-    // una comparación solo entre cifras del mismo nivel
-    expect(t).toContain('Costo directo');
+    for (const x of ['Anexo técnico', 'Detalle de cálculo', 'diferencia aritmética de $0,40 entre las cifras documentadas', 'Valores por etapa', 'Documentos del edificio']) expect(t).toContain(x);
   });
 
   it('un PDF largo repite el encabezado de la tabla en cada página y numera todas las páginas', async () => {

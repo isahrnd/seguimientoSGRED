@@ -10,6 +10,17 @@ export default {
     // El navegador solo habla con este origen; la API queda en la red interna.
     return [{ source: "/api/:path*", destination: `${API}/api/:path*` }];
   },
+  async redirects() {
+    // Enlaces antiguos: todos llevan a la ficha única (nunca a la ficha saturada anterior). /expedientes/:id decide por sí mismo
+    // (un edificio: su ficha; varios: resumen compacto del contrato). El detalle técnico vive en /documentos/trazabilidad/....
+    return [
+      { source: "/analisis-precios", destination: "/", permanent: false },
+      { source: "/analisis-precios/:clave", destination: "/demoliciones/:clave", permanent: false },
+      { source: "/edificaciones", destination: "/", permanent: false },
+      { source: "/edificaciones/:id(\\d+)", destination: "/demoliciones/e:id", permanent: false },
+      { source: "/expedientes", destination: "/", permanent: false },
+    ];
+  },
   async headers() {
     // Nada de lo servido se guarda en cachés compartidas ni se restaura con «Atrás» tras cerrar sesión.
     return [{

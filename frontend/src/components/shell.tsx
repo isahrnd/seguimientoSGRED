@@ -3,16 +3,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button, Dropdown, Grid, Layout } from "antd";
-import { FileSearchOutlined, FolderOpenOutlined, HomeOutlined, LogoutOutlined, ApartmentOutlined, LineChartOutlined, UserOutlined } from "@ant-design/icons";
+import { ApartmentOutlined, FileSearchOutlined, LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { IndiceControl } from "./indice-control";
 
+/** Dos entradas: Demoliciones (inicio) y Documentos (gestión documental y trazabilidad). */
 const ITEMS = [
-  { key: "/", href: "/", label: "Inicio", icon: <HomeOutlined /> },
-  { key: "/expedientes", href: "/expedientes", label: "Expedientes", icon: <FolderOpenOutlined /> },
-  { key: "/edificaciones", href: "/edificaciones", label: "Edificaciones", icon: <ApartmentOutlined /> },
-  { key: "/analisis-precios", href: "/analisis-precios", label: "Análisis de precios", icon: <LineChartOutlined /> },
+  { key: "/", href: "/", label: "Demoliciones", icon: <ApartmentOutlined /> },
   { key: "/documentos", href: "/documentos", label: "Documentos", icon: <FileSearchOutlined /> },
 ];
 
@@ -23,7 +21,7 @@ export function Shell({ nombre, children }: { nombre: string; children: React.Re
   const pantallas = Grid.useBreakpoint();
   const compacto = !pantallas.lg;
   const amplio = !!pantallas.xl;
-  const activo = ITEMS.filter((i) => i.key !== "/" && path.startsWith(i.key)).map((i) => i.key)[0] ?? (path === "/" ? "/" : "");
+  const activo = path.startsWith("/documentos") ? "/documentos" : "/";
 
   async function salir() {
     try { await api.logout(); } finally {

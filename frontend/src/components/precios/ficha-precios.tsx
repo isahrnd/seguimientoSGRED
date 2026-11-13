@@ -1,200 +1,243 @@
 "use client";
-import type { ReactNode } from "react";
-import { Collapse, Table, Tag } from "antd";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { Button, Drawer, Segmented, Select, Table, Tag } from "antd";
+import { FileSearchOutlined, FileTextOutlined, FolderOpenOutlined } from "@ant-design/icons";
+import { BotonEnlace } from "@/components/boton-enlace";
 import { cop, fechaCorta } from "@/lib/format";
+import { etiquetaOferta, filasDesglose, type FilaDesglose } from "@/lib/ficha";
 import { urlVisor } from "@/components/soporte-link";
-import { EtiquetaInformativa } from "@/components/estado-informativo";
-import type { FichaPrecios, FilaPrecios, FuenteDato, OfertaEdificio } from "@/types/contratacion";
-import { BarrasSimples } from "./barras-simples";
-import { ETQ_PROCEDENCIA, m2, Procedencia, VerFuente } from "./comunes";
+import type { FichaPrecios, FilaComparacionEjecutiva, FilaPrecios, FuenteDato } from "@/types/contratacion";
+import { BotonPdf, FuenteLink, m2 } from "./comunes";
 
-const caja: React.CSSProperties = { background: "#fff", border: "1px solid #D5DBE5", borderRadius: 10, padding: "14px 16px", minWidth: 0 };
+const caja: React.CSSProperties = { background: "#fff", border: "1px solid #D5DBE5", borderRadius: 10, padding: "16px 20px", minWidth: 0 };
+const h2: React.CSSProperties = { fontSize: 20, margin: "0 0 12px", color: "#1B3A6B", fontWeight: 650 };
 
-function Dato({ etiqueta, valor, detalle, fuente }: { etiqueta: string; valor: ReactNode; detalle?: ReactNode; fuente?: FuenteDato | null }) {
+function Dato({ etiqueta, valor, detalle, fuente }: { etiqueta: string; valor: ReactNode; detalle: ReactNode; fuente?: FuenteDato | null }) {
   return (
     <div style={caja}>
-      <div className="texto-secundario" style={{ fontSize: 12.5, textTransform: "uppercase", letterSpacing: 0.3 }}>{etiqueta}</div>
-      <div className="cifra" style={{ fontSize: 24, fontWeight: 700, color: "#1B3A6B", margin: "4px 0 2px", overflowWrap: "anywhere" }}>{valor}</div>
-      <div className="texto-secundario" style={{ fontSize: 13 }}>{detalle}</div>
-      {fuente ? <div style={{ marginTop: 4 }}><VerFuente fuente={fuente} /></div> : null}
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: "#4A5568", textTransform: "uppercase", letterSpacing: 0.3 }}>{etiqueta}</div>
+      <div className="cifra" style={{ fontSize: 30, fontWeight: 700, color: "#1B3A6B", margin: "6px 0 4px", lineHeight: 1.15 }}>{valor}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", alignItems: "baseline", fontSize: 14.5 }}>
+        <span className="texto-secundario">{detalle}</span>
+        {fuente ? <FuenteLink fuente={fuente} /> : null}
+      </div>
     </div>
   );
 }
 
-/** Los cuatro datos que responden lo esencial: valor, área, valor por m² y responsable (cada uno con su procedencia y su fuente). */
-export function DatosClave({ f }: { f: FilaPrecios }) {
+/** Tres datos esenciales. La fuente de cada uno se abre con un clic; el nombre del archivo no se despliega aquí. */
+function DatosClave({ f }: { f: FilaPrecios }) {
+  const contratado = f.valor?.procedencia === "CONTRATO";
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
       <Dato
-        etiqueta={f.valor?.procedencia === "CONTRATO" ? "Valor contratado" : "Valor reportado"}
+        etiqueta={contratado ? "Valor contratado" : "Valor reportado"}
         valor={f.valor ? cop(f.valor.valor) : f.contrato_conjunto ? "Contrato conjunto" : "Por documentar"}
-        detalle={f.valor ? <><Procedencia p={f.valor.procedencia} /> <span>{f.valor.etiqueta}</span></> : f.contrato_conjunto ? `${cop(f.contrato_conjunto.valor)} · ${f.contrato_conjunto.edificios} edificaciones` : undefined}
+        detalle={f.valor ? f.valor.etiqueta : f.contrato_conjunto ? `${cop(f.contrato_conjunto.valor)} · ${f.contrato_conjunto.edificios} edificios` : "Sin soporte aún"}
         fuente={f.valor?.fuente ?? f.contrato_conjunto?.soporte}
       />
-      <Dato etiqueta="Área" valor={f.area ? m2(f.area.valor) : "Por precisar"} detalle={f.area ? f.area.etiqueta : "Aún no hay un área documentada ni reportada"} fuente={f.area?.fuente} />
+      <Dato
+        etiqueta="Área"
+        valor={f.area ? m2(f.area.valor) : "Por precisar"}
+        detalle={f.area ? (f.area.clase === "DOCUMENTADA" ? "Verificada en documentos" : `Reportada · ${f.area.etiqueta.charAt(0).toLowerCase()}${f.area.etiqueta.slice(1)}`) : "Sin fuente aún"}
+        fuente={f.area?.fuente}
+      />
       <Dato
         etiqueta={f.valor_m2?.clase === "CONTRATADO" ? "Valor contratado por m²" : "Valor por m²"}
         valor={f.valor_m2 ? cop(f.valor_m2.valor) : "Por precisar"}
-        detalle={f.valor_m2 ? (f.valor_m2.clase === "REPORTADO" ? "Indicador reportado (consolidado)" : "Contrato ÷ área documentada") : undefined}
+        detalle={f.valor_m2 ? (f.valor_m2.clase === "REPORTADO" ? "Reportado en el consolidado" : "Contrato ÷ área verificada") : "Requiere valor y área"}
         fuente={f.valor_m2?.fuente}
       />
-      <Dato etiqueta="Responsable" valor={<span style={{ fontSize: 20 }}>{f.responsable?.nombre ?? "Por identificar"}</span>} detalle={f.responsable?.etiqueta} fuente={f.responsable?.fuente} />
     </div>
   );
 }
 
-const fechaOferta = (iso: string | null) => (iso ? fechaCorta(iso) : null);
+const Secuencia = ({ s }: { s: "ANTERIOR" | "POSTERIOR" | null }) => (s ? <Tag style={{ marginInlineStart: 8 }}>{s === "ANTERIOR" ? "Anterior" : "Posterior"}</Tag> : null);
+const fecha = (iso: string | null) => (iso ? fechaCorta(iso) : "—");
 
-function TablaOferta({ o }: { o: OfertaEdificio }) {
-  const c = o.componentes;
-  const comp = ([["Costo directo", c.costo_directo, "costo_directo"], ["Administración", c.administracion, "administracion"], ["Imprevistos", c.imprevistos, "imprevistos"], ["Utilidad", c.utilidad, "utilidad"], ["IVA", c.iva, "iva"], ["Total de la oferta", c.total, "total"]] as const)
-    .filter(([, v]) => v !== null).map(([etq, v, k]) => ({ k, etq, valor: v as number, fuente: o.fuentes_componentes[k] }));
-  return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <p className="texto-secundario" style={{ margin: 0, fontSize: 13 }}>
-        {o.relacion}.{o.alcance ? ` ${o.alcance}.` : ""}{o.oferta_conjunta ? ` Oferta conjunta de ${o.oferta_conjunta.edificios} edificios${o.oferta_conjunta.total ? `: total de la oferta ${cop(o.oferta_conjunta.total)} (no es el valor de este edificio)` : ""}.` : ""}
-      </p>
-      {o.items.length > 0 && (
-        <Table
-          size="small" pagination={false} rowKey={(_, i) => String(i)} dataSource={o.items} scroll={{ x: 640 }}
-          columns={[
-            { title: "Actividad", dataIndex: "actividad", render: (t: string) => <span className="largo">{t}</span> },
-            { title: "Unidad", dataIndex: "unidad", width: 90 },
-            { title: "Cantidad", dataIndex: "cantidad", align: "right", width: 90, render: (v: number | null) => (v === null ? "" : v.toLocaleString("es-CO", { maximumFractionDigits: 2 })) },
-            { title: "Precio unitario", dataIndex: "precio_unitario", align: "right", width: 130, render: (v: number | null) => (v === null ? "" : <span className="cifra">{cop(v)}</span>) },
-            { title: "Subtotal", dataIndex: "subtotal", align: "right", width: 140, render: (v: number | null) => (v === null ? "" : <span className="cifra">{cop(v)}</span>) },
-            { title: "Fuente", dataIndex: "fuente", width: 130, render: (fu) => <VerFuente fuente={fu} texto="Ver" /> },
-          ]}
-        />
-      )}
-      {comp.length > 0 && (
-        <Table
-          size="small" pagination={false} rowKey="k" dataSource={comp} scroll={{ x: 480 }}
-          columns={[
-            { title: "Componente (con la base de cálculo de cada fuente)", dataIndex: "etq" },
-            { title: "Valor", dataIndex: "valor", align: "right", width: 150, render: (v: number) => <span className="cifra" style={{ fontWeight: 600 }}>{cop(v)}</span> },
-            { title: "Fuente", dataIndex: "fuente", width: 130, render: (fu) => <VerFuente fuente={fu} texto="Ver" /> },
-          ]}
-        />
-      )}
-      {o.controles.length > 0 && (
-        <ul className="texto-secundario" style={{ margin: 0, paddingLeft: 18, fontSize: 12.5 }}>
-          {o.controles.map((k, i) => (
-            <li key={i}>{k.control}: {k.estado === "CUADRA" ? "cuadra" : Math.abs(k.diferencia) < 1 ? `Diferencia aritmética de ${cop(Math.abs(k.diferencia))} entre las cifras documentadas` : `no cuadra (diferencia ${cop(k.diferencia)})`}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-const h2 = { fontSize: 19, margin: "0 0 10px", color: "#1B3A6B" } as const;
-
-/** Ficha ejecutiva de un edificio: cuatro datos y, luego, A. Desglose, B. Comparación y C. Documentos de respaldo. Lo técnico queda en desplegables. */
-export function FichaPreciosEdificio({ ficha, tecnico, tecnicoEtiqueta }: { ficha: FichaPrecios; tecnico?: ReactNode; tecnicoEtiqueta?: string }) {
+/** A. Desglose del precio: una oferta a la vez (la de la empresa responsable cuando consta), con subpartidas plegadas y AIU e IVA una sola vez. */
+function Desglose({ ficha }: { ficha: FichaPrecios }) {
   const f = ficha.fila;
-  const conItems = f.ofertas.filter((o) => o.items.length || o.componentes.costo_directo || o.componentes.total);
-  const actividades = conItems.flatMap((o) => o.items.filter((i) => i.subtotal).map((i) => ({ etiqueta: `${o.empresa}: ${i.actividad}`.slice(0, 70), valor: i.subtotal as number })));
-  const respaldo: { dato: string; fuente: FuenteDato | null }[] = [];
-  if (f.valor) respaldo.push({ dato: `Valor (${f.valor.etiqueta})`, fuente: f.valor.fuente });
-  if (f.area) respaldo.push({ dato: `Área (${f.area.clase === "DOCUMENTADA" ? "documentada" : "reportada"})`, fuente: f.area.fuente });
-  if (f.valor_m2) respaldo.push({ dato: "Valor por m²", fuente: f.valor_m2.fuente });
-  if (f.responsable) respaldo.push({ dato: `Responsable (${f.responsable.etiqueta})`, fuente: f.responsable.fuente });
-  if (f.contrato_conjunto) respaldo.push({ dato: "Contrato conjunto", fuente: f.contrato_conjunto.soporte });
-  for (const v of f.valores_alternos) respaldo.push({ dato: `Otra cifra: ${v.etiqueta}`, fuente: v.fuente });
-
+  const x = f.ejecutivo;
+  const conDesglose = useMemo(() => f.ofertas.map((o, i) => ({ o, i })).filter(({ o }) => o.items.length > 0 || Object.values(o.componentes).some((v) => v !== null)), [f.ofertas]);
+  const [elegida, setElegida] = useState<number | null>(null);
+  const indice = elegida ?? x.desglose_indice;
+  const o = indice !== null ? f.ofertas[indice] : null;
+  if (!o) return <p className="texto-secundario" style={{ margin: 0, fontSize: 15.5 }}>Aún no hay un desglose documentado para este edificio.</p>;
+  const filas = filasDesglose(o);
+  const nota = [o.nota_version, o.oferta_conjunta ? `Oferta conjunta de ${o.oferta_conjunta.edificios} edificios: se muestran solo las filas de este edificio.` : null].filter(Boolean).join(". ");
   return (
-    <div style={{ display: "grid", gap: 26 }}>
-      <DatosClave f={f} />
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        <strong style={{ marginRight: 4 }}>{f.estado.etiqueta}</strong>
-        {f.mensajes.map((m) => <EtiquetaInformativa key={m}>{m}</EtiquetaInformativa>)}
-      </div>
-      {f.contrato_conjunto && <p className="texto-secundario" style={{ margin: "-14px 0 0", fontSize: 13.5 }}>{f.contrato_conjunto.nota}</p>}
-      {f.diferencias.length > 0 && (
-        <Collapse size="small" items={[{ key: "d", label: `Diferencias entre fuentes (${f.diferencias.length})`, children: <ul style={{ margin: 0, paddingLeft: 18 }}>{f.diferencias.map((d, i) => <li key={i}>{d}</li>)}</ul> }]} />
-      )}
-
-      <section aria-labelledby="sec-a">
-        <h2 id="sec-a" style={h2}>A. Desglose de precios</h2>
-        {conItems.length === 0 ? (
-          <p className="texto-secundario" style={{ margin: 0 }}>Aún no hay una oferta con desglose documentado para este edificio.</p>
-        ) : (
-          <Collapse
-            defaultActiveKey={[`${0}`]}
-            items={conItems.map((o, i) => ({
-              key: `${i}`,
-              label: <span><strong>{o.empresa}</strong> <span className="texto-secundario">· {o.documento}{o.referencia ? ` · ${o.referencia}` : ""}{fechaOferta(o.fecha) ? ` · ${fechaOferta(o.fecha)}` : ""}</span>{o.secuencia && <Tag style={{ marginLeft: 8 }}>{o.secuencia === "ANTERIOR" ? "Anterior" : "Posterior"}</Tag>}</span>,
-              children: <>{o.nota_version && <p className="texto-secundario" style={{ margin: "0 0 8px", fontSize: 13.5 }}>{o.nota_version}</p>}<TablaOferta o={o} /></>,
-            }))}
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>{etiquetaOferta(o, (iso) => fechaCorta(iso))}</div>
+        {conDesglose.length > 1 && (
+          <Select
+            style={{ minWidth: 280, maxWidth: "100%" }} aria-label="Oferta cuyo desglose se muestra" value={indice ?? undefined} onChange={setElegida}
+            options={conDesglose.map(({ o: x2, i }) => ({ value: i, label: etiquetaOferta(x2, (iso) => fechaCorta(iso)) }))}
           />
         )}
-        <BarrasSimples titulo="Composición del costo por actividad" datos={actividades.slice(0, 12)} />
-      </section>
-
-      <section aria-labelledby="sec-b">
-        <h2 id="sec-b" style={h2}>B. Comparación</h2>
-        <p className="texto-secundario" style={{ margin: "0 0 8px", fontSize: 13.5 }}>{f.comparacion.nota}</p>
-        {f.comparacion.niveles.map((n) => (
-          <div key={n.nivel} style={{ marginBottom: 14 }}>
-            <Table
-              size="small" pagination={false} rowKey={(r) => `${r.etiqueta}-${r.valor}`} dataSource={n.ofertas} scroll={{ x: 420 }}
-              columns={[
-                { title: n.etiqueta, dataIndex: "etiqueta", render: (t: string, r) => <span>{t}{r.secuencia && <Tag style={{ marginLeft: 8 }}>{r.secuencia === "ANTERIOR" ? "Anterior" : "Posterior"}</Tag>}</span> },
-                { title: "Valor", dataIndex: "valor", align: "right", width: 150, render: (v: number) => <span className="cifra" style={{ fontWeight: 600 }}>{cop(v)}</span> },
-                { title: "Fecha", dataIndex: "fecha", width: 110, render: (v: string | null) => fechaOferta(v) ?? "" },
-                { title: "Fuente", dataIndex: "fuente", width: 130, render: (fu) => <VerFuente fuente={fu} texto="Ver" /> },
-              ]}
-            />
-            <BarrasSimples titulo={`${n.etiqueta} por empresa`} datos={n.ofertas.map((o) => ({ etiqueta: o.etiqueta, valor: o.valor }))} />
-          </div>
-        ))}
-        {f.etapas.length > 0 && (
-          <div>
-            <h3 style={{ fontSize: 15, margin: "10px 0 6px" }}>Valores por etapa</h3>
-            <Table
-              size="small" pagination={false} rowKey={(r) => `${r.etapa}-${r.valor}`} dataSource={f.etapas} scroll={{ x: 520 }}
-              columns={[
-                { title: "Etapa", dataIndex: "etapa" },
-                { title: "Procedencia", dataIndex: "procedencia", width: 130, render: (p) => <Procedencia p={p} /> },
-                { title: "Valor", dataIndex: "valor", align: "right", width: 150, render: (v: number) => <span className="cifra">{cop(v)}</span> },
-                { title: "Fuente", dataIndex: "fuente", width: 130, render: (fu) => <VerFuente fuente={fu} texto="Ver" /> },
-              ]}
-            />
-            {f.etapas_comparables
-              ? <BarrasSimples titulo="Evolución de valores por etapa" datos={f.etapas.map((e) => ({ etiqueta: e.etapa, valor: e.valor }))} />
-              : f.etapas.length > 1 && <p className="texto-secundario" style={{ fontSize: 13, margin: "6px 0 0" }}>Las cifras de cada etapa no declaran el mismo nivel (costo directo o total con AIU e IVA); por eso no se grafican juntas.</p>}
-          </div>
-        )}
-      </section>
-
-      <section aria-labelledby="sec-c">
-        <h2 id="sec-c" style={h2}>C. Documentos de respaldo</h2>
-        <Table
-          size="small" pagination={false} rowKey={(r, i) => `${r.dato}-${i}`} dataSource={respaldo} scroll={{ x: 520 }} locale={{ emptyText: "Sin documento de respaldo identificado" }}
-          columns={[{ title: "Dato", dataIndex: "dato" }, { title: "Documento y ubicación", dataIndex: "fuente", render: (fu) => (fu ? <span className="largo"><span className="texto-secundario" style={{ fontSize: 12.5 }}>{fu.documento}</span> <VerFuente fuente={fu} /></span> : "—") }]}
-        />
-        {ficha.documentos.length > 0 && (
-          <Collapse style={{ marginTop: 12 }} size="small" items={[{
-            key: "docs", label: `Documentos del edificio (${ficha.documentos.length})`,
-            children: (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {ficha.documentos.map((d, i) => (
-                  <li key={i} className="largo"><span className="texto-secundario">{d.grupo} · </span>{d.version_id ? <Link href={urlVisor(d.version_id)}>{d.nombre}</Link> : d.nombre}</li>
-                ))}
-              </ul>
-            ),
-          }]} />
-        )}
-      </section>
-
-      {tecnico && (
-        <Collapse size="small" items={[{ key: "t", label: tecnicoEtiqueta ?? "Detalles técnicos, extracción y revisión", children: <div style={{ display: "grid", gap: 16 }}>{tecnico}</div> }]} />
-      )}
+      </div>
+      {nota && <p className="texto-secundario" style={{ margin: 0, fontSize: 14.5 }}>{nota}</p>}
+      <Table<FilaDesglose>
+        size="middle" pagination={false} rowKey="key" dataSource={filas} scroll={{ x: 640 }}
+        expandable={{ childrenColumnName: "children", indentSize: 18 }}
+        rowClassName={(r) => (r.tipo === "total" ? "fila-total" : "")}
+        columns={[
+          { title: "Actividad", dataIndex: "actividad", render: (t: string, r) => <span className="largo" style={{ fontWeight: r.tipo === "actividad" ? 500 : 600 }}>{t}</span> },
+          { title: "Cantidad / unidad", dataIndex: "cantidad", width: 150, render: (t: string) => <span className="cifra">{t}</span> },
+          { title: "Precio unitario", dataIndex: "unitario", width: 170, align: "right", render: (v: number | null) => (v === null ? "" : <span className="cifra">{cop(v)}</span>) },
+          { title: "Importe", dataIndex: "importe", width: 170, align: "right", render: (v: number | null, r) => (v === null ? "" : <span className="cifra" style={{ fontWeight: r.tipo === "total" ? 700 : 600 }}>{cop(v)}</span>) },
+        ]}
+      />
     </div>
   );
 }
 
-export { ETQ_PROCEDENCIA };
+/** B. Comparación de ofertas: cada valor es una referencia separada con su base y alcance; nunca un porcentaje. */
+function Comparacion({ ficha }: { ficha: FichaPrecios }) {
+  const x = ficha.fila.ejecutivo;
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      {x.comparacion.length > 0 && (
+        <Table<FilaComparacionEjecutiva>
+          size="middle" pagination={false} rowKey={(r) => `${r.indice}`} dataSource={x.comparacion} scroll={{ x: 760 }}
+          columns={[
+            { title: "Empresa", key: "e", width: 230, render: (_, r) => (
+              <div><span style={{ fontWeight: 650 }}>{r.empresa}</span><Secuencia s={r.secuencia} />{r.referencia && <div className="texto-secundario" style={{ fontSize: 14 }}>{r.referencia}</div>}</div>
+            ) },
+            { title: "Fecha", key: "f", width: 120, render: (_, r) => <span className="cifra">{fecha(r.fecha)}</span> },
+            { title: "Alcance resumido", dataIndex: "alcance", render: (t: string) => <span className="largo">{t}</span> },
+            { title: "Valor", key: "v", align: "right", width: 190, render: (_, r) => (
+              <div style={{ display: "grid", justifyItems: "end" }}><span className="cifra" style={{ fontWeight: 700 }}>{cop(r.valor)}</span><span className="texto-secundario" style={{ fontSize: 13.5 }}>{r.base}</span></div>
+            ) },
+            { title: "", key: "o", width: 120, render: (_, r) => <FuenteLink fuente={r.fuente} texto="Ver oferta" /> },
+          ]}
+        />
+      )}
+      <p className="texto-secundario" style={{ margin: 0, fontSize: 14.5 }}>{x.nota_comparacion}</p>
+    </div>
+  );
+}
+
+type Panel = "fuentes" | "documentos" | "calculo";
+
+/** Panel lateral: otras fuentes, documentos relacionados y detalle de cálculo (lo que antes saturaba la ficha). */
+function PanelLateral({ ficha, abierto, panel, cambiar, cerrar }: { ficha: FichaPrecios; abierto: boolean; panel: Panel; cambiar: (p: Panel) => void; cerrar: () => void }) {
+  const f = ficha.fila;
+  const x = f.ejecutivo;
+  const fuentes: Array<{ dato: string; valor: string | null; nota: string | null; fuente: FuenteDato | null | undefined }> = [];
+  if (f.valor) fuentes.push({ dato: `Valor principal · ${f.valor.etiqueta}`, valor: cop(f.valor.valor), nota: f.valor.nota, fuente: f.valor.fuente });
+  for (const v of f.valores_alternos) fuentes.push({ dato: `Otra fuente · ${v.etiqueta}`, valor: cop(v.valor), nota: v.nota, fuente: v.fuente });
+  if (f.contrato_conjunto) fuentes.push({ dato: `Contrato conjunto · ${f.contrato_conjunto.proceso}`, valor: cop(f.contrato_conjunto.valor), nota: f.contrato_conjunto.nota, fuente: f.contrato_conjunto.soporte });
+  if (f.area) fuentes.push({ dato: `Área · ${f.area.clase === "DOCUMENTADA" ? "verificada" : "reportada"}`, valor: m2(f.area.valor), nota: null, fuente: f.area.fuente });
+  if (f.valor_m2) fuentes.push({ dato: `Valor por m² · ${f.valor_m2.clase === "REPORTADO" ? "reportado" : "contratado"}`, valor: cop(f.valor_m2.valor), nota: f.valor_m2.nota, fuente: f.valor_m2.fuente });
+  if (f.responsable) fuentes.push({ dato: "Responsable", valor: f.responsable.nombre, nota: f.responsable.etiqueta, fuente: f.responsable.fuente });
+  const controles = f.ofertas.filter((o) => o.controles.length > 0);
+  const grupos = [...new Set(ficha.documentos.map((d) => d.grupo))];
+  return (
+    <Drawer open={abierto} onClose={cerrar} width={560} title="Fuentes y documentos" destroyOnHidden>
+      <div style={{ display: "grid", gap: 16 }}>
+        <Segmented<Panel> block value={panel} onChange={cambiar} options={[{ label: "Fuentes", value: "fuentes" }, { label: `Documentos (${ficha.documentos.length})`, value: "documentos" }, { label: "Cálculo", value: "calculo" }]} />
+        {panel === "fuentes" && (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
+            {fuentes.length === 0 && <li className="texto-secundario">Sin fuentes registradas todavía.</li>}
+            {fuentes.map((r, i) => (
+              <li key={i} style={{ borderBottom: "1px solid #E6EAF0", paddingBottom: 10 }}>
+                <div className="texto-secundario" style={{ fontSize: 14 }}>{r.dato}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                  <span className="cifra" style={{ fontWeight: 650, fontSize: 16 }}>{r.valor}</span>
+                  <FuenteLink fuente={r.fuente} />
+                </div>
+                {r.nota && <div className="texto-secundario" style={{ fontSize: 14 }}>{r.nota}</div>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {panel === "documentos" && (
+          <div style={{ display: "grid", gap: 14 }}>
+            {ficha.documentos.length === 0 && <span className="texto-secundario">No hay documentos relacionados todavía.</span>}
+            {grupos.map((g) => (
+              <section key={g}>
+                <h3 style={{ fontSize: 15, margin: "0 0 6px", color: "#1B3A6B" }}>{g}</h3>
+                <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                  {ficha.documentos.filter((d) => d.grupo === g).map((d, i) => (
+                    <li key={i} className="largo">{d.version_id ? <Link href={urlVisor(d.version_id)}>{d.nombre}</Link> : d.nombre} <span className="texto-secundario" style={{ fontSize: 13 }}>{d.formato}</span></li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+            {f.edificio_id !== null && <Link href={`/documentos/trazabilidad/edificio/${f.edificio_id}`} style={{ fontWeight: 600 }}><FolderOpenOutlined aria-hidden /> Trazabilidad y gestión de este edificio</Link>}
+          </div>
+        )}
+        {panel === "calculo" && (
+          <div style={{ display: "grid", gap: 14, fontSize: 15 }}>
+            {x.diferencias_calculo.length === 0 && controles.length === 0 && !f.valor_m2?.nota && <span className="texto-secundario">No hay diferencias ni controles que informar.</span>}
+            {x.diferencias_calculo.length > 0 && <section><h3 style={{ fontSize: 15, margin: "0 0 6px" }}>Diferencias menores entre fuentes</h3><ul style={{ margin: 0, paddingLeft: 18 }}>{x.diferencias_calculo.map((t, i) => <li key={i}>{t}</li>)}</ul></section>}
+            {f.valor_m2?.nota && <section><h3 style={{ fontSize: 15, margin: "0 0 6px" }}>Valor por m²</h3><p style={{ margin: 0 }}>{f.valor_m2.nota}</p></section>}
+            {controles.map((o, i) => (
+              <section key={i}>
+                <h3 style={{ fontSize: 15, margin: "0 0 6px" }}>Controles aritméticos · {etiquetaOferta(o, (iso) => fechaCorta(iso))}</h3>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {o.controles.map((k, j) => <li key={j}>{k.control}: {k.estado === "CUADRA" ? "cuadra" : Math.abs(k.diferencia) < 1 ? `diferencia aritmética de ${cop(Math.abs(k.diferencia))} entre las cifras documentadas` : `no cuadra (diferencia ${cop(k.diferencia)})`}</li>)}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
+    </Drawer>
+  );
+}
+
+/**
+ * Ficha ejecutiva de un edificio: nombre, responsable, valor, área y valor por m² a la vista; debajo, solo el desglose y la comparación.
+ * Todo lo demás (otras fuentes, documentos, cálculo) está en un panel lateral. Pantalla y PDF consumen la misma capa de datos.
+ */
+export function FichaEjecutiva({ ficha, clave }: { ficha: FichaPrecios; clave: string }) {
+  const f = ficha.fila;
+  const x = f.ejecutivo;
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const [ultimo, setUltimo] = useState<Panel>("fuentes");
+  const abrir = (p: Panel) => { setUltimo(p); setPanel(p); };
+  const contrato = x.contrato?.fuente;
+  return (
+    <div style={{ display: "grid", gap: 22 }}>
+      <header style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end", justifyContent: "space-between" }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 className="largo" style={{ margin: 0, fontSize: 34, lineHeight: 1.15, color: "#1B3A6B" }}>{f.nombre}</h1>
+          <p className="texto-secundario largo" style={{ margin: "6px 0 0", fontSize: 16 }}>
+            {[f.direccion, f.responsable ? `Responsable: ${f.responsable.nombre}` : "Responsable por identificar"].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {contrato?.version_id ? <BotonEnlace size="large" icon={<FileTextOutlined aria-hidden />} href={urlVisor(contrato.version_id, contrato.pagina)}>{x.contrato?.conjunto ? "Ver contrato conjunto" : "Ver contrato"}</BotonEnlace> : null}
+          <BotonPdf href={`/api/monitoreo-contratacion/exportar/pdf/edificio/${clave}`} />
+        </div>
+      </header>
+
+      <DatosClave f={f} />
+
+      {(
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between", marginTop: -6 }}>
+          <div style={{ display: "grid", gap: 6, minWidth: 0, flex: "1 1 360px" }}>
+            {x.nota && <span className="texto-secundario" style={{ fontSize: 15.5 }}>{x.nota}</span>}
+            {x.diferencias_visibles.map((t) => (
+              <span key={t} style={{ fontSize: 15.5, borderLeft: "3px solid #1B3A6B", background: "#EEF2F9", padding: "6px 12px", borderRadius: 4 }}><strong>Diferencia entre fuentes.</strong> {t}</span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {x.contrato?.conjunto && <BotonEnlace icon={<FolderOpenOutlined aria-hidden />} href={`/expedientes/${x.contrato.proceso_id}`}>Resumen del contrato</BotonEnlace>}
+            <Button icon={<FileSearchOutlined aria-hidden />} onClick={() => abrir("fuentes")}>Ver fuentes</Button>
+            <Button icon={<FolderOpenOutlined aria-hidden />} onClick={() => abrir("documentos")}>Documentos relacionados</Button>
+          </div>
+        </div>
+      )}
+
+      <section aria-labelledby="sec-a"><h2 id="sec-a" style={h2}>A. Desglose del precio</h2><Desglose ficha={ficha} key={clave} /></section>
+      <section aria-labelledby="sec-b"><h2 id="sec-b" style={h2}>B. Comparación de ofertas</h2><Comparacion ficha={ficha} /></section>
+
+      <PanelLateral ficha={ficha} abierto={panel !== null} panel={panel ?? ultimo} cambiar={(p) => { setUltimo(p); setPanel(p); }} cerrar={() => setPanel(null)} />
+    </div>
+  );
+}

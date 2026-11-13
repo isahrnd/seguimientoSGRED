@@ -41,4 +41,5 @@ a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, [tabindex]:fo
 /* Cuadro de precios: en móvil el concepto y el precio unitario quedan visibles y el resto pasa a una línea bajo el concepto. */
 .solo-movil { display: none; }
 @media (max-width: 767px) { .solo-movil { display: block; margin-top: 4px; } }
+.fila-total > td { background: #EEF2F9 !important; }
 .fila-activa > td { background: #EEF2F9 !important; }

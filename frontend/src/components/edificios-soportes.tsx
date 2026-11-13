@@ -69,7 +69,7 @@ export function EdificiosSoportes({ d }: { d: DetalleExpediente }) {
           <section key={g.edificio?.id ?? `conjunto-${i}`} style={{ background: "#fff", border: `1px solid ${PALETA.borde}`, borderRadius: 8, padding: 18 }}>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
               <h3 className="largo" style={{ margin: 0, fontSize: 18 }}>{g.edificio ? g.edificio.nombre : "Alcance conjunto (varios edificios)"}</h3>
-              {g.edificio && <Link href={`/edificaciones/${g.edificio.id}`}>Ver ficha de la edificación</Link>}
+              {g.edificio && <Link href={`/demoliciones/e${g.edificio.id}`}>Ver ficha de la edificación</Link>}
             </div>
             {g.edificio && <div style={{ marginTop: 8 }}><EstadoResolucion r={info?.resolucion ?? null} /></div>}
             <div style={{ marginTop: 10 }}>

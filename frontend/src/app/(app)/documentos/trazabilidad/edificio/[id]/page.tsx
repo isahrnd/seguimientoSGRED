@@ -2,9 +2,8 @@
 import { use } from "react";
 import Link from "next/link";
 import { Alert, Skeleton, Tag } from "antd";
-import { useDetalleEdificio, useFichaPrecios } from "@/hooks/queries";
-import { FichaPreciosEdificio } from "@/components/precios/ficha-precios";
-import { BotonPdf } from "@/components/precios/comunes";
+import { useDetalleEdificio } from "@/hooks/queries";
+import { BotonEnlace } from "@/components/boton-enlace";
 import { PENDIENTE, cop, fechaCorta } from "@/lib/format";
 import { esErrorDeAcceso } from "@/lib/api";
 import { SinAcceso, ErrorCarga } from "@/components/estados";
@@ -27,7 +26,6 @@ const Caja = ({ titulo, children }: { titulo: string; children: React.ReactNode 
 export default function FichaEdificacion({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const q = useDetalleEdificio(Number(id));
-  const qf = useFichaPrecios(`e${id}`);
   if (q.isError && esErrorDeAcceso(q.error)) return <SinAcceso />;
   if (q.isLoading) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (q.isError || !q.data) return <ErrorCarga texto="No fue posible cargar la edificación." onReintentar={() => q.refetch()} />;
@@ -67,7 +65,7 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
             <div style={{ display: "grid", gap: 10 }}>
               {d.procesos.map((p) => (
                 <div key={p.id} style={{ borderBottom: "1px solid #E6EAF0", paddingBottom: 10 }}>
-                  <Link href={`/expedientes/${p.id}`} style={{ fontWeight: 600 }}>{p.proceso}</Link> <Tag>{p.estado_asociacion}</Tag>
+                  <Link href={`/documentos/trazabilidad/expediente/${p.id}`} style={{ fontWeight: 600 }}>{p.proceso}</Link> <Tag>{p.estado_asociacion}</Tag>
                   <div className="largo">{p.intervencion}</div>
                   <div className="texto-secundario" style={{ fontSize: 13.5 }}>
                     Valor contratado del proceso: <span className="cifra">{p.valor_contratado !== null ? cop(p.valor_contratado) : PENDIENTE}</span>{p.nota_valor ? ` · ${p.nota_valor}` : ""}
@@ -140,15 +138,14 @@ export default function FichaEdificacion({ params }: { params: Promise<{ id: str
     <div style={{ display: "grid", gap: 20 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", justifyContent: "space-between" }}>
         <div>
-          <Volver alternativa="/analisis-precios" texto="Volver" />
-          <h1 className="largo" style={{ margin: "6px 0 0", fontSize: 30 }}>{d.edificio.nombre}</h1>
+          <Volver alternativa="/documentos?seccion=edificaciones" texto="Volver a la gestión documental" />
+          <p className="texto-secundario" style={{ margin: "6px 0 0", fontSize: 14 }}>Trazabilidad y gestión</p>
+          <h1 className="largo" style={{ margin: "2px 0 0", fontSize: 30 }}>{d.edificio.nombre}</h1>
           {d.edificio.direccion && <p className="texto-secundario largo" style={{ margin: "4px 0 0" }}>{d.edificio.direccion}</p>}
         </div>
-        <BotonPdf href={`/api/monitoreo-contratacion/exportar/pdf/edificio/e${id}`} />
+        <BotonEnlace type="primary" size="large" href={`/demoliciones/e${id}`}>Ver ficha ejecutiva</BotonEnlace>
       </div>
-      {qf.data
-        ? <FichaPreciosEdificio ficha={qf.data} tecnico={tecnico} tecnicoEtiqueta={discrepancias.length ? `Detalles técnicos y revisión · ${discrepancias.length} ${discrepancias.length === 1 ? "dirección" : "direcciones"} por verificar` : undefined} />
-        : qf.isLoading ? <Skeleton active paragraph={{ rows: 6 }} /> : <div style={{ display: "grid", gap: 20 }}>{tecnico}</div>}
+      {tecnico}
     </div>
   );
 }

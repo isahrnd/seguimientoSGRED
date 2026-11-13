@@ -29,11 +29,10 @@ function Contenido() {
   const filas = q.data?.edificios ?? [];
   const procesos = (e: EdificioFila) => e.procesos.length === 0
     ? <EtiquetaInformativa>Proceso contractual por vincular</EtiquetaInformativa>
-    : e.procesos.map((p) => <div key={p.id}><Link href={`/expedientes/${p.id}`}>{p.proceso}</Link></div>);
+    : e.procesos.map((p) => <div key={p.id}><Link href={`/documentos/trazabilidad/expediente/${p.id}`}>{p.proceso}</Link></div>);
 
   return (
     <>
-      <Typography.Title level={1} style={{ margin: "0 0 16px", fontSize: 30 }}>Edificaciones</Typography.Title>
       <Input size="large" allowClear prefix={<SearchOutlined />} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Buscar edificación o dirección" aria-label="Buscar edificación" style={{ maxWidth: 560, height: 52 }} />
       <div style={{ marginTop: 16 }}>
         {q.isLoading ? <Skeleton active /> : q.isError ? <ErrorCarga texto="No fue posible cargar las edificaciones." onReintentar={() => q.refetch()} />
@@ -46,7 +45,7 @@ function Contenido() {
                   <div className="texto-secundario largo">{e.direccion ?? ""}</div>
                   <div style={{ margin: "8px 0" }}><Tag color={TONO[e.resolucion.requisito] ?? "default"} style={{ whiteSpace: "normal" }}>{e.resolucion.etiqueta}</Tag></div>
                   <div>{procesos(e)}</div>
-                  <BotonEnlace href={`/edificaciones/${e.id}`} block type="primary" style={{ marginTop: 10 }}>Abrir ficha · {e.documentos} documentos</BotonEnlace>
+                  <BotonEnlace href={`/documentos/trazabilidad/edificio/${e.id}`} block type="primary" style={{ marginTop: 10 }}>Abrir trazabilidad · {e.documentos} documentos</BotonEnlace>
                 </li>
               ))}
             </ul>
@@ -57,7 +56,7 @@ function Contenido() {
                 { title: "Resolución", render: (_, e) => <Tag color={TONO[e.resolucion.requisito] ?? "default"} style={{ whiteSpace: "normal" }}>{e.resolucion.etiqueta}</Tag> },
                 { title: "Proceso contractual", render: (_, e) => procesos(e) },
                 { title: "Documentos", align: "right", dataIndex: "documentos", render: (n) => <span className="cifra">{n}</span> },
-                { title: "", width: 130, render: (_, e) => <BotonEnlace href={`/edificaciones/${e.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
+                { title: "", width: 130, render: (_, e) => <BotonEnlace href={`/documentos/trazabilidad/edificio/${e.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
               ]} />
           )}
       </div>
@@ -65,6 +64,6 @@ function Contenido() {
   );
 }
 
-export default function EdificacionesPage() {
+export function ListaEdificaciones() {
   return <Suspense><Contenido /></Suspense>;
 }

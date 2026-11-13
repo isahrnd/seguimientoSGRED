@@ -176,7 +176,7 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
                   <strong style={{ fontSize: 16 }}>{b.nombre}</strong>
                   <div className="texto-secundario" style={{ fontSize: 13.5 }}>{b.direccion ? `${b.direccion} · ` : ""}{b.documentos} documentos · {b.resolucion.etiqueta}{b.procesos.length === 0 ? " · proceso contractual pendiente" : ""}</div>
                 </div>
-                <BotonEnlace href={`/edificaciones/${b.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir ficha</BotonEnlace>
+                <BotonEnlace href={`/documentos/trazabilidad/edificio/${b.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir ficha</BotonEnlace>
               </li>
             ))}
           </ul>
@@ -199,7 +199,7 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
                   <EstadoExpediente e={e} />
                   <Cifra e={e} />
                 </div>
-                <BotonEnlace href={`/expedientes/${e.id}`} block style={{ marginTop: 10 }} type="primary">Abrir expediente</BotonEnlace>
+                <BotonEnlace href={`/documentos/trazabilidad/expediente/${e.id}`} block style={{ marginTop: 10 }} type="primary">Abrir expediente</BotonEnlace>
               </li>
             ))}
           </ul>
@@ -209,14 +209,14 @@ export function ListaExpedientes({ completo }: { completo: boolean }) {
             dataSource={filas}
             pagination={false}
             tableLayout="auto"
-            onRow={(e) => ({ onDoubleClick: () => { location.assign(`/expedientes/${e.id}`); } })}
+            onRow={(e) => ({ onDoubleClick: () => { location.assign(`/documentos/trazabilidad/expediente/${e.id}`); } })}
             columns={[
               { title: "Intervención", key: "i", render: (_, e) => <Alcance e={e} />, width: "38%" },
               { title: "Empresa", key: "emp", responsive: ["lg"], width: 220, render: (_, e) => <span className="largo">{e.empresa_seleccionada ?? (e.ofertas_analizadas.length ? <span className="texto-secundario">{e.ofertas_analizadas.length === 1 ? `Cotiza: ${e.ofertas_analizadas[0]}` : `${e.ofertas_analizadas.length} empresas cotizan`}</span> : <span className="texto-secundario">—</span>)}</span> },
               { title: "Estado", key: "s", render: (_, e) => <EstadoExpediente e={e} /> },
               { title: "Documento", dataIndex: "fecha_documento", key: "f", responsive: ["xl"], render: (f) => fechaCorta(f) },
               { title: <div style={{ textAlign: "right" }}>Cifra principal</div>, key: "c", align: "right", render: (_, e) => <Cifra e={e} /> },
-              { title: "", key: "a", width: 120, render: (_, e) => <BotonEnlace href={`/expedientes/${e.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
+              { title: "", key: "a", width: 120, render: (_, e) => <BotonEnlace href={`/documentos/trazabilidad/expediente/${e.id}`} type="primary" icon={<ArrowRightOutlined />} iconPosition="end">Abrir</BotonEnlace> },
             ]}
           />
         )}

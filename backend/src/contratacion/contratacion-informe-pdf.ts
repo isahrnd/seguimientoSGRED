@@ -286,102 +286,86 @@ export async function informeGeneral(d: DatosInformeGeneral): Promise<Buffer> {
   return aBuffer(inf);
 }
 
-// ------------------------------------------------------------------------------------------------ informe de un edificio
-const ETQ_NIVEL_ITEM: Record<string, string> = { PARTIDA: 'Actividad' };
+// ------------------------------------------------------------------------------------------------ informe de un edificio (ejecutivo)
+const ETQ_SECUENCIA = { ANTERIOR: 'versión anterior', POSTERIOR: 'versión posterior' } as const;
+const tituloOferta = (o: OfertaEdificio) => `${o.empresa}${o.referencia ? ` · ${o.referencia}` : ''}${o.fecha ? ` (${fechaCorteTexto(o.fecha)})` : ''}${o.secuencia ? ` · ${ETQ_SECUENCIA[o.secuencia]}` : ''}`;
+const ubicacion = (f: FuenteDato | null | undefined) => (f?.hoja && f.celda ? `${f.hoja}!${f.celda}` : f?.pagina ? `p. ${f.pagina}` : '');
+const minuscula = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
 export async function informeEdificio(d: DatosInformeEdificio): Promise<Buffer> {
   const f = d.fila;
+  const x = f.ejecutivo;
   const inf = new Informe(`Informe del edificio — ${f.nombre}`, d.fecha_corte, d.generado_en);
   const doc = inf.doc;
   doc.font(NEGRITA).fontSize(20).fillColor(COLOR.marca).text(f.nombre, M, doc.y, { width: inf.ancho });
   doc.y += 2;
-  inf.texto([f.direccion, d.fecha_corte ? `Fecha de corte del consolidado: ${fechaCorteTexto(d.fecha_corte)}` : null].filter(Boolean).join('  ·  '), { size: 10, color: COLOR.gris, gap: 10 });
+  inf.texto([f.direccion, f.responsable ? `Responsable: ${f.responsable.nombre}` : null, d.fecha_corte ? `Corte del consolidado: ${fechaCorteTexto(d.fecha_corte)}` : null].filter(Boolean).join('  ·  '), { size: 10, color: COLOR.gris, gap: 10 });
 
   inf.datosClave([
-    { etiqueta: f.valor?.procedencia === 'CONTRATO' ? 'Valor contratado' : 'Valor reportado', valor: f.valor ? cop(f.valor.valor) : f.contrato_conjunto ? 'Contrato conjunto' : 'Por documentar', detalle: f.valor ? `${f.valor.etiqueta}` : f.contrato_conjunto ? `${cop(f.contrato_conjunto.valor)} · ${f.contrato_conjunto.edificios} edificaciones` : undefined },
-    { etiqueta: 'Área', valor: f.area ? m2(f.area.valor) : 'Por precisar', detalle: f.area ? f.area.etiqueta : undefined },
-    { etiqueta: f.valor_m2?.clase === 'CONTRATADO' ? 'Valor contratado por m²' : 'Valor por m²', valor: f.valor_m2 ? cop(f.valor_m2.valor) : 'Por precisar', detalle: f.valor_m2 ? (f.valor_m2.clase === 'REPORTADO' ? 'Reportado (consolidado)' : 'Contrato ÷ área documentada') : undefined },
-    { etiqueta: 'Responsable', valor: f.responsable?.nombre ?? 'Por identificar', detalle: f.responsable?.etiqueta },
+    { etiqueta: f.valor?.procedencia === 'CONTRATO' ? 'Valor contratado' : 'Valor reportado', valor: f.valor ? cop(f.valor.valor) : f.contrato_conjunto ? 'Contrato conjunto' : 'Por documentar', detalle: f.valor ? f.valor.etiqueta : f.contrato_conjunto ? `${cop(f.contrato_conjunto.valor)} · ${f.contrato_conjunto.edificios} edificios` : undefined },
+    { etiqueta: 'Área', valor: f.area ? m2(f.area.valor) : 'Por precisar', detalle: f.area ? (f.area.clase === 'DOCUMENTADA' ? 'Verificada en documentos' : `Reportada · ${minuscula(f.area.etiqueta)}`) : undefined },
+    { etiqueta: f.valor_m2?.clase === 'CONTRATADO' ? 'Valor contratado por m²' : 'Valor por m²', valor: f.valor_m2 ? cop(f.valor_m2.valor) : 'Por precisar', detalle: f.valor_m2 ? (f.valor_m2.clase === 'REPORTADO' ? 'Reportado (consolidado)' : 'Contrato ÷ área verificada') : undefined },
   ]);
+  if (x.nota) inf.texto(x.nota, { size: 9.5, color: COLOR.gris, gap: 3 });
+  for (const t of x.diferencias_visibles) inf.texto(`• ${t}`, { size: 9.5, gap: 3 });
 
-  inf.titulo1('Resumen ejecutivo');
-  inf.texto(`Estado: ${f.estado.etiqueta}${f.estado.avance ? ` · avance ${f.estado.avance.toLowerCase()} (según consolidado)` : ''}.`, { gap: 4 });
-  for (const m of f.mensajes) inf.texto(`• ${m}`, { size: 9, gap: 2 });
-  if (f.valor?.procedencia === 'CONSOLIDADO') inf.texto('El valor proviene del consolidado de seguimiento; no se ha verificado un contrato firmado para este edificio con los documentos disponibles.', { size: 9, color: COLOR.gris, gap: 4 });
-  if (f.contrato_conjunto) inf.texto(f.contrato_conjunto.nota, { size: 9, color: COLOR.gris, gap: 4 });
-  if (f.valores_alternos.length) {
-    inf.titulo2('Otras cifras disponibles (fuentes distintas; no se suman)');
-    inf.tabla([{ t: 'Fuente', w: 30 }, { t: 'Valor', w: 18, a: 'right' }, { t: 'Documento', w: 52 }], f.valores_alternos.map((v) => [v.etiqueta, cop(v.valor), fuenteTexto(v.fuente)]), { size: 8.5 });
-  }
-  if (f.diferencias.length) { inf.titulo2('Diferencias entre fuentes'); for (const t of f.diferencias) inf.texto(t, { size: 8.5, gap: 3 }); }
-
-  // A. Desglose de precios
-  inf.titulo1('A. Desglose de precios');
-  const conItems = f.ofertas.filter((o) => o.items.length || o.componentes.costo_directo || o.componentes.total);
-  if (!conItems.length) inf.texto('Aún no hay ofertas con desglose documentado para este edificio.', { color: COLOR.gris });
-  for (const o of conItems) desgloseOferta(inf, o);
-  const actividades = conItems.flatMap((o) => o.items.filter((i) => i.subtotal).map((i) => ({ etiqueta: `${o.empresa}: ${i.actividad}`.slice(0, 60), valor: i.subtotal as number })));
-  if (actividades.length > 1) inf.barras('Composición del costo por actividad', actividades.slice(0, 10));
-
-  // B. Comparación
-  inf.titulo1('B. Comparación');
-  if (!f.comparacion.disponible) inf.texto(f.comparacion.nota, { color: COLOR.gris });
+  // A. Desglose del precio (la oferta mostrada es una decisión de presentación; no implica selección ni contratación)
+  inf.titulo1('A. Desglose del precio');
+  const o = x.desglose_indice !== null ? f.ofertas[x.desglose_indice] : null;
+  if (!o) inf.texto('Aún no hay un desglose documentado para este edificio.', { color: COLOR.gris });
   else {
-    inf.texto(f.comparacion.nota, { size: 9, color: COLOR.gris, gap: 6 });
-    for (const n of f.comparacion.niveles) {
-      inf.tabla([{ t: n.etiqueta, w: 40 }, { t: 'Valor', w: 20, a: 'right' }, { t: 'Fecha', w: 14 }, { t: 'Fuente', w: 40 }], n.ofertas.map((o) => [`${o.etiqueta}${o.secuencia ? ` (${o.secuencia === 'ANTERIOR' ? 'anterior' : 'posterior'})` : ''}`, cop(o.valor), o.fecha ? fechaCorteTexto(o.fecha) ?? '' : '', fuenteTexto(o.fuente)]), { size: 8.5, negritas: [0] });
-      inf.barras(`${n.etiqueta} por empresa`, n.ofertas.map((o) => ({ etiqueta: o.etiqueta, valor: o.valor })));
-    }
-  }
-  if (f.etapas.length >= 1) {
-    inf.titulo2('Valores por etapa (cada etapa conserva su fuente; no son precios equivalentes por defecto)');
-    inf.tabla([{ t: 'Etapa', w: 34 }, { t: 'Valor', w: 18, a: 'right' }, { t: 'Nivel', w: 16 }, { t: 'Fuente', w: 48 }], f.etapas.map((e) => [e.etapa, cop(e.valor), e.nivel ?? '', `${ETQ_PROCEDENCIA[e.procedencia]}${e.fecha ? ` (${fechaCorteTexto(e.fecha)})` : ''} · ${fuenteTexto(e.fuente)}`]), { size: 8.5 });
-    if (f.etapas_comparables) inf.barras('Evolución de valores por etapa', f.etapas.map((e) => ({ etiqueta: e.etapa.replace(/^Cotización · /, 'Cot. '), valor: e.valor })));
-    else if (f.etapas.length > 1) inf.texto('Las cifras de cada etapa no declaran el mismo nivel (costo directo, total con AIU e IVA); por eso no se grafican juntas.', { size: 8.5, color: COLOR.gris, gap: 4 });
+    inf.titulo2(`Oferta de ${tituloOferta(o)}`);
+    const nota = [o.nota_version, o.oferta_conjunta ? `Oferta conjunta de ${o.oferta_conjunta.edificios} edificios: se muestran solo las filas de este edificio.` : null].filter(Boolean).join('. ');
+    if (nota) inf.texto(nota, { size: 8.5, color: COLOR.gris, gap: 4 });
+    const filas: string[][] = o.items.map((i) => [i.actividad, [i.cantidad !== null ? i.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '', i.unidad ?? ''].filter(Boolean).join(' '), i.precio_unitario !== null ? cop(i.precio_unitario) : '', i.subtotal !== null ? cop(i.subtotal) : '']);
+    const fondos: Array<string | null> = filas.map(() => null);
+    const c = o.componentes;
+    const sumaItems = Math.round(o.items.reduce((a, i) => a + (i.subtotal ?? 0), 0) * 100) / 100;
+    const comp: Array<[string, number | null]> = [['Costo directo', c.costo_directo !== null && Math.abs(c.costo_directo - sumaItems) < 0.5 ? null : c.costo_directo], ['Administración', c.administracion], ['Imprevistos', c.imprevistos], ['Utilidad', c.utilidad], ['IVA', c.iva], ['Total de la oferta', c.total]];
+    for (const [etq, v] of comp) if (v !== null) { filas.push([etq, '', '', cop(v)]); fondos.push(etq === 'Total de la oferta' ? COLOR.suave : null); }
+    if (filas.length) inf.tabla([{ t: 'Actividad', w: 46 }, { t: 'Cantidad / unidad', w: 15 }, { t: 'Precio unitario', w: 20, a: 'right' }, { t: 'Importe', w: 19, a: 'right' }], filas, { size: 8.5, fondos });
   }
 
-  // C. Documentos de respaldo
-  inf.titulo1('C. Documentos de respaldo');
-  const origen = (v: FilaEdificio['valor'] | null) => (v ? `${v.etiqueta}: ${fuenteTexto(v.fuente)}` : '');
-  const filasRef: string[][] = [];
-  if (f.valor) filasRef.push(['Valor', origen(f.valor)]);
-  if (f.area) filasRef.push([`Área (${f.area.clase === 'DOCUMENTADA' ? 'documentada' : 'reportada'})`, fuenteTexto(f.area.fuente)]);
-  if (f.valor_m2) filasRef.push(['Valor por m²', fuenteTexto(f.valor_m2.fuente)]);
-  if (f.responsable) filasRef.push(['Responsable', `${f.responsable.etiqueta}: ${fuenteTexto(f.responsable.fuente)}`]);
-  if (f.contrato_conjunto) filasRef.push(['Contrato conjunto', fuenteTexto(f.contrato_conjunto.soporte)]);
-  inf.tabla([{ t: 'Dato', w: 28 }, { t: 'Documento y ubicación', w: 72 }], filasRef.length ? filasRef : [['—', 'Sin documento de respaldo identificado']], { size: 8.5, negritas: [0] });
-  if (d.documentos.length) {
-    inf.titulo2('Documentos del edificio');
-    inf.tabla([{ t: 'Grupo', w: 26 }, { t: 'Documento', w: 62 }, { t: 'Formato', w: 12 }], d.documentos.map((x) => [x.grupo, x.nombre, x.formato]), { size: 8.5 });
-  }
-  if (d.anexo) {
-    inf.titulo1('Anexo documental');
-    const ev = d.documentos.filter((x) => x.evidencias.length);
-    if (!ev.length) inf.texto('No hay fragmentos de evidencia registrados para los documentos de este edificio.', { color: COLOR.gris });
-    for (const x of ev) { inf.titulo2(x.nombre); for (const e of x.evidencias) inf.texto(`${ETQ_FUENTE[e.fuente_tipo] ?? e.fuente_tipo}: ${e.detalle}`, { size: 8.5, gap: 3 }); }
-    for (const o of f.ofertas.filter((x) => x.controles.length)) {
-      inf.titulo2(`Controles aritméticos — ${o.empresa}${o.referencia ? ` · ${o.referencia}` : ''}${o.fecha ? ` (${fechaCorteTexto(o.fecha)})` : ''}`);
-      for (const c of o.controles) inf.texto(`${c.control}: ${c.estado === 'CUADRA' ? 'cuadra' : Math.abs(c.diferencia) < 1 ? `diferencia aritmética de ${cop(Math.abs(c.diferencia))} entre las cifras documentadas` : `no cuadra (${cop(c.diferencia)})`}`, { size: 8.5, gap: 3 });
-    }
-  }
-  return aBuffer(inf);
-}
-
-function desgloseOferta(inf: Informe, o: OfertaEdificio) {
-  inf.titulo2(`${o.empresa} — ${o.documento}${o.referencia ? ` · ${o.referencia}` : ''}${o.fecha ? ` (${fechaCorteTexto(o.fecha)})` : ''}${o.secuencia ? ` · ${o.secuencia === 'ANTERIOR' ? 'versión anterior' : 'versión posterior'}` : ''}`);
-  inf.texto(`${o.nota_version ? `${o.nota_version}. ` : ''}${o.relacion}.${o.alcance ? ` ${o.alcance}.` : ''}${o.oferta_conjunta ? ` Oferta conjunta de ${o.oferta_conjunta.edificios} edificios${o.oferta_conjunta.total ? `: total de la oferta ${cop(o.oferta_conjunta.total)} (no es el valor de este edificio)` : ''}.` : ''}`, { size: 8.5, color: COLOR.gris, gap: 4 });
-  if (o.items.length) {
+  // B. Comparación de ofertas
+  inf.titulo1('B. Comparación de ofertas');
+  if (x.comparacion.length) {
     inf.tabla(
-      [{ t: 'Actividad', w: 36 }, { t: 'Unidad', w: 9 }, { t: 'Cantidad', w: 11, a: 'right' }, { t: 'Precio unitario', w: 19, a: 'right' }, { t: 'Subtotal', w: 17, a: 'right' }, { t: 'Fuente', w: 15 }],
-      o.items.map((i) => [i.actividad, i.unidad ?? '', i.cantidad !== null ? i.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '', i.precio_unitario !== null ? cop(i.precio_unitario) : '', i.subtotal !== null ? cop(i.subtotal) : '', i.fuente?.hoja && i.fuente.celda ? `${i.fuente.hoja}!${i.fuente.celda}` : i.fuente?.pagina ? `p. ${i.fuente.pagina}` : '']),
-      { size: 8 },
+      [{ t: 'Empresa', w: 22 }, { t: 'Fecha', w: 11 }, { t: 'Alcance resumido', w: 31 }, { t: 'Valor', w: 18, a: 'right' }, { t: 'Oferta', w: 18 }],
+      x.comparacion.map((c) => [`${c.empresa}${c.referencia ? `\n${c.referencia}` : ''}${c.secuencia ? `\n(${c.secuencia === 'ANTERIOR' ? 'anterior' : 'posterior'})` : ''}`, c.fecha ? fechaCorteTexto(c.fecha) ?? '' : '—', c.alcance, `${cop(c.valor)}\n${c.base}`, [c.fuente?.documento?.replace(/\.pdf$/i, ''), ubicacion(c.fuente)].filter(Boolean).join(', ')]),
+      { size: 8.5, negritas: [0] },
     );
   }
-  const c = o.componentes;
-  const comp: string[][] = [];
-  const add = (r: string, v: number | null, k: string) => { if (v !== null) comp.push([r, cop(v), fuenteTexto(o.fuentes_componentes[k] ?? null).replace(/^.*?, /, '')]); };
-  add('Costo directo', c.costo_directo, 'costo_directo'); add('Administración', c.administracion, 'administracion'); add('Imprevistos', c.imprevistos, 'imprevistos');
-  add('Utilidad', c.utilidad, 'utilidad'); add('IVA', c.iva, 'iva'); add('Total de la oferta', c.total, 'total');
-  if (comp.length) inf.tabla([{ t: 'Componente (cada fuente, con su base de cálculo)', w: 50 }, { t: 'Valor', w: 22, a: 'right' }, { t: 'Ubicación', w: 28 }], comp, { size: 8.5, negritas: [0] });
-  void etiquetaConsolidado; void ETQ_NIVEL_ITEM;
+  inf.texto(x.nota_comparacion, { size: 8.5, color: COLOR.gris, gap: 4 });
+
+  // Referencias breves
+  inf.titulo1('Referencias');
+  const refs: string[][] = [];
+  const origen = (v: FilaEdificio['valor'] | null) => (v ? `${v.etiqueta}: ${fuenteTexto(v.fuente)}` : '');
+  if (x.contrato) refs.push([x.contrato.conjunto ? 'Contrato conjunto' : 'Contrato', fuenteTexto(x.contrato.fuente)]);
+  if (f.valor) refs.push(['Valor', origen(f.valor)]);
+  if (f.area) refs.push([`Área (${f.area.clase === 'DOCUMENTADA' ? 'verificada' : 'reportada'})`, fuenteTexto(f.area.fuente)]);
+  if (f.valor_m2) refs.push(['Valor por m²', fuenteTexto(f.valor_m2.fuente)]);
+  for (const v of f.valores_alternos) refs.push([`Otra fuente: ${v.etiqueta.charAt(0).toLowerCase()}${v.etiqueta.slice(1)}`, `${cop(v.valor)} · ${fuenteTexto(v.fuente)}`]);
+  inf.tabla([{ t: 'Dato', w: 30 }, { t: 'Documento y ubicación', w: 70 }], refs.length ? refs : [['—', 'Sin documento de respaldo identificado']], { size: 8.5, negritas: [0] });
+
+  // Anexo técnico (opcional; por defecto no se incluye)
+  if (d.anexo) {
+    inf.titulo1('Anexo técnico');
+    if (x.diferencias_calculo.length) { inf.titulo2('Detalle de cálculo'); for (const t of x.diferencias_calculo) inf.texto(t, { size: 8.5, gap: 3 }); }
+    for (const of of f.ofertas.filter((y) => y.controles.length)) {
+      inf.titulo2(`Controles aritméticos — ${tituloOferta(of)}`);
+      for (const c of of.controles) inf.texto(`${c.control}: ${c.estado === 'CUADRA' ? 'cuadra' : Math.abs(c.diferencia) < 1 ? `diferencia aritmética de ${cop(Math.abs(c.diferencia))} entre las cifras documentadas` : `no cuadra (${cop(c.diferencia)})`}`, { size: 8.5, gap: 3 });
+    }
+    if (f.etapas.length) {
+      inf.titulo2('Valores por etapa (cada etapa conserva su fuente; no son precios equivalentes)');
+      inf.tabla([{ t: 'Etapa', w: 34 }, { t: 'Valor', w: 18, a: 'right' }, { t: 'Nivel', w: 16 }, { t: 'Fuente', w: 48 }], f.etapas.map((e) => [e.etapa, cop(e.valor), e.nivel ?? '', `${ETQ_PROCEDENCIA[e.procedencia]}${e.fecha ? ` (${fechaCorteTexto(e.fecha)})` : ''} · ${fuenteTexto(e.fuente)}`]), { size: 8.5 });
+    }
+    if (d.documentos.length) {
+      inf.titulo2('Documentos del edificio');
+      inf.tabla([{ t: 'Grupo', w: 26 }, { t: 'Documento', w: 62 }, { t: 'Formato', w: 12 }], d.documentos.map((y) => [y.grupo, y.nombre, y.formato]), { size: 8.5 });
+    }
+    const ev = d.documentos.filter((y) => y.evidencias.some((e) => e.fuente_tipo === 'ACLARACION' || e.fuente_tipo === 'REVISION_PRIVADA'));
+    for (const y of ev) { inf.titulo2(y.nombre); for (const e of y.evidencias.filter((z) => z.fuente_tipo === 'ACLARACION' || z.fuente_tipo === 'REVISION_PRIVADA')) inf.texto(`${ETQ_FUENTE[e.fuente_tipo] ?? e.fuente_tipo}: ${e.detalle}`, { size: 8.5, gap: 3 }); }
+  }
+  return aBuffer(inf);
 }

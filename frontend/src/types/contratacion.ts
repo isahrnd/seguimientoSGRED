@@ -670,6 +670,20 @@ export interface ComparacionOfertas {
   niveles: { nivel: NivelOferta; etiqueta: string; ofertas: { empresa: string; etiqueta: string; valor: number; fecha: string | null; fuente: FuenteDato | null; secuencia: "ANTERIOR" | "POSTERIOR" | null }[]; minimo: number; maximo: number; diferencia: number }[];
 }
 export interface EtapaValor { etapa: string; fecha: string | null; valor: number; procedencia: ProcedenciaValor; fuente: FuenteDato | null; nivel: string | null }
+export interface FilaComparacionEjecutiva {
+  indice: number; empresa: string; referencia: string | null; fecha: string | null; secuencia: "ANTERIOR" | "POSTERIOR" | null;
+  alcance: string; valor: number; base: string; fuente: FuenteDato | null;
+}
+/** Capa ejecutiva calculada una sola vez por el servidor y usada igual por pantalla y PDF. */
+export interface FilaEjecutiva {
+  nota: string | null;
+  contrato: { fuente: FuenteDato; conjunto: boolean; proceso: string; proceso_id: number } | null;
+  desglose_indice: number | null;
+  comparacion: FilaComparacionEjecutiva[];
+  nota_comparacion: string;
+  diferencias_visibles: string[];
+  diferencias_calculo: string[];
+}
 export interface FilaPrecios {
   clave: string; edificio_id: number | null; nombre: string; direccion: string | null;
   responsable: { nombre: string; procedencia: ProcedenciaValor; etiqueta: string; fuente: FuenteDato | null } | null;
@@ -681,6 +695,7 @@ export interface FilaPrecios {
   documento_contractual: "RESPALDADO" | "CONJUNTO" | "POR_INCORPORAR" | "POR_VINCULAR" | "NO_APLICA";
   mensajes: string[]; diferencias: string[]; ofertas: OfertaEdificio[]; comparacion: ComparacionOfertas; etapas: EtapaValor[]; etapas_comparables: boolean;
   procesos: { id: number; proceso: string; numero_contrato: string | null }[]; consolidado_id: number | null;
+  ejecutivo: FilaEjecutiva;
 }
 export interface VistaPrecios {
   fecha_corte: string | null; generado_en: string; filas: FilaPrecios[];
