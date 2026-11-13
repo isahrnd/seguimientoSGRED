@@ -6,7 +6,7 @@ import type { FuenteDato, ItemOferta, NivelOferta, OfertaEdificio } from './cont
  * Reglas deterministas; nada se reparte ni se completa por proporción.
  */
 
-export interface CotizacionVerificada { version_id: number; proveedor: string; importe: number; base: string; total_oferta: number | null; fecha_oferta: string | null; edificio_id: number }
+export interface CotizacionVerificada { version_id: number; proveedor: string; importe: number; base: string; total_oferta: number | null; fecha_oferta: string | null; edificio_id: number; referencia_oferta?: string | null; nota?: string | null; alcance_oferta?: string | null }
 
 /** «Hoja RESUMEN, celda H29» → hoja y celda; un número es la página. */
 export function fuenteDePartida(p: any, version_id: number, documento: string): FuenteDato {
@@ -20,6 +20,15 @@ const empresaDe = (entrada: any): string => {
   const dato = campo('proveedor') ?? campo('contratista');
   if (dato) return String(dato).replace(/\s+/g, ' ').replace(/\s+(S\.?A\.?S?\.?|S\.?A\.?|LTDA\.?)$/i, '').trim();
   return String(entrada.documento ?? '').replace(/\.(pdf|xlsx?)$/i, '').replace(/^\s*\d+\s*[.)-]\s*/, '').replace(/\s*\(v\d+\)$/, '').trim() || 'Sin empresa identificada';
+};
+
+/** Lo que la propia oferta dice sobre otras versiones («reemplaza expresamente toda cotización anterior»), tal como consta en su registro verificado. */
+const notaDeVersion = (vs: CotizacionVerificada[]): string | null => {
+  for (const v of vs) {
+    const m = /reemplaza[^.;]*(?:cotizaci[oó]n|oferta)[^.;]*/i.exec(`${v.nota ?? ''}. ${v.alcance_oferta ?? ''}`);
+    if (m) return m[0].trim().replace(/^./, (c) => c.toUpperCase());
+  }
+  return null;
 };
 
 const COMPONENTES: Array<[keyof OfertaEdificio['componentes'], RegExp, string]> = [
@@ -83,8 +92,11 @@ export function ofertasDeLectura(
     const metodo = !etiquetado ? 'Documento vinculado únicamente a este edificio' : mias.some((p) => p.coincidencia?.estado === 'POSIBLE') ? 'Por el nombre del edificio en la tabla, en un documento vinculado al edificio' : 'Por el nombre del edificio en la tabla';
     salida.push({
       empresa: empresaDe(e), documento: doc.replace(/\s*\(v\d+\)$/, ''), version_id: e.version_id, etapa: 'COTIZACION',
-      fecha: (e.campos ?? []).find((c: any) => c.campo === 'fecha_cotizacion')?.valor ?? verificadas.find((v) => v.version_id === e.version_id && v.edificio_id === edificio.id)?.fecha_oferta ?? null,
-      referencia: (e.campos ?? []).find((c: any) => c.campo === 'numero_cotizacion')?.valor ?? null,
+      // La fecha y la referencia son de la OFERTA (documento): se toman de la lectura o de cualquier cotización verificada de esa versión.
+      fecha: (e.campos ?? []).find((c: any) => c.campo === 'fecha_cotizacion')?.valor ?? verificadas.find((v) => v.version_id === e.version_id && v.fecha_oferta)?.fecha_oferta ?? null,
+      referencia: (e.campos ?? []).find((c: any) => c.campo === 'numero_cotizacion')?.valor ?? verificadas.find((v) => v.version_id === e.version_id && v.referencia_oferta)?.referencia_oferta ?? null,
+      secuencia: null,
+      nota_version: notaDeVersion(verificadas.filter((v) => v.version_id === e.version_id)),
       nivel, items, componentes: comp, fuentes_componentes: fuentes, alcance: alt ? alt.replace(/\s*[-–]\s*total.*$/i, '') : null,
       oferta_conjunta: totalConjunto !== null || (etiquetado && vinculados > 1) ? { edificios: vinculados, total: totalConjunto } : null,
       relacion: metodo,

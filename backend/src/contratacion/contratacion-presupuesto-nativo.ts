@@ -224,7 +224,7 @@ export interface LecturaVisual {
   pagina: number;
   /** Resolución y método con los que se leyó la imagen (p. ej. «300 ppp, lectura visual por una persona o asistente»). */
   metodo: string;
-  filas: Array<{ item: number; edificio: string; alcance: string; importe: number; cantidad?: number; unidad?: string }>;
+  filas: Array<{ item: number; edificio: string; alcance: string; importe: number; cantidad?: number; unidad?: string; /** Precio unitario tal como consta (con centavos). */ precio_unitario?: number }>;
   /** Total de los ítems impreso en la tabla; la suma de las filas debe coincidir. Nunca se ajusta una cifra para que cuadre. */
   total_declarado: number;
   /** Filas del cierre que el OCR no leyó y se leyeron en la imagen (p. ej. imprevistos). */
@@ -251,7 +251,7 @@ export function fusionarLecturaVisual(resultado: any, lv: LecturaVisual): Result
     edificio: null, alcance_literal: true, unidad: 'GLOBAL', pagina: lv.pagina, cita: '', relacion: 'PENDIENTE_REVISION', origen: 'LECTURA_VISUAL', ...p,
   });
   const nuevas: any[] = lv.filas.map((f) => mk({
-    nivel: 'PARTIDA', edificio: f.edificio, alcance: f.alcance, importe: f.importe, unidad: f.unidad ?? 'GLOBAL', ...(f.cantidad !== undefined ? { cantidad: f.cantidad } : {}),
+    nivel: 'PARTIDA', edificio: f.edificio, alcance: f.alcance, importe: f.importe, unidad: f.unidad ?? 'GLOBAL', ...(f.cantidad !== undefined ? { cantidad: f.cantidad } : {}), ...(f.precio_unitario !== undefined ? { precio_unitario: f.precio_unitario } : {}),
     cita: `ítem ${f.item} de la tabla de la p. ${lv.pagina}: ${f.edificio}`.slice(0, 200), relacion: 'EXPLICITA',
   }));
   nuevas.push(mk({ nivel: 'SUBTOTAL', alcance: 'Total de ítems (impreso en la tabla)', importe: lv.total_declarado, cita: `TOTAL de la tabla, p. ${lv.pagina}` }));

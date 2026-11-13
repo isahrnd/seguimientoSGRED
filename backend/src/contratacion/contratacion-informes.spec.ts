@@ -12,7 +12,7 @@ const oferta = (empresa: string, cd: number, total: number): OfertaEdificio => (
   empresa, documento: `${empresa}.pdf`, version_id: 2, etapa: 'COTIZACION', fecha: '2026-09-18', referencia: null, nivel: 'COSTO_DIRECTO',
   items: [{ actividad: 'Demolición total', unidad: 'Global', cantidad: 1, precio_unitario: cd, subtotal: cd, nivel: 'PARTIDA', fuente: F(`${empresa}.pdf`, { pagina: 9 }) }],
   componentes: { costo_directo: cd, administracion: cd * 0.15, imprevistos: cd * 0.03, utilidad: cd * 0.05, iva: 9500, total }, fuentes_componentes: { costo_directo: F(`${empresa}.pdf`, { pagina: 9 }), total: F(`${empresa}.pdf`, { pagina: 9 }) },
-  alcance: null, oferta_conjunta: null, relacion: 'Documento vinculado únicamente a este edificio', controles: [{ control: 'Total antes de IVA + IVA = total', estado: 'NO_CUADRA', diferencia: -0.4 }],
+  alcance: null, oferta_conjunta: null, secuencia: null, nota_version: null, relacion: 'Documento vinculado únicamente a este edificio', controles: [{ control: 'Total antes de IVA + IVA = total', estado: 'NO_CUADRA', diferencia: -0.4 }],
 });
 
 const entrada = (o: Partial<EntradaFila>): EntradaFila => ({ edificio: { id: 1, nombre: 'Edificio Alfa', direccion: 'Carrera 1 # 2-3' }, consolidado: null, procesos: [], area_documentada: null, ofertas: [], contrato_por_vincular: false, analisis_sector: false, ...o });

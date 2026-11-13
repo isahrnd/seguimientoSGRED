@@ -660,14 +660,14 @@ export interface DatoValor { valor: number; procedencia: ProcedenciaValor; etiqu
 export type NivelOferta = "COSTO_DIRECTO" | "TOTAL" | "NO_ESPECIFICADO";
 export interface ItemOferta { actividad: string; unidad: string | null; cantidad: number | null; precio_unitario: number | null; subtotal: number | null; nivel: string; fuente: FuenteDato | null }
 export interface OfertaEdificio {
-  empresa: string; documento: string; version_id: number | null; etapa: "COTIZACION"; fecha: string | null; referencia: string | null; nivel: NivelOferta; items: ItemOferta[];
+  empresa: string; documento: string; version_id: number | null; etapa: "COTIZACION"; fecha: string | null; referencia: string | null; secuencia: "ANTERIOR" | "POSTERIOR" | null; nota_version: string | null; nivel: NivelOferta; items: ItemOferta[];
   componentes: { costo_directo: number | null; administracion: number | null; imprevistos: number | null; utilidad: number | null; iva: number | null; total: number | null };
   fuentes_componentes: Record<string, FuenteDato | null>; alcance: string | null; oferta_conjunta: { edificios: number; total: number | null } | null; relacion: string;
   controles: { control: string; estado: string; diferencia: number }[];
 }
 export interface ComparacionOfertas {
   disponible: boolean; nota: string;
-  niveles: { nivel: NivelOferta; etiqueta: string; ofertas: { empresa: string; valor: number; fecha: string | null; fuente: FuenteDato | null }[]; minimo: number; maximo: number; diferencia: number }[];
+  niveles: { nivel: NivelOferta; etiqueta: string; ofertas: { empresa: string; etiqueta: string; valor: number; fecha: string | null; fuente: FuenteDato | null; secuencia: "ANTERIOR" | "POSTERIOR" | null }[]; minimo: number; maximo: number; diferencia: number }[];
 }
 export interface EtapaValor { etapa: string; fecha: string | null; valor: number; procedencia: ProcedenciaValor; fuente: FuenteDato | null; nivel: string | null }
 export interface FilaPrecios {

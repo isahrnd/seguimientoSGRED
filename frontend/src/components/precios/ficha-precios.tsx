@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { Collapse, Table } from "antd";
+import { Collapse, Table, Tag } from "antd";
 import Link from "next/link";
 import { cop, fechaCorta } from "@/lib/format";
 import { urlVisor } from "@/components/soporte-link";
@@ -126,8 +126,8 @@ export function FichaPreciosEdificio({ ficha, tecnico, tecnicoEtiqueta }: { fich
             defaultActiveKey={[`${0}`]}
             items={conItems.map((o, i) => ({
               key: `${i}`,
-              label: <span><strong>{o.empresa}</strong> <span className="texto-secundario">· {o.documento}{fechaOferta(o.fecha) ? ` · ${fechaOferta(o.fecha)}` : ""}</span></span>,
-              children: <TablaOferta o={o} />,
+              label: <span><strong>{o.empresa}</strong> <span className="texto-secundario">· {o.documento}{o.referencia ? ` · ${o.referencia}` : ""}{fechaOferta(o.fecha) ? ` · ${fechaOferta(o.fecha)}` : ""}</span>{o.secuencia && <Tag style={{ marginLeft: 8 }}>{o.secuencia === "ANTERIOR" ? "Anterior" : "Posterior"}</Tag>}</span>,
+              children: <>{o.nota_version && <p className="texto-secundario" style={{ margin: "0 0 8px", fontSize: 13.5 }}>{o.nota_version}</p>}<TablaOferta o={o} /></>,
             }))}
           />
         )}
@@ -140,15 +140,15 @@ export function FichaPreciosEdificio({ ficha, tecnico, tecnicoEtiqueta }: { fich
         {f.comparacion.niveles.map((n) => (
           <div key={n.nivel} style={{ marginBottom: 14 }}>
             <Table
-              size="small" pagination={false} rowKey={(r) => `${r.empresa}-${r.valor}`} dataSource={n.ofertas} scroll={{ x: 420 }}
+              size="small" pagination={false} rowKey={(r) => `${r.etiqueta}-${r.valor}`} dataSource={n.ofertas} scroll={{ x: 420 }}
               columns={[
-                { title: n.etiqueta, dataIndex: "empresa" },
+                { title: n.etiqueta, dataIndex: "etiqueta", render: (t: string, r) => <span>{t}{r.secuencia && <Tag style={{ marginLeft: 8 }}>{r.secuencia === "ANTERIOR" ? "Anterior" : "Posterior"}</Tag>}</span> },
                 { title: "Valor", dataIndex: "valor", align: "right", width: 150, render: (v: number) => <span className="cifra" style={{ fontWeight: 600 }}>{cop(v)}</span> },
                 { title: "Fecha", dataIndex: "fecha", width: 110, render: (v: string | null) => fechaOferta(v) ?? "" },
                 { title: "Fuente", dataIndex: "fuente", width: 130, render: (fu) => <VerFuente fuente={fu} texto="Ver" /> },
               ]}
             />
-            <BarrasSimples titulo={`${n.etiqueta} por empresa`} datos={n.ofertas.map((o) => ({ etiqueta: o.empresa, valor: o.valor }))} />
+            <BarrasSimples titulo={`${n.etiqueta} por empresa`} datos={n.ofertas.map((o) => ({ etiqueta: o.etiqueta, valor: o.valor }))} />
           </div>
         ))}
         {f.etapas.length > 0 && (

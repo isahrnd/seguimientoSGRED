@@ -38,7 +38,7 @@ export async function construirLibroPrecios(d: DatosLibroPrecios): Promise<Buffe
 
   const wd = wb.addWorksheet('Desglose por oferta', { views: [{ state: 'frozen', ySplit: 1 }] });
   wd.columns = [
-    { header: 'Edificio', key: 'edificio', width: 30 }, { header: 'Empresa', key: 'empresa', width: 22 }, { header: 'Documento', key: 'documento', width: 34 }, { header: 'Fecha de la oferta', key: 'fecha', width: 14 },
+    { header: 'Edificio', key: 'edificio', width: 30 }, { header: 'Empresa', key: 'empresa', width: 22 }, { header: 'Documento', key: 'documento', width: 34 }, { header: 'Referencia / versión', key: 'referencia', width: 18 }, { header: 'Fecha de la oferta', key: 'fecha', width: 14 }, { header: 'Orden entre versiones', key: 'secuencia', width: 16 },
     { header: 'Nivel', key: 'nivel', width: 18 }, { header: 'Actividad / componente', key: 'actividad', width: 58 }, { header: 'Unidad', key: 'unidad', width: 10 }, { header: 'Cantidad', key: 'cantidad', width: 12 },
     { header: 'Precio unitario', key: 'unitario', width: 18, style: { numFmt: MONEDA } }, { header: 'Subtotal / valor', key: 'importe', width: 20, style: { numFmt: MONEDA } }, { header: 'Fuente', key: 'fuente', width: 38 },
     { header: 'Relación con el edificio', key: 'relacion', width: 40 },
@@ -46,7 +46,7 @@ export async function construirLibroPrecios(d: DatosLibroPrecios): Promise<Buffe
   wd.getRow(1).font = { bold: true };
   for (const f of d.filas) {
     for (const o of f.ofertas) {
-      const base = { edificio: f.nombre, empresa: o.empresa, documento: o.documento, fecha: o.fecha ?? '', relacion: o.relacion };
+      const base = { edificio: f.nombre, empresa: o.empresa, documento: o.documento, referencia: o.referencia ?? '', fecha: o.fecha ?? '', secuencia: o.secuencia === 'ANTERIOR' ? 'Anterior' : o.secuencia === 'POSTERIOR' ? 'Posterior' : '', relacion: o.nota_version ? `${o.relacion}. ${o.nota_version}` : o.relacion };
       for (const i of o.items) wd.addRow({ ...base, nivel: 'Actividad', actividad: i.actividad, unidad: i.unidad ?? '', cantidad: i.cantidad, unitario: i.precio_unitario, importe: i.subtotal, fuente: fuenteTexto(i.fuente) });
       const c = o.componentes;
       for (const [etq, v, k] of [['Costo directo', c.costo_directo, 'costo_directo'], ['Administración', c.administracion, 'administracion'], ['Imprevistos', c.imprevistos, 'imprevistos'], ['Utilidad', c.utilidad, 'utilidad'], ['IVA', c.iva, 'iva'], ['Total de la oferta', c.total, 'total']] as const) {

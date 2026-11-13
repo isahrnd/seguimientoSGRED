@@ -8,7 +8,7 @@ export type CoincidenciaEdificio = 'COINCIDE' | 'POSIBLE' | 'SIN_COINCIDENCIA';
 
 const GENERICAS = new Set(['ed', 'edificio', 'edificacion', 'conjunto', 'multifamiliar', 'centro', 'comercial', 'residencial', 'y', 'de', 'del', 'la', 'el', 'los', 'las']);
 
-const nucleo = (nombre: string) =>
+export const nucleo = (nombre: string) =>
   normalizar(nombre).replace(/[./-]/g, ' ').split(' ').filter((t) => t && !GENERICAS.has(t)).join('');
 
 function bigramas(s: string): string[] {

@@ -50,6 +50,10 @@ export interface OfertaEdificio {
   componentes: { costo_directo: number | null; administracion: number | null; imprevistos: number | null; utilidad: number | null; iva: number | null; total: number | null };
   fuentes_componentes: Record<string, FuenteDato | null>;
   alcance: string | null;
+  /** Entre ofertas de la misma empresa con fechas distintas: la más antigua es ANTERIOR y la más reciente POSTERIOR. Nunca implica que sea la seleccionada o la contratada. */
+  secuencia: 'ANTERIOR' | 'POSTERIOR' | null;
+  /** Lo que la oferta declara sobre otras versiones, cuando consta. */
+  nota_version: string | null;
   /** Total de una oferta que cubre varios edificios (no es el valor de este edificio). */
   oferta_conjunta: { edificios: number; total: number | null } | null;
   relacion: string;
@@ -109,7 +113,7 @@ export interface FilaEdificio {
 
 export interface Comparacion {
   disponible: boolean;
-  niveles: Array<{ nivel: NivelOferta; etiqueta: string; ofertas: Array<{ empresa: string; valor: number; fecha: string | null; fuente: FuenteDato | null }>; minimo: number; maximo: number; diferencia: number }>;
+  niveles: Array<{ nivel: NivelOferta; etiqueta: string; ofertas: Array<{ empresa: string; /** Empresa con su referencia y fecha cuando hay varias versiones. */ etiqueta: string; valor: number; fecha: string | null; fuente: FuenteDato | null; secuencia: 'ANTERIOR' | 'POSTERIOR' | null }>; minimo: number; maximo: number; diferencia: number }>;
   nota: string;
 }
 const ETQ_NIVEL: Record<NivelOferta, string> = { COSTO_DIRECTO: 'Costo directo', TOTAL: 'Total de la oferta', NO_ESPECIFICADO: 'Importe (nivel no especificado)' };
@@ -123,12 +127,13 @@ export function compararOfertas(ofertas: OfertaEdificio[]): Comparacion {
     return o.nivel === 'NO_ESPECIFICADO' ? (o.items.length ? r2(suma(o.items.map((i) => i.subtotal ?? 0))) : null) : null;
   };
   for (const nivel of ['COSTO_DIRECTO', 'TOTAL', 'NO_ESPECIFICADO'] as NivelOferta[]) {
-    const por = new Map<string, { empresa: string; valor: number; fecha: string | null; fuente: FuenteDato | null }>();
+    const por = new Map<string, Comparacion['niveles'][number]['ofertas'][number]>();
     for (const o of ofertas) {
       const v = valorDe(o, nivel);
       if (v === null || !(v > 0)) continue;
       const k = `${o.empresa}|${o.documento}`;
-      por.set(k, { empresa: o.empresa, valor: v, fecha: o.fecha, fuente: o.fuentes_componentes[nivel === 'TOTAL' ? 'total' : 'costo_directo'] ?? { version_id: o.version_id, documento: o.documento, pagina: null, hoja: null, celda: null } });
+      const varias = ofertas.filter((x) => x.empresa === o.empresa).length > 1;
+      por.set(k, { empresa: o.empresa, etiqueta: varias ? `${o.empresa} · ${o.referencia ? `${o.referencia}, ` : ''}${o.fecha ? fechaCorteTexto(o.fecha) : o.documento}` : o.empresa, secuencia: o.secuencia, valor: v, fecha: o.fecha, fuente: o.fuentes_componentes[nivel === 'TOTAL' ? 'total' : 'costo_directo'] ?? { version_id: o.version_id, documento: o.documento, pagina: null, hoja: null, celda: null } });
     }
     const lista = [...por.values()].sort((a, b) => a.valor - b.valor);
     const empresas = new Set(lista.map((x) => x.empresa));
@@ -142,7 +147,21 @@ export function compararOfertas(ofertas: OfertaEdificio[]): Comparacion {
   };
 }
 
-export function construirFila(e: EntradaFila): FilaEdificio {
+/** Marca, por empresa, cuál oferta es anterior y cuál posterior (solo por fecha; no equivale a seleccionada ni contratada). */
+export function marcarSecuencia(ofertas: OfertaEdificio[]): OfertaEdificio[] {
+  const porEmpresa = new Map<string, OfertaEdificio[]>();
+  for (const o of ofertas) porEmpresa.set(o.empresa, [...(porEmpresa.get(o.empresa) ?? []), o]);
+  const salida = ofertas.map((o) => ({ ...o }));
+  for (const lista of porEmpresa.values()) {
+    const fechas = [...new Set(lista.map((o) => o.fecha).filter(Boolean) as string[])].sort();
+    if (fechas.length < 2) continue;
+    for (const o of salida) if (o.empresa === lista[0].empresa && o.fecha) o.secuencia = o.fecha === fechas[fechas.length - 1] ? 'POSTERIOR' : 'ANTERIOR';
+  }
+  return salida.sort((a, b) => (a.fecha ?? '9999').localeCompare(b.fecha ?? '9999') || a.empresa.localeCompare(b.empresa));
+}
+
+export function construirFila(e0: EntradaFila): FilaEdificio {
+  const e = { ...e0, ofertas: marcarSecuencia(e0.ofertas) };
   const c = e.consolidado;
   const conContrato = e.procesos.filter((p) => p.contratos.length > 0);
   const unico = conContrato.find((p) => p.edificios_del_proceso === 1) ?? null;

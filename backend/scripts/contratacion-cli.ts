@@ -13,6 +13,7 @@ import { NestFactory } from '@nestjs/core';
 import { MonitoreoContratacionModule } from '../src/contratacion/monitoreo-contratacion.module';
 import { ContratacionIndiceService, paginasPdf } from '../src/contratacion/contratacion-indice.service';
 import { ContratacionDocumentosService } from '../src/contratacion/contratacion-documentos.service';
+import { evidenciaRelacion, proponerRelaciones } from '../src/contratacion/contratacion-relaciones-ofertas';
 import { tipoPorSegmento } from '../src/contratacion/contratacion-identificadores';
 import { compararEdificio } from '../src/contratacion/contratacion-edificios-match';
 import { edificacionDeCarpeta } from '../src/contratacion/contratacion-sugerencias';
@@ -118,6 +119,33 @@ async function main() {
       const ruta = (args.find((a) => a.startsWith('--archivo=')) ?? '').slice(10);
       if (!Number.isInteger(id) || id <= 0 || !ruta) throw new Error('Indique --version=ID y --archivo=ruta');
       console.log(JSON.stringify(await app.get(ContratacionIndiceService).ia.incorporarLecturaVisual(id, JSON.parse(fs.readFileSync(ruta, 'utf8')))));
+    } else if (cmd === 'relacionar-ofertas') {
+      // Relaciona las filas de una oferta con los edificios registrados por el contenido de su tabla (nombre en la fila), sin Claude. Sin --aplicar solo lista.
+      // Con --aplicar registra las relaciones inequívocas como «comprobación documental del asistente»; no toca las confirmaciones humanas existentes.
+      const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      if (!lista.length) throw new Error('Indique --versiones=ID,ID,...');
+      const prisma = (app.get(ContratacionIndiceService) as any).prisma;
+      const registrados = (await prisma.contratacionEdificio.findMany({ select: { id: true, nombre: true } })) as Array<{ id: number; nombre: string }>;
+      const confirmaciones: Array<{ documento: string; confirmaciones: Array<{ tipo: string; valor: string; evidencia: string }> }> = [];
+      for (const id of lista) {
+        const ver = await prisma.contratacionDocumentoVersion.findUnique({ where: { id }, include: { documento: { include: { edificios: true } } } });
+        const fila = await prisma.contratacionIaExtraccion.findFirst({ where: { version_id: id, estado: 'OK' }, orderBy: { id: 'desc' } });
+        if (!ver || !fila?.resultado) { console.log(JSON.stringify({ version_id: id, error: 'sin lectura aceptada (OK)' })); continue; }
+        const vinc = ver.documento.edificios.map((e: any) => e.edificio_id);
+        const props = proponerRelaciones(((fila.resultado as any).partidas ?? []).map((p: any) => ({ edificio: p.edificio ?? null, pagina: p.pagina ?? null, importe: p.importe ?? null, alcance: p.alcance ?? '' })), registrados, vinc);
+        const porEdificio = new Map<number, typeof props>();
+        for (const p of props) {
+          console.log(JSON.stringify({ version_id: id, documento: ver.documento.nombre, pagina: p.pagina, fila: p.etiqueta, importe: p.importe, edificio: p.candidato?.nombre ?? null, metodo: p.metodo, estado: p.estado, falta: p.falta }));
+          if (p.estado === 'APLICABLE') porEdificio.set(p.candidato!.id, [...(porEdificio.get(p.candidato!.id) ?? []), p]);
+        }
+        const conf = [...porEdificio.entries()].map(([eid, ps]) => ({ tipo: 'EDIFICACION', valor: registrados.find((r) => r.id === eid)!.nombre, evidencia: evidenciaRelacion(ver.documento.nombre, ps[0]) }));
+        if (conf.length) confirmaciones.push({ documento: ver.md5, confirmaciones: conf });
+      }
+      const payload = { version: 1, documentos: confirmaciones };
+      const svc = app.get(ContratacionImportacionService);
+      if (!confirmaciones.length) console.log(JSON.stringify({ aplicable: 0 }));
+      else if (args.includes('--aplicar')) console.log(JSON.stringify(await svc.aplicar(payload, null)));
+      else { const v = await svc.previsualizar(payload); console.log(JSON.stringify({ valida: v.valida, errores: v.errores, resumen: v.resumen })); }
     } else if (cmd === 'cierre-ocr') {
       // OCR local selectivo de una página (--pagina=N) para leer el cierre de una oferta cuya tabla es una imagen. Sin API; solo se acepta si cuadra la aritmética.
       const lista = (args.find((a) => a.startsWith('--versiones=')) ?? '').slice(12).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
@@ -172,7 +200,7 @@ async function main() {
       if (args.includes('--aplicar')) console.log(JSON.stringify(await svc.aplicar(payload, null), null, 2));
       else { const v = await svc.previsualizar(payload); console.log(JSON.stringify({ valida: v.valida, errores: v.errores, advertencias: v.advertencias, resumen: v.resumen }, null, 2)); }
     } else {
-      console.error('Comandos: reindexar | desglose-nativo --versiones=ID,ID | verificar-envio --versiones=ID,ID [--forzar] | proponer-vinculos-carpeta --documento=ID [--aplicar] | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
+      console.error('Comandos: reindexar | relacionar-ofertas --versiones=ID,ID [--aplicar] | desglose-nativo --versiones=ID,ID | verificar-envio --versiones=ID,ID [--forzar] | proponer-vinculos-carpeta --documento=ID [--aplicar] | corregir-identificadores [--aplicar] | interpretar --versiones=ID,ID [--detalle] [--forzar] | importar <archivo> [--aplicar] | drive-vincular');
       process.exitCode = 1;
     }
   } finally {

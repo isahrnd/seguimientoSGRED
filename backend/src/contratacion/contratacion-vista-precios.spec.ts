@@ -1,4 +1,4 @@
-import { compararOfertas, construirFila, cop, etiquetaConsolidado, EntradaFila, OfertaEdificio } from './contratacion-vista-precios';
+import { marcarSecuencia, compararOfertas, construirFila, cop, etiquetaConsolidado, EntradaFila, OfertaEdificio } from './contratacion-vista-precios';
 
 // Datos SINTÉTICOS.
 const F = (documento: string, extra: Partial<{ pagina: number; hoja: string; celda: string }> = {}) => ({ version_id: 1, documento, pagina: null, hoja: null, celda: null, ...extra });
@@ -94,7 +94,7 @@ describe('vista de precios por edificio', () => {
 describe('evolución por etapa', () => {
   const o = (empresa: string, total: number) => ({
     empresa, documento: `${empresa}.pdf`, version_id: 1, etapa: 'COTIZACION' as const, fecha: null, referencia: null, nivel: 'TOTAL' as const, items: [],
-    componentes: { costo_directo: null, administracion: null, imprevistos: null, utilidad: null, iva: null, total }, fuentes_componentes: {}, alcance: null, oferta_conjunta: null, relacion: 'x', controles: [],
+    componentes: { costo_directo: null, administracion: null, imprevistos: null, utilidad: null, iva: null, total }, fuentes_componentes: {}, alcance: null, oferta_conjunta: null, secuencia: null, nota_version: null, relacion: 'x', controles: [],
   });
   it('cotización y consolidado no declaran el mismo nivel: se listan, pero no se grafican juntos', () => {
     const f = construirFila(entrada({ consolidado: consolidado(), ofertas: [o('A', 130_000_000)] }));
@@ -110,7 +110,7 @@ describe('evolución por etapa', () => {
 describe('comparación de ofertas por nivel', () => {
   const oferta = (empresa: string, cd: number | null, total: number | null, nivel: any = 'COSTO_DIRECTO'): OfertaEdificio => ({
     empresa, documento: `${empresa}.pdf`, version_id: 1, etapa: 'COTIZACION', fecha: null, referencia: null, nivel, items: [],
-    componentes: { costo_directo: cd, administracion: null, imprevistos: null, utilidad: null, iva: null, total }, fuentes_componentes: {}, alcance: null, oferta_conjunta: null, relacion: 'x', controles: [],
+    componentes: { costo_directo: cd, administracion: null, imprevistos: null, utilidad: null, iva: null, total }, fuentes_componentes: {}, alcance: null, oferta_conjunta: null, secuencia: null, nota_version: null, relacion: 'x', controles: [],
   });
   it('compara solo cifras del mismo nivel y no mezcla costo directo con total', () => {
     const c = compararOfertas([oferta('A', 100, 130), oferta('B', 120, null), oferta('C', null, 150)]);
@@ -125,6 +125,27 @@ describe('comparación de ofertas por nivel', () => {
   });
   it('dos versiones de la misma empresa no cuentan como dos ofertas', () => {
     expect(compararOfertas([oferta('A', 100, null), { ...oferta('A', 110, null), documento: 'A-v2.pdf' }]).disponible).toBe(false);
+  });
+});
+
+describe('versiones de una misma oferta', () => {
+  const v = (empresa: string, fecha: string | null, doc: string): OfertaEdificio => ({
+    empresa, documento: doc, version_id: 1, etapa: 'COTIZACION', fecha, referencia: null, nivel: 'TOTAL', items: [],
+    componentes: { costo_directo: null, administracion: null, imprevistos: null, utilidad: null, iva: null, total: 100 }, fuentes_componentes: {}, alcance: null, oferta_conjunta: null, secuencia: null, nota_version: null, relacion: 'x', controles: [],
+  });
+  it('distingue anterior y posterior por fecha, conserva ambas y no marca ninguna como seleccionada', () => {
+    const r = marcarSecuencia([v('A', '2026-10-20', 'A-v2.pdf'), v('A', '2026-09-18', 'A-v1.pdf'), v('B', '2026-09-30', 'B.pdf')]);
+    expect(r.map((o) => [o.documento, o.secuencia])).toEqual([['A-v1.pdf', 'ANTERIOR'], ['B.pdf', null], ['A-v2.pdf', 'POSTERIOR']]);
+    expect(JSON.stringify(r)).not.toMatch(/seleccionad|contratad/i);
+  });
+  it('sin fecha en alguna versión no se afirma el orden', () => {
+    const r = marcarSecuencia([v('A', null, 'A-v1.pdf'), v('A', '2026-10-20', 'A-v2.pdf')]);
+    expect(r.every((o) => o.secuencia === null)).toBe(true);
+  });
+  it('la comparación usa la etiqueta con fecha cuando hay varias versiones', () => {
+    const r = marcarSecuencia([v('A', '2026-09-18', 'A-v1.pdf'), v('A', '2026-10-20', 'A-v2.pdf'), v('B', '2026-09-30', 'B.pdf')]);
+    const c = compararOfertas(r);
+    expect(c.niveles[0].ofertas.map((o) => o.etiqueta).join('|')).toContain("A · 18/09/2026");
   });
 });
 

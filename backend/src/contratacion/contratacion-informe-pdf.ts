@@ -50,7 +50,26 @@ class Informe {
     }
   }
 
-  texto(t0: string, o: { size?: number; bold?: boolean; color?: string; gap?: number; width?: number; align?: 'left' | 'right' | 'center'; x?: number } = {}) {
+  /** Altura máxima que un bloque «atómico» (tabla o gráfica corta) puede ocupar: si cabe en una página, nunca se parte. */
+  private static readonly ATOMICO_MAX = 600;
+  /** Títulos pendientes: se dibujan junto con el contenido que les sigue (nunca quedan solos al final de una página). */
+  private pendientes: Array<{ n: 1 | 2; t: string }> = [];
+  private static readonly ALTO_TITULO = { 1: 40, 2: 24 } as const;
+
+  private altoPendientes() { return this.pendientes.reduce((a, p) => a + Informe.ALTO_TITULO[p.n], 0); }
+
+  /** Dibuja los títulos pendientes asegurando que quepan JUNTO con `altoContenido` del bloque que sigue. */
+  private soltarTitulos(altoContenido: number) {
+    if (!this.pendientes.length) return;
+    this.espacio(this.altoPendientes() + altoContenido);
+    for (const p of this.pendientes) {
+      if (p.n === 1) { this.doc.y += 8; this.escribir(p.t, { size: 13, bold: true, color: COLOR.marca, gap: 2 }); this.linea(); this.doc.y += 6; }
+      else { this.doc.y += 4; this.escribir(p.t, { size: 10.5, bold: true, color: COLOR.marca, gap: 4 }); }
+    }
+    this.pendientes = [];
+  }
+
+  private escribir(t0: string, o: { size?: number; bold?: boolean; color?: string; gap?: number; width?: number; align?: 'left' | 'right' | 'center'; x?: number } = {}) {
     const d = this.doc;
     const t = nfc(t0);
     d.font(o.bold ? NEGRITA : FUENTE).fontSize(o.size ?? 9.5).fillColor(o.color ?? COLOR.tinta);
@@ -61,34 +80,65 @@ class Informe {
     d.y += o.gap ?? 4;
   }
 
-  titulo1(t: string) { this.espacio(84); this.doc.y += 8; this.texto(t, { size: 13, bold: true, color: COLOR.marca, gap: 2 }); this.linea(); this.doc.y += 6; }
-  titulo2(t: string) { this.espacio(60); this.doc.y += 4; this.texto(t, { size: 10.5, bold: true, color: COLOR.marca, gap: 4 }); }
+  texto(t0: string, o: { size?: number; bold?: boolean; color?: string; gap?: number; width?: number; align?: 'left' | 'right' | 'center'; x?: number } = {}) {
+    if (this.pendientes.length) {
+      const d = this.doc;
+      d.font(o.bold ? NEGRITA : FUENTE).fontSize(o.size ?? 9.5);
+      this.soltarTitulos(Math.min(d.heightOfString(nfc(t0), { width: o.width ?? this.cuerpo.ancho, align: o.align }) + (o.gap ?? 4), 90));
+    }
+    this.escribir(t0, o);
+  }
+
+  titulo1(t: string) { this.pendientes.push({ n: 1, t }); }
+  titulo2(t: string) { this.pendientes.push({ n: 2, t }); }
   linea(color = COLOR.linea) { const y = this.doc.y; this.doc.moveTo(this.cuerpo.izq, y).lineTo(this.cuerpo.izq + this.cuerpo.ancho, y).lineWidth(0.6).strokeColor(color).stroke(); this.doc.y = y + 2; }
 
-  /** Tabla con encabezado repetido en cada página; filas que no se cortan. */
+  /**
+   * Tabla con encabezado repetido en cada página. Si cabe en una página se imprime completa (nunca se parte); si es más larga, se reparte sin dejar una sola
+   * fila sola en la última página ni el encabezado solo al final de una página. Los títulos pendientes viajan con su primera fila.
+   */
   tabla(cols: Array<{ t: string; w: number; a?: 'left' | 'right' | 'center' }>, filas0: Array<Array<string>>, o: { size?: number; negritas?: number[]; fondos?: Array<string | null> } = {}) {
     const filas = filas0.map((f) => f.map((c) => nfc(c)));
     const d = this.doc; const size = o.size ?? 8.5; const pad = 4;
     const total = cols.reduce((a, c) => a + c.w, 0);
     const esc = this.cuerpo.ancho / total;
     const anchos = cols.map((c) => c.w * esc);
+    d.font(NEGRITA).fontSize(size);
+    const hCab = Math.max(...cols.map((c, i) => d.heightOfString(c.t, { width: anchos[i] - 2 * pad }))) + 2 * pad - 2;
+    d.font(FUENTE).fontSize(size);
+    const alturas = filas.map((f) => Math.max(...f.map((t, i) => d.heightOfString(t ?? '', { width: anchos[i] - 2 * pad }))) + 2 * pad - 1 + 1);
     const dibujarEncabezado = () => {
-      d.font(NEGRITA).fontSize(size);
-      const h = Math.max(...cols.map((c, i) => d.heightOfString(c.t, { width: anchos[i] - 2 * pad }))) + 2 * pad - 2;
       const y = d.y; let x = this.cuerpo.izq;
-      d.rect(this.cuerpo.izq, y, this.cuerpo.ancho, h).fill(COLOR.fondo);
+      d.rect(this.cuerpo.izq, y, this.cuerpo.ancho, hCab).fill(COLOR.fondo);
       cols.forEach((c, i) => { d.fillColor(COLOR.marca).font(NEGRITA).fontSize(size).text(c.t, x + pad, y + pad - 1, { width: anchos[i] - 2 * pad, align: c.a ?? 'left' }); x += anchos[i]; });
-      d.y = y + h;
+      d.y = y + hCab;
       d.moveTo(this.cuerpo.izq, d.y).lineTo(this.cuerpo.izq + this.cuerpo.ancho, d.y).lineWidth(0.8).strokeColor(COLOR.marca).stroke();
     };
+    const sumar = (a: number[]) => a.reduce((x, y) => x + y, 0);
+    const alturaTotal = hCab + sumar(alturas);
+    const atomica = alturaTotal <= Informe.ATOMICO_MAX;
+    // Contenido que debe acompañar a los títulos: toda la tabla si es atómica; si no, el encabezado y las dos primeras filas.
+    this.soltarTitulos(atomica ? alturaTotal : hCab + sumar(alturas.slice(0, 2)));
+    if (atomica) this.espacio(alturaTotal);
+    else this.espacio(hCab + sumar(alturas.slice(0, 2)));
+
+    // Reparto por páginas (simulación): se evita dejar una sola fila en la última página.
+    const cortes: number[] = []; // índices de fila donde empieza una página nueva
+    if (!atomica) {
+      let libre = this.cuerpo.abajo - d.y - hCab;
+      const capacidad = this.cuerpo.abajo - this.cuerpo.arriba - hCab;
+      for (let i = 0; i < filas.length; i++) {
+        if (alturas[i] > libre) { cortes.push(i); libre = capacidad; }
+        libre -= alturas[i];
+      }
+      const ultimo = cortes[cortes.length - 1];
+      if (cortes.length && filas.length - ultimo === 1 && ultimo - (cortes[cortes.length - 2] ?? 0) >= 3) cortes[cortes.length - 1] = ultimo - 1;
+    }
     this.encabezadoTabla = dibujarEncabezado;
-    // El encabezado nunca queda solo al final de una página: se exige espacio para él y para la primera fila.
-    this.espacio(64);
     dibujarEncabezado();
     filas.forEach((f, fi) => {
-      d.font(FUENTE).fontSize(size);
-      const h = Math.max(...f.map((t, i) => d.heightOfString(t ?? '', { width: anchos[i] - 2 * pad }))) + 2 * pad - 1;
-      this.espacio(h + 1);
+      if (cortes.includes(fi)) { d.addPage(); d.y = this.cuerpo.arriba; dibujarEncabezado(); }
+      const h = alturas[fi] - 1;
       const y = d.y; let x = this.cuerpo.izq;
       if (o.fondos?.[fi]) d.rect(this.cuerpo.izq, y, this.cuerpo.ancho, h).fill(o.fondos[fi]!);
       f.forEach((t, i) => { d.fillColor(COLOR.tinta).font(o.negritas?.includes(i) ? NEGRITA : FUENTE).fontSize(size).text(t ?? '', x + pad, y + pad - 1, { width: anchos[i] - 2 * pad, align: cols[i].a ?? 'left' }); x += anchos[i]; });
@@ -99,23 +149,27 @@ class Informe {
     d.y += 6;
   }
 
-  /** Barras horizontales (vectoriales): etiqueta, barra proporcional al valor y cifra. */
+  /** Barras horizontales (vectoriales): etiqueta, barra proporcional al valor y cifra. Una gráfica que cabe en una página nunca se parte. */
   barras(titulo: string, datos: Array<{ etiqueta: string; valor: number; nota?: string; color?: string }>) {
     if (!datos.length) return;
     const d = this.doc; const maxV = Math.max(...datos.map((x) => x.valor));
-    const wEtq = 150; const wCifra = 92; const wBarra = this.cuerpo.ancho - wEtq - wCifra - 8; const h = 15;
-    // Una gráfica corta va completa en una página; una larga puede continuar en la siguiente, pero nunca deja solo el título.
-    this.espacio(24 + Math.min(datos.length, 5) * (h + 5) + (datos.length <= 8 ? (datos.length - Math.min(datos.length, 5)) * (h + 5) : 0));
-    this.texto(titulo, { size: 9.5, bold: true, gap: 6 });
-    for (const x of datos) {
-      this.espacio(h + 6);
+    const wEtq = 150; const wCifra = 92; const wBarra = this.cuerpo.ancho - wEtq - wCifra - 8; const h = 15; const paso = h + 5;
+    const alto = 26 + datos.length * paso + 2;
+    const atomica = alto <= Informe.ATOMICO_MAX;
+    this.soltarTitulos(atomica ? alto : 26 + 6 * paso);
+    this.espacio(atomica ? alto : 26 + 6 * paso);
+    this.escribir(titulo, { size: 9.5, bold: true, gap: 6 });
+    datos.forEach((x, i) => {
+      // Una gráfica larga que se parte no deja una sola barra en la página nueva.
+      if (!atomica && datos.length - i <= 2) this.espacio(paso * (datos.length - i));
+      else this.espacio(paso);
       const y = d.y;
       d.font(FUENTE).fontSize(8.5).fillColor(COLOR.tinta).text(nfc(x.etiqueta), this.cuerpo.izq, y + 3, { width: wEtq - 6, height: h, ellipsis: true, lineBreak: false });
       const w = Math.max(1.5, (x.valor / maxV) * wBarra);
       d.rect(this.cuerpo.izq + wEtq, y + 1, w, h - 2).fill(x.color ?? COLOR.acento);
       d.font(NEGRITA).fontSize(8.5).fillColor(COLOR.tinta).text(cop(x.valor), this.cuerpo.izq + wEtq + wBarra + 8, y + 3, { width: wCifra, align: 'right', lineBreak: false });
-      d.y = y + h + 5;
-    }
+      d.y = y + paso;
+    });
     d.y += 2;
   }
 
@@ -125,6 +179,7 @@ class Informe {
     d.font(FUENTE).fontSize(8);
     const hDet = Math.max(...items.map((i) => (i.detalle ? d.heightOfString(i.detalle, { width: w - 16 }) : 0)));
     const h = 52 + hDet;
+    this.soltarTitulos(h + 6);
     this.espacio(h + 6);
     const y = d.y;
     items.forEach((it, i) => {
@@ -139,6 +194,7 @@ class Informe {
 
   /** Encabezado y pie de cada página (con «Página i de n»). */
   cerrar(): void {
+    this.pendientes = [];
     const d = this.doc; const rango = d.bufferedPageRange();
     const logo = Buffer.from(LOGO_INFOGRED_PNG_BASE64, 'base64');
     for (let i = 0; i < rango.count; i++) {
@@ -198,14 +254,6 @@ export async function informeGeneral(d: DatosInformeGeneral): Promise<Buffer> {
   );
   inf.texto('«rep.» = valor por m² reportado en el consolidado. Procedencia: Contrato (respaldado por documento), Consolidado (reportado), Matriz, Presupuesto, Cotización.', { size: 8, color: COLOR.gris, gap: 8 });
 
-  const conM2 = d.filas.filter((f) => f.valor_m2);
-  if (conM2.length) {
-    inf.espacio(150); // el título y las primeras barras van juntos
-    inf.titulo1('Valor por m²');
-    inf.barras('Valor por m² por edificio (cada barra indica si es contratado o reportado en el consolidado)', conM2.map((f) => ({ etiqueta: `${f.nombre}${f.valor_m2!.clase === 'REPORTADO' ? ' (rep.)' : ''}`, valor: f.valor_m2!.valor, color: f.valor_m2!.clase === 'CONTRATADO' ? COLOR.marca : COLOR.acento })));
-    inf.texto('No se compara el valor por m² entre edificios con alcances distintos (demolición, transporte, alquiler de equipos); es un indicador por edificio con su fuente.', { size: 8, color: COLOR.gris, gap: 6 });
-  }
-
   const conj = d.filas.filter((f) => f.contrato_conjunto);
   const vistos = new Set<string>();
   const contratos = conj.filter((f) => (vistos.has(f.contrato_conjunto!.proceso) ? false : (vistos.add(f.contrato_conjunto!.proceso), true)));
@@ -224,6 +272,13 @@ export async function informeGeneral(d: DatosInformeGeneral): Promise<Buffer> {
     inf.titulo1('Diferencias entre fuentes');
     for (const f of dif) for (const t of f.diferencias) inf.texto(`${f.nombre}: ${t}`, { size: 8.5, gap: 4 });
   }
+  const conM2 = d.filas.filter((f) => f.valor_m2);
+  if (conM2.length) {
+    inf.titulo1('Valor por m²');
+    inf.barras('Valor por m² por edificio (cada barra indica si es contratado o reportado en el consolidado)', conM2.map((f) => ({ etiqueta: `${f.nombre}${f.valor_m2!.clase === 'REPORTADO' ? ' (rep.)' : ''}`, valor: f.valor_m2!.valor, color: f.valor_m2!.clase === 'CONTRATADO' ? COLOR.marca : COLOR.acento })));
+    inf.texto('No se compara el valor por m² entre edificios con alcances distintos (demolición, transporte, alquiler de equipos); es un indicador por edificio con su fuente.', { size: 8, color: COLOR.gris, gap: 6 });
+  }
+
   if (d.fuentes.length) {
     inf.titulo1('Fuentes');
     for (const s of d.fuentes) inf.texto(`${s.rotulo}: ${s.documento} (versión ${s.version_id})`, { size: 8.5, gap: 3 });
@@ -274,8 +329,8 @@ export async function informeEdificio(d: DatosInformeEdificio): Promise<Buffer> 
   else {
     inf.texto(f.comparacion.nota, { size: 9, color: COLOR.gris, gap: 6 });
     for (const n of f.comparacion.niveles) {
-      inf.tabla([{ t: n.etiqueta, w: 40 }, { t: 'Valor', w: 20, a: 'right' }, { t: 'Fecha', w: 14 }, { t: 'Fuente', w: 40 }], n.ofertas.map((o) => [o.empresa, cop(o.valor), o.fecha ? fechaCorteTexto(o.fecha) ?? '' : '', fuenteTexto(o.fuente)]), { size: 8.5, negritas: [0] });
-      inf.barras(`${n.etiqueta} por empresa`, n.ofertas.map((o) => ({ etiqueta: o.empresa, valor: o.valor })));
+      inf.tabla([{ t: n.etiqueta, w: 40 }, { t: 'Valor', w: 20, a: 'right' }, { t: 'Fecha', w: 14 }, { t: 'Fuente', w: 40 }], n.ofertas.map((o) => [`${o.etiqueta}${o.secuencia ? ` (${o.secuencia === 'ANTERIOR' ? 'anterior' : 'posterior'})` : ''}`, cop(o.valor), o.fecha ? fechaCorteTexto(o.fecha) ?? '' : '', fuenteTexto(o.fuente)]), { size: 8.5, negritas: [0] });
+      inf.barras(`${n.etiqueta} por empresa`, n.ofertas.map((o) => ({ etiqueta: o.etiqueta, valor: o.valor })));
     }
   }
   if (f.etapas.length >= 1) {
@@ -313,8 +368,8 @@ export async function informeEdificio(d: DatosInformeEdificio): Promise<Buffer> 
 }
 
 function desgloseOferta(inf: Informe, o: OfertaEdificio) {
-  inf.titulo2(`${o.empresa} — ${o.documento}${o.fecha ? ` (${fechaCorteTexto(o.fecha)})` : ''}`);
-  inf.texto(`${o.relacion}.${o.alcance ? ` ${o.alcance}.` : ''}${o.oferta_conjunta ? ` Oferta conjunta de ${o.oferta_conjunta.edificios} edificios${o.oferta_conjunta.total ? `: total de la oferta ${cop(o.oferta_conjunta.total)} (no es el valor de este edificio)` : ''}.` : ''}`, { size: 8.5, color: COLOR.gris, gap: 4 });
+  inf.titulo2(`${o.empresa} — ${o.documento}${o.referencia ? ` · ${o.referencia}` : ''}${o.fecha ? ` (${fechaCorteTexto(o.fecha)})` : ''}${o.secuencia ? ` · ${o.secuencia === 'ANTERIOR' ? 'versión anterior' : 'versión posterior'}` : ''}`);
+  inf.texto(`${o.nota_version ? `${o.nota_version} ` : ''}${o.relacion}.${o.alcance ? ` ${o.alcance}.` : ''}${o.oferta_conjunta ? ` Oferta conjunta de ${o.oferta_conjunta.edificios} edificios${o.oferta_conjunta.total ? `: total de la oferta ${cop(o.oferta_conjunta.total)} (no es el valor de este edificio)` : ''}.` : ''}`, { size: 8.5, color: COLOR.gris, gap: 4 });
   if (o.items.length) {
     inf.tabla(
       [{ t: 'Actividad', w: 44 }, { t: 'Unidad', w: 9 }, { t: 'Cantidad', w: 10, a: 'right' }, { t: 'Precio unitario', w: 15, a: 'right' }, { t: 'Subtotal', w: 17, a: 'right' }, { t: 'Fuente', w: 15 }],
