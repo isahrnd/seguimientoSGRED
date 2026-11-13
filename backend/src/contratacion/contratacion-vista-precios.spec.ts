@@ -142,6 +142,11 @@ describe('versiones de una misma oferta', () => {
     const r = marcarSecuencia([v('A', null, 'A-v1.pdf'), v('A', '2026-10-20', 'A-v2.pdf')]);
     expect(r.every((o) => o.secuencia === null)).toBe(true);
   });
+  it('dos versiones del mismo documento (misma empresa) aparecen ambas en la comparación, cada una con su fecha y su orden', () => {
+    const r = marcarSecuencia([{ ...v('A', '2026-09-18', 'A.pdf'), version_id: 10 }, { ...v('A', '2026-10-20', 'A.pdf'), version_id: 11 }, v('B', '2026-09-30', 'B.pdf')]);
+    const c = compararOfertas(r);
+    expect(c.niveles[0].ofertas.filter((o) => o.empresa === 'A').map((o) => o.secuencia).sort()).toEqual(['ANTERIOR', 'POSTERIOR']);
+  });
   it('la comparación usa la etiqueta con fecha cuando hay varias versiones', () => {
     const r = marcarSecuencia([v('A', '2026-09-18', 'A-v1.pdf'), v('A', '2026-10-20', 'A-v2.pdf'), v('B', '2026-09-30', 'B.pdf')]);
     const c = compararOfertas(r);

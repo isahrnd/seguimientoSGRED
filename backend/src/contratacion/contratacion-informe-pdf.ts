@@ -369,10 +369,10 @@ export async function informeEdificio(d: DatosInformeEdificio): Promise<Buffer> 
 
 function desgloseOferta(inf: Informe, o: OfertaEdificio) {
   inf.titulo2(`${o.empresa} — ${o.documento}${o.referencia ? ` · ${o.referencia}` : ''}${o.fecha ? ` (${fechaCorteTexto(o.fecha)})` : ''}${o.secuencia ? ` · ${o.secuencia === 'ANTERIOR' ? 'versión anterior' : 'versión posterior'}` : ''}`);
-  inf.texto(`${o.nota_version ? `${o.nota_version} ` : ''}${o.relacion}.${o.alcance ? ` ${o.alcance}.` : ''}${o.oferta_conjunta ? ` Oferta conjunta de ${o.oferta_conjunta.edificios} edificios${o.oferta_conjunta.total ? `: total de la oferta ${cop(o.oferta_conjunta.total)} (no es el valor de este edificio)` : ''}.` : ''}`, { size: 8.5, color: COLOR.gris, gap: 4 });
+  inf.texto(`${o.nota_version ? `${o.nota_version}. ` : ''}${o.relacion}.${o.alcance ? ` ${o.alcance}.` : ''}${o.oferta_conjunta ? ` Oferta conjunta de ${o.oferta_conjunta.edificios} edificios${o.oferta_conjunta.total ? `: total de la oferta ${cop(o.oferta_conjunta.total)} (no es el valor de este edificio)` : ''}.` : ''}`, { size: 8.5, color: COLOR.gris, gap: 4 });
   if (o.items.length) {
     inf.tabla(
-      [{ t: 'Actividad', w: 38 }, { t: 'Unidad', w: 9 }, { t: 'Cantidad', w: 9, a: 'right' }, { t: 'Precio unitario', w: 19, a: 'right' }, { t: 'Subtotal', w: 17, a: 'right' }, { t: 'Fuente', w: 15 }],
+      [{ t: 'Actividad', w: 36 }, { t: 'Unidad', w: 9 }, { t: 'Cantidad', w: 11, a: 'right' }, { t: 'Precio unitario', w: 19, a: 'right' }, { t: 'Subtotal', w: 17, a: 'right' }, { t: 'Fuente', w: 15 }],
       o.items.map((i) => [i.actividad, i.unidad ?? '', i.cantidad !== null ? i.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '', i.precio_unitario !== null ? cop(i.precio_unitario) : '', i.subtotal !== null ? cop(i.subtotal) : '', i.fuente?.hoja && i.fuente.celda ? `${i.fuente.hoja}!${i.fuente.celda}` : i.fuente?.pagina ? `p. ${i.fuente.pagina}` : '']),
       { size: 8 },
     );

@@ -131,7 +131,7 @@ export function compararOfertas(ofertas: OfertaEdificio[]): Comparacion {
     for (const o of ofertas) {
       const v = valorDe(o, nivel);
       if (v === null || !(v > 0)) continue;
-      const k = `${o.empresa}|${o.documento}`;
+      const k = `${o.empresa}|${o.documento}|${o.version_id ?? ''}`;
       const varias = ofertas.filter((x) => x.empresa === o.empresa).length > 1;
       por.set(k, { empresa: o.empresa, etiqueta: varias ? `${o.empresa} · ${o.referencia ? `${o.referencia}, ` : ''}${o.fecha ? fechaCorteTexto(o.fecha) : o.documento}` : o.empresa, secuencia: o.secuencia, valor: v, fecha: o.fecha, fuente: o.fuentes_componentes[nivel === 'TOTAL' ? 'total' : 'costo_directo'] ?? { version_id: o.version_id, documento: o.documento, pagina: null, hoja: null, celda: null } });
     }
